@@ -638,6 +638,12 @@ static NSString *pdErr(NSString *fmt, ...)
 	}
 
 	if ([cmd isEqualToString:@"pacing"]) {
+		if (argv.count > 1 && [argv[1].lowercaseString isEqualToString:@"samples"]) {
+			__block NSString *out = nil;
+			if (![shell enqueueAndWait:^{ out = [PDPacing.shared intervalSamples]; }
+			                    timeout:kEngineTimeout]) return pdErr(@"frame sample read timed out");
+			return out;
+		}
 		if (argv.count > 1 && [argv[1].lowercaseString isEqualToString:@"reset"]) {
 			[PDPacing.shared resetHistogram];
 			return @"pacing_histogram=reset";

@@ -134,6 +134,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator checks passed: invalid root ROM shows actionable error; two loose candidates remain unselected; one candidate copies and retains its source; invalid data/ ROM is rejected even beside a valid root ROM; removing the invalid fixture allows the valid root input to be copied into data/ and starts the engine. Screenshots `work/evidence/rom-startup-invalid{,-data}.png`. Temporary inputs cleaned up and stock ROM restored.
 - Simulator and unsigned device builds pass (`app-rom-startup-*.log`). Documents/Library backed up before installation. ROM, EEPROM, configuration and multiplayer setup SHA-256 values match before/after (`rom-startup-preservation.json`). Only the dedicated simulator ran. Physical hardware validation and the inherited modified-ROM policy remain open.
 
+## Sustained frame-interval measurement
+
+- Added development `pacing samples` with chronological raw intervals, monotonic timestamps, sequence IDs and reset/session identity. Read at engine frame boundaries; normal pacing behavior unchanged.
+- `scripts/capture-frame-intervals.py` saves raw JSONL plus footprint/thermal/audio state snapshots and evaluates rolling 30-second windows ending at every frame (57 fps, p95 ≤20 ms, p99 ≤33.4 ms). Rejects ring gaps, resets/restarts, stale and short captures. Preserves long stalls. Clock is pacing-wait return, not GPU completion; physical workload qualification still required. Usage/limitations in `docs/pacing.md`.
+- Synthetic acceptance tests pass for empty/short recordings, steady 60 and 30 Hz, a five-second stall and p99-tail failure. Runtime 32-second simulator capture retained 1,909 intervals, 120 complete windows, no gaps (`frame-capture-smoke.jsonl`, `frame-capture-smoke-report.json`). Explicit histogram reset correctly invalidated another in-flight capture (`frame-capture-reset-test.log`). This is measurement-path evidence only.
+- Both simulator and unsigned device builds pass (`app-frame-capture-*.log`). Backed up Documents/Library before update; ROM, EEPROM, config and multiplayer setup hashes match afterward (`frame-capture-preservation.json`). Single existing simulator only. Physical 30-minute gameplay, GPU profiling and thermal acceptance remain not run.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

@@ -60,6 +60,8 @@
 	// -waitForPresent and read (copied, sorted) by -report. Torn reads are of
 	// no consequence: it is an instrument, not a control input.
 	float _hist[kHistN];
+	double _histAt[kHistN];
+	uint64_t _histEpoch;
 	uint32_t _histN;
 	uint32_t _histWrite;
 	double _lastPresentAt;
@@ -548,6 +550,7 @@ static void pdWakeSourcePerform(void *info)
 - (void)resetHistogram
 {
 	_histN = 0;
+	_histEpoch++;
 	_histWrite = 0;
 	_lastPresentAt = 0.0;
 	[self resetWakeStats];
@@ -730,6 +733,7 @@ static void pdWakeSourcePerform(void *info)
 		if (_lastPresentAt > 0.0) {
 			const double ms = (now - _lastPresentAt) * 1000.0;
 			_hist[_histWrite % kHistN] = (float)ms;
+			_histAt[_histWrite % kHistN] = now;
 			_histWrite++;
 			if (_histN < kHistN) {
 				_histN++;
@@ -769,6 +773,24 @@ static int pdCmpFloat(const void *a, const void *b)
 	o->presents = atomic_load(&_presents);
 	o->dropped = atomic_load(&_dropped);
 	o->waiting = atomic_load(&_waiting);
+}
+
+// Called at an engine frame boundary by the development bridge. Keep sequence
+// numbers so the collector can detect an overwritten ring or lifecycle reset.
+- (NSString *)intervalSamples
+{
+	static NSString *session;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ session = NSUUID.UUID.UUIDString; });
+	NSMutableArray *samples = [NSMutableArray new];
+	for (uint32_t seq = _histWrite - _histN; seq < _histWrite; seq++) {
+		uint32_t slot = seq % kHistN;
+		[samples addObject:@[ @(seq), @(_histAt[slot]), @(_hist[slot]) ]];
+	}
+	NSDictionary *snapshot = @{ @"session": session, @"epoch": @(_histEpoch),
+		@"clock": @"pacing_wait_return", @"samples": samples };
+	NSData *data = [NSJSONSerialization dataWithJSONObject:snapshot options:0 error:NULL];
+	return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
 - (NSString *)report

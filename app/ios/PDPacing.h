@@ -118,6 +118,9 @@ typedef NS_ENUM(int, PDPacingWaitMode) {
 /** The instrument, as the bridge's `state` prints it. */
 - (NSString *)report;
 
+/** Development capture, read on the engine thread at a frame boundary. */
+- (NSString *)intervalSamples;
+
 @end
 
 #ifdef __cplusplus
