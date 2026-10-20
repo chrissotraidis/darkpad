@@ -252,6 +252,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Private evidence under `work/evidence/investigation/`: `drcaroll-objective-completed.png`, `extraction-next-mission.png`, `reloaded-extraction-unlock.png`, `reloaded-investigation-time.png`, and `completed-save/`. Current app is at Investigation difficulty selection after reload, no live mission. PID 25917 is no longer active. Same single dedicated simulator; no rebuild/install required.
 - Next campaign coverage starts with Extraction; physical device, controller, graphics-pack memory/performance and later networking gates remain open.
 
+## Extraction opening coverage
+
+- Launched Extraction / Agent through the normally unlocked mission menu. Briefing lists foyer elevator, Cassandra’s bodyguards and helipad objectives. Activated Night Vision through the touch Inventory; the dark scene becomes visibly green and readable. Exercised movement, USE, pistol firing and reload; guard 1 is defeated. Mission completion remains pending.
+- Current live run is paused by native Settings, PID 74642, health 0.8125, position approximately (-1707,-8442,964), heading 359.89. Dr. Caroll follows normally. The east-facing room at x≈-1278 is a dead end; the route leaves west to x≈-1707, then north through z=221 and z=667. Read-only room/portal inspection guided navigation; no game-state mutations.
+- Private evidence: `work/evidence/extraction/opening-checkpoint.json`, room/portal snapshots and Night Vision screenshot. Only the dedicated simulator is booted. Continue the opening foyer route from this paused session.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
