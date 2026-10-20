@@ -211,6 +211,12 @@ extern "C" int pdAngleInit(SDL_Window *wnd, char *errbuf, int errlen)
 #define FAIL(...) do { snprintf(errbuf, errlen, __VA_ARGS__); return 0; } while (0)
 
 	s_wnd = wnd;
+#if TARGET_OS_IOS && !TARGET_OS_VISION
+	// SDL's UIKit backend derives status-bar visibility from these flags.
+	// Desktop window preferences must not expose the bar over phone gameplay,
+	// including when onboarding has already presented a UIKit window.
+	SDL_SetWindowBordered(wnd, SDL_FALSE);
+#endif
 	s_view = SDL_Metal_CreateView(wnd);
 	if (!s_view) {
 		FAIL("SDL_Metal_CreateView: %s", SDL_GetError());
