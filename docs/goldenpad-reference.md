@@ -76,8 +76,14 @@ Controller connection events preserve live bindings, including custom R3 roll as
 
 ## CamSpy touch controls
 
-Deploy CamSpy from the game's pause menu → Inventory, then resume. With the
-current dual-analogue touch profile:
+Deploy CamSpy from the game's pause menu → Inventory, then resume. Leave clear
+space in front of Joanna and confirm the CamSpy HUD appears before moving. The
+game rejects a launch obstructed by nearby geometry with “Not enough room to
+launch CamSpy”; movement then still controls Joanna. A simulator comparison
+reproduced rejection facing the lift wall and successful launch facing the open
+corridor using the same Inventory/BACK inputs.
+
+With the current dual-analogue touch profile:
 
 - Drag on the left movement area to fly forward/back or strafe.
 - Drag the open right-side view to turn and look up/down.
@@ -87,11 +93,12 @@ current dual-analogue touch profile:
 Simulator checks in normal Investigation / Agent verified deployment, yaw,
 pitch, forward travel, ascent, shutter and return to Joanna. AIM-drag raised
 height from 0.94 m to 1.42 m while retaining pitch. This is diagnostic-guided
-touch-path evidence, not physical usability or holograph-objective completion.
-The first attempt ended deceased while Joanna remained exposed; pause between
-observations. Descent, strafing, objective capture and physical controller camera
-controls still need runtime coverage. Evidence is private under
-`work/evidence/camspy/`.
+touch-path evidence, not physical usability. Subsequent normal Investigation
+runs verified the isotope holograph objective completing after flight and FIRE;
+those runs later failed at the lasers, so no Investigation mission completion is
+claimed. Descent, strafing and physical controller camera controls still need
+runtime coverage. Evidence is private under `work/evidence/camspy/` and
+`work/evidence/investigation/`.
 
 ## Touch weapon and stance checks
 

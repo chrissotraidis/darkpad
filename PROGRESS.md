@@ -211,6 +211,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Next normal attempt must stop close to the first barrier (before z=-10900), wait for the robot to return, and cross promptly during that local opening. A distant snapshot of an open door does not guarantee safe arrival. Inspect all three barrier groups at z=-10975.5/-11598.5/-12529.5. Diagnostic `lasers.py`/`lasers.json` remain private; reads only, no state mutation.
 - Investigation completion remains open. Same single simulator; no save or installation replacement.
 
+## CamSpy launch clearance verified
+
+- Compared two launches from the initial Investigation lift using identical Inventory selection and BACK inputs. Facing the nearby west wall, the game displayed its insufficient-room message; read-only engine inspection showed held=1, active=0, deployed=0. Turning south toward the open corridor allowed launch: held=0, active=1, deployed=1, with the CamSpy HUD visible. No input or gameplay code change was warranted by this test.
+- Source `bondeyespy.c::eyespyTryLaunch` tests clearance at a launch point 100 units ahead and rejects obstructed launches. This reproduces a plausible cause of the earlier isotope doorway incident, without proving that incident's exact cause. Updated the control documentation to require clearance and visual activation confirmation.
+- WHEEL subsequently returned to Joanna (active=0, deployed=1) without moving her. New normal retry remains paused in native Settings at the initial lift, facing south, PID 25917. Private evidence: `camspy-clearance-rejected.png`, `camspy-clearance-launched.png` under `work/evidence/investigation/`. Same single simulator; no save edits or build/install changes.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
