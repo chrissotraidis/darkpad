@@ -559,7 +559,9 @@ static void *pdWatchdogMain(void *arg)
 		// what it was told. Only a foreground-active one that has gone quiet is
 		// a hang. (app_state 0 = UIApplicationStateActive.)
 		const int active = (s.appState == 0);
-		if (since > 2.0 && active && (now - lastDump) > 10.0) {
+		// Onboarding and optional asset preparation intentionally run before
+		// the first engine frame. Their elapsed time is not a frame stall.
+		if (atomic_load(&sFrameCount) > 0 && since > 2.0 && active && (now - lastDump) > 10.0) {
 			lastDump = now;
 			char why[128];
 			snprintf(why, sizeof why, "frame hook silent for %.1f s, app_state=%d", since, s.appState);

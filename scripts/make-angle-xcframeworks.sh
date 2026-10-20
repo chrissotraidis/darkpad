@@ -4,24 +4,27 @@
 # path cannot do that, and a build-setting variable inside the path is not
 # resolved by the embed/copy phase (dhewm3-ios earned this one).
 #
-# Nothing is copied or rebuilt: work/angle-ios-{device,simulator} are symlinks
-# into ~/dev/realrtcw-ios/work/angle (see work/deps-PROVENANCE.md). The
-# xcframeworks themselves are small wrappers and live in work/, gitignored.
+# Source frameworks come from the project-local pinned ANGLE build.
+# Xcode copies the slices into work/angle-xcframeworks (ignored).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# All four slices in ONE pair of xcframeworks: iOS device/simulator and
-# visionOS device/simulator. Xcode picks the slice by the SDK in use, so the
-# iOS and visionOS app targets can both name the same framework path.
-SLICES="ios-device ios-simulator visionos-device visionos-simulator"
+# iOS is the required product. Preserve optional visionOS support without
+# requiring unrelated platform builds for an iPhone/iPad checkout.
+SLICES="ios-device ios-simulator"
+case "${1:-}" in
+  --simulator-only) SLICES="ios-simulator" ;;
+  --visionos) SLICES="$SLICES visionos-device visionos-simulator" ;;
+  "") ;;
+  *) echo "usage: $0 [--visionos|--simulator-only]" >&2; exit 2 ;;
+esac
 
 for s in $SLICES; do
   for lib in libEGL libGLESv2; do
     test -d "work/angle-$s/$lib.framework" || {
       echo "FATAL: work/angle-$s/$lib.framework missing." >&2
-      echo "       ln -sfn ~/dev/realrtcw-ios/work/angle/out/<platform>-arm64-<slice> work/angle-$s" >&2
-      echo "       (ANGLE 2.1.1 e25e8d8565f7, Metal-only; rebuild with ~/dev/q2repro-ios/scripts/build-angle-ios.sh)" >&2
+      echo "       Build iOS slices with scripts/build-angle-ios.sh device and simulator." >&2
       exit 1; }
   done
 done

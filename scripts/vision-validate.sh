@@ -188,7 +188,7 @@ echo "  plist OK: scene manifest, CFBundleIconName, Assets.car"
 # ---------------------------------------------------------------------------
 step "boot + install"
 
-xcrun simctl bootstatus "$SIM" -b >/dev/null 2>&1 || fail "could not boot $SIM"
+python3 scripts/simulator-session.py boot "$SIM" || fail "could not exclusively boot $SIM"
 xcrun simctl terminate "$SIM" "$BUNDLE" >/dev/null 2>&1 || true
 xcrun simctl install "$SIM" "$APP" || fail "install failed"
 

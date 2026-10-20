@@ -19,5 +19,5 @@ scripts/gen-app-project.sh
 for sdk in iphonesimulator iphoneos; do
  xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark \
   -configuration Debug -sdk "$sdk" -derivedDataPath "build/dd-$sdk" \
-  CODE_SIGNING_ALLOWED=NO build
+  ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
 done

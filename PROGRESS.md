@@ -1,49 +1,50 @@
 # Darkpad progress
 
-## Active milestone: P0 — reproducible foundation
+## Current milestone: P0 — running baseline, acceptance incomplete
 
-Goal: implement docs/goal.md and docs/prd.md, then Goldenpad-inspired controls/menu polish and optional enhanced art. At most one booted simulator. No public release authorized.
+Implement `docs/goal.md` and `docs/prd.md`, then Goldenpad-inspired controls/three-dot utilities, gyro trial, enhanced art and staged LAN/co-op. At most one booted simulator. No public release authorized. Previous goal turns made implementation and runtime-validation progress.
 
-## Sources
-- Apple shell: rebelancap/perfect-dark-ios, b88f7cff611d54f7d233ebe3882e2295e5ecca9a; imported app, overlay, scripts, tools and license. Historical docs retained under docs/upstream; their results are not Darkpad test results.
-- Engine baseline: 90c8622e74b35be669d60d177effc6d7d2d7621c (UPSTREAM_PIN).
-- Goldenpad reference: chrissotraidis/goldenpad, 52bb67328c2cc4b98b4242ba0539985bd61fc2d3, downloaded into ignored work/references/goldenpad.
+Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE Python fix `4625c23`. User's document relocation preserved.
 
-## Local inventory (2026-10-20)
-- Apple Silicon Mac14,2, 24 GiB RAM; macOS 27.0.1; Xcode 26.6 (17F113).
-- CMake 3.27.1, Ninja 1.13.2; XcodeGen missing. Initial free disk 396 GiB.
-- Supplied ref ROM: 33,554,432 bytes; MD5 e03b088b6ac9e0080440efed07c1e40f (PASS); SHA-256 4e51142acac686d96861cecc58cf7cb7c3b06b21733b7f8ed609a709dc039a21. Original preserved; ref/work/build ignored.
-- No simulator booted at start. Existing document moves preserved.
+## Exact sources and environment
 
-## Status
-- Source/build: shell imported; reconstructing self-contained dependencies.
-- Package/install: not run.
-- Physical gameplay: not run.
-- Performance: not run.
-- Release readiness: not ready; private development only.
+- Apple shell: rebelancap/perfect-dark-ios `b88f7cff611d54f7d233ebe3882e2295e5ecca9a`; historical docs under `docs/upstream` are not Darkpad measurements.
+- Engine: `90c8622e74b35be669d60d177effc6d7d2d7621c` (`UPSTREAM_PIN`), unmodified vendor; all 48 overlay patches apply.
+- Goldenpad: chrissotraidis/goldenpad `52bb67328c2cc4b98b4242ba0539985bd61fc2d3`, downloaded under ignored `work/references`; direct behavior inspection in `docs/goldenpad-reference.md`.
+- SDL2 `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8); curl 8.11.0 archive SHA-256 `264537d90e58d2b09dddc50944baf3c38e7089151c8986715e2aaeaaf2b8118f`.
+- ANGLE `e25e8d8565f7b077002e07c2cbacfc2eec35aec0`; depot_tools `3a8af1e64be01a524f7d1c46daf8c2dcac63ff85`. Transitive actual revisions in `work/evidence/angle-dependency-revisions.txt`; pins in `dependencies/pins.env`.
+- Mac14,2 ARM64, 24 GiB RAM; macOS 27.0.1; Xcode 26.6 (17F113), SDKs 26.5; CMake 3.27.1, Ninja 1.13.2, XcodeGen 2.46.0, Python 3.11.2 for ANGLE. Default user Python 3.8 is too old for Dawn's generators; recipe selects 3.11 locally without changing user defaults.
+- Initial free disk 396 GiB; ANGLE tree/build about 14 GiB, project build tree about 1.6 GiB. Tool inventory in `work/evidence/toolchain.json`.
+- Ref ROM: 33,554,432 bytes, MD5 `e03b088b6ac9e0080440efed07c1e40f`, SHA-256 `4e51142acac686d96861cecc58cf7cb7c3b06b21733b7f8ed609a709dc039a21`. Original preserved. ROM normalization tests passed v64/n64, truncation rejection and original preservation.
 
-## Next
-Resolve pinned ANGLE/depot_tools and build SDL2/curl without sibling dependencies; bootstrap baseline engine and apply overlay. Inspect Goldenpad control schema and overflow menu before adapting the existing shell.
+## Five statuses
 
-## Foundation evidence
-- `scripts/bootstrap.sh`: exact engine pin fetched; `scripts/apply-overlay.sh`: all 48 patches apply cleanly. Vendor remains separate and unmodified.
-- `scripts/build-apple-deps.sh {iphonesimulator,iphoneos,macosx}`: SDL2 2.32.8 and curl 8.11.0 built from local pinned source caches for all three targets. `check-apple-platform.py` passes every tagged archive object: SDL2 186/186/185, curl 169 per SDK. TLS uses SecureTransport.
-- XcodeGen 2.46.0 installed. ANGLE e25e8d8565f7b077002e07c2cbacfc2eec35aec0 resolved; depot_tools pinned to 3a8af1e64be01a524f7d1c46daf8c2dcac63ff85. DEPS/toolchain sync underway (exec session 23108; work/evidence/angle-fetch.log).
-- Native Mac build underway (exec session 45983; work/evidence/build-macos.log). Initial no-curl build exposed upstream unresolved ghostnetJsonField; recipe now explicitly links locally built curl and matching macOS 12 deployment target. No vendor edit.
-- ROM validation/staging passes; tests verified v64/n64 normalization, original preservation and truncated-input rejection. Private copy in work/gamedata.
-- Goldenpad behavior inspection documented in docs/goldenpad-reference.md; implementation deferred until baseline gameplay passes.
-- `xcrun devicectl list devices`: no physical devices connected. All simulators remain shut down.
-- Full `scripts/bootstrap-apple.sh` recipe added, not yet validated end-to-end. Build logs in ignored work/evidence. Physical gameplay/performance/release acceptance remain NOT RUN/not ready.
-- Mac build now PASS: `build/oracle-clang/pd.arm64`, ARM64/macOS. Disabled curl's opportunistic nghttp2 dependency after the Mac link exposed it; all dependency recipes now explicitly disable HTTP/2/3 extras.
-- Mac Chicago smoke PASS: 600 seeded fixed-step frames, exit 0, inspected 1280×720 screenshot at frame 500 (intro cutscene rendered), pd.ini and 2048-byte eeprom.bin written. This is a rendering/lifecycle smoke, not completed-mission evidence. Log: work/evidence/mac-smoke-chicago.log.
-- ANGLE sync PASS. Simulator framework build running, session 98166 (work/evidence/angle-simulator.log). Use DEPS-provided buildtools/mac/gn and the pre-resolved host Ninja; depot_tools' wrappers expected an obsolete Python bootstrap marker.
-- Eight-bot Mac smoke started (work/evidence/mac-smoke-eight-bots.log). Still zero booted simulators.
-- Eight-bot Mac smoke PASS: 2,000 frames, eight simulants, CPU vertex path, exit 0 and screenshot at frame 1,800. Not a completed match/progression acceptance test.
-- Foundation checkpoint committed as 3eab186 on codex/perfect-dark-foundation (including preserved document relocation).
-- ANGLE first compile reached 250 targets then Dawn generator failed under the user's default Python 3.8 (functools.cache absent). Recipe now selects installed Python 3.11 via a project-local tool shim, with a minimum-version check. Resumed simulator ANGLE build: session 17538; work/evidence/angle-simulator.log.
+- **Source/build:** PASS baseline Mac, ARM64 simulator and unsigned iOS device apps. Local SDL2/curl/ANGLE recipes require no sibling checkout. `scripts/bootstrap-apple.sh` assembles the proven steps; whole-command empty-cache rerun still not performed. No broad engine optimization changes.
+- **Package/install:** simulator installed; native Files picker imported the supplied ROM; missing-ROM UI works. Updated installation preserved EEPROM and ROM. Device package built but not installed/signed.
+- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. No completed mission or complete campaign coverage yet.
+- **Performance:** NOT QUALIFIED — no physical-device thermal/frame-time session. Simulator counters are not phone benchmarks.
+- **Release readiness:** NOT READY. Private development only; assets/saves/captures/builds ignored. P1/P2 acceptance remains incomplete.
 
-## Next continuation
-1. Check ANGLE session 17538/log, finish simulator frameworks then engine and app; device slice follows sequentially.
-2. Mac smoke passes are only partial P0 evidence. Verify save reload, early mission completion and actual bot match; use CPU-vertices for renderer comparisons.
-3. Boot at most one discovered simulator, verify missing-ROM UI, import and gameplay, then shut it down before another target.
-4. Only after stable baseline apply Goldenpad menu/controls, gyro trial and enhanced-art work. No physical devices currently connected.
+## Reproducible commands and evidence
+
+- `scripts/bootstrap.sh`, `scripts/apply-overlay.sh`: exact engine and clean application of 48 patches (`work/evidence/bootstrap.log`, `overlay.log`).
+- `scripts/build-apple-deps.sh {iphonesimulator,iphoneos,macosx}`: SDL2/curl built, every tagged archive object checked ARM64 and correct platform (SDL2 186/186/185, curl 169 per SDK). SecureTransport TLS; optional nghttp2/HTTP3 discovery disabled after finding unintended Homebrew linkage in the first Mac attempt.
+- `scripts/fetch-angle.sh`, `scripts/build-angle-ios.sh {simulator,device}`: both native framework pairs built and checked. Use DEPS-provided GN and host Ninja, avoiding depot_tools' stale Python-wrapper requirement. Logs `angle-{simulator,device}.log`.
+- `scripts/build-macos.sh`: `build/oracle-clang/pd.arm64`. Chicago 600-frame smoke and eight-simulant 2,000-frame smoke exited 0; screenshots inspected. Mac save/reload kept EEPROM byte-identical. These are partial correctness checks, not mission/match completion.
+- `scripts/build-simulator-app.sh`: `build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app`; `app-simulator-update.log` confirms build. Project explicitly ARM64; generic simulator builds formerly attempted unsupported x86_64 watchdog code.
+- `scripts/build-ios.sh device`, `scripts/make-angle-xcframeworks.sh`, `scripts/gen-app-project.sh`, then `xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/dd-iphoneos CODE_SIGNING_ALLOWED=NO build`: PASS. Device binary passes platform check. Logs `engine-device.log`, `app-device-update.log`.
+- Simulator first boot services delayed launch; initial simctl request returned no process. Native app launch subsequently worked. No baseline game crash established by that delay.
+- Native Files import and touch menus created agent **Dark**, saved to Game Pak, selected Defection/Agent and launched with the proper Falcon 2 loadout. Native touch fired; timed touch stream moved from `14.9,159.0,-20.8` to `449.4,-441.0,-13.2` and released all inputs. Evidence `sim-{first-state,touch-before,touch-after,movement}.txt`, `sim-defection-touch.png`.
+- Quit/relaunch visibly retained **Dark** (`sim-saved-agent-reload.png`). Documents/Library backup in `work/evidence/sim-before-update/`. Pre-update EEPROM SHA-256 `97f96398b6740a47e8b4ef89a6fbb1eadf4f057d51a633b3f6ea7f7bb67ec3d9`; installation preserved its bytes.
+- Fixed watchdog false hangs before first engine frame. Updated app waited >30 seconds on onboarding with `frames=0`, `hang_dumps=0` (`sim-onboarding-watchdog.txt`), then restored ROM resumed gameplay (`sim-after-update-state.txt`). Private ROM backup was restored; none left renamed.
+
+## Next work
+
+Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
+
+- Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This is not a completed match. Simulator shut down after the test.
+- Complete early mission and actual bot match/save progression; maintain distinction from seeded smoke. Full campaign and human control usability still outstanding.
+- First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default controls overlap the display cutout. Fix from this evidence during control/layout work.
+- Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
+- Implement Goldenpad utility menu and semantic control layout, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Add original/enhanced profiles instead of forcing 2× texture enhancement and combat roll by default; gyro stays experimental until physical testing.
+- P2 networking follows P1 acceptance; do not update engine prematurely. No physical target currently connected.

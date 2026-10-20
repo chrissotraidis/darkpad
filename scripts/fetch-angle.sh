@@ -24,6 +24,7 @@ if [[ ! -f .gclient ]]; then
  printf '\ntarget_os = ["ios", "mac"]\n' >> .gclient
 fi
 gclient sync --no-history --shallow --jobs=4
-mkdir -p "$ROOT/work/licenses"
+mkdir -p "$ROOT/work/licenses" "$ROOT/work/evidence"
+gclient revinfo -a > "$ROOT/work/evidence/angle-dependency-revisions.txt"
 cp LICENSE "$ROOT/work/licenses/ANGLE.txt"
 echo "ANGLE and DEPS synchronized at $ANGLE_COMMIT"
