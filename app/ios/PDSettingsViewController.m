@@ -837,6 +837,15 @@ static CFTimeInterval sPresentStarted;
 			// and on a 60 Hz panel there is one segment because there is one
 			// rate. Offering a rate the panel cannot serve is what made the
 			// headset read "set to 120, running at 60".
+			pdSegRow(@"Art profile", PDDefGraphicsProfile,
+				@[ @"Original", @"Enhanced", @"Remaster" ], @[ @0, @1, @2 ]),
+			pdInfoRow(@"Art status", ^NSString *{
+				switch (PDDefInt(PDDefGraphicsProfile)) {
+					case 1: return @"2× texture filtering; installed packs optional";
+					case 2: return xblaImportIsAvailable() ? @"Xbox 360 art available" : @"No remaster assets — using N64 art";
+					default: return @"N64 art; replacement packs off";
+				}
+			}),
 			pdFrameRateRow(),
 			// Render scale. The engine draws at the drawable's size and every
 			// buffer it owns is that size, so this is a launch-time input - see
@@ -881,9 +890,8 @@ static CFTimeInterval sPresentStarted;
 			pdSwitchRow(@"Mute", PDDefAudioMute),
 		],
 		@[
-			// ONE switch, the F6 equivalent: it drives all five parts together
-			// (xblaswitch.c), which is what F6 does and what a player means.
-			pdSwitchRow(@"Xbox 360 textures and models", PDDefXblaWholeRelease),
+			// Asset imports stay here; the selected art profile controls activation.
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Remaster under Display → Art profile"; }),
 			// What is in Documents/added-content (or the legacy xbla/), named. The engine's own
 			// xblaImportIsAvailable() answers yes/no and nothing else, and a
 			// player whose file was not recognised needs to be told which file
@@ -949,7 +957,7 @@ static CFTimeInterval sPresentStarted;
 			}),
 		],
 		@[
-			pdSwitchRow(@"Texture packs", PDDefTexturePacks),
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Display → Art profile"; }),
 			pdButtonRow(@"Reload packs (F9)", ^{
 				[PDShell.shared enqueue:^{ texpackReload(); }];
 			}),
@@ -1212,7 +1220,7 @@ static CFTimeInterval sPresentStarted;
 		        "four C directions, which is on or off with no speed in between. "
 		        "In a menu, tap an item to choose it, drag up or down to scroll (a drag never "
 		        "chooses), and tap left or right of the menu to go to the previous or next one. "
-		        "Double-tap the left of the screen to roll that way, the middle of it to roll "
+		        "When roll gestures are enabled, double-tap the left of the screen to roll that way, the middle to roll "
 		        "the other.";
 	}
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Display"]) {
@@ -1400,6 +1408,7 @@ static CFTimeInterval sPresentStarted;
 			row.values[(NSUInteger)idx].stringValue.UTF8String);
 		[NSUserDefaults.standardUserDefaults setInteger:row.values[(NSUInteger)idx].integerValue forKey:row.key];
 		[self commit];
+		if ([row.key isEqualToString:PDDefGraphicsProfile]) [self.tableView reloadData];
 	}
 }
 

@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 
+NSString *const PDDefGraphicsProfile = @"pd.graphics.profile";
 NSString *const PDDefLookDegPerPoint  = @"pd.look.degPerPoint";
 NSString *const PDDefLookDegPerPointY = @"pd.look.degPerPointY";
 NSString *const PDDefInvertY          = @"pd.look.invertY";
@@ -73,7 +74,7 @@ void PDDefaultsRegister(void)
 		// figure that would be invisible as a filled disc is not.
 		PDDefButtonOpacity: @0.28f,
 		PDDefHaptics: @YES,
-		PDDefDoubleTapRoll: @YES,
+		PDDefDoubleTapRoll: @NO,
 		// D-022: dual analogue. It is not a new control style - it is the port's
 		// own default one (CONTROLMODE_PC, forced from Game.PlayerN.ExtendedControls
 		// on every gamefile load) with the touch stick finally on the axis that
@@ -107,6 +108,7 @@ void PDDefaultsRegister(void)
 		// before the switch came back (D-072); off is the player's choice.
 		PDDefXblaGoldenEye: @YES,
 		PDDefTexturePacks: @YES,
+		PDDefGraphicsProfile: @0,
 
 		// "Lower Other Audio" - bean's default and the family's (D-033): a
 		// podcast keeps going, quietly, which is what a player who started one
@@ -190,14 +192,13 @@ void PDDefaultsApplyToEngine(void)
 	PDLifecycle("defaults: apply begin (refreshHz=%ld, page=%d)",
 		(long)PDDefInt(PDDefRefreshHz), (int)PDSettingsViewController.isPresented);
 
-	// Picture settings are FIXED, not rows (D-032). Enhance Textures stays at
-	// upstream's own 2x; Vivid Colours and Black Level stay OFF, and off is what
-	// keeps gfx_opengl from ever building the grade pass - a shader compiled on
-	// the game thread the first time the setting is touched, which is the freeze
-	// a player hits when he flips the row mid-level. The values are still pushed
-	// (and still only when they moved, see pdSetInt) so a pd.ini carried in from
-	// a desktop machine cannot arm the pass behind our back.
-	if (pdSetInt("Mod.EnhanceTextures", 1 /* MODENHANCE_2X */)) {
+	NSInteger profile = PDDefInt(PDDefGraphicsProfile);
+	if (profile < 0 || profile > 2) profile = 0;
+	const BOOL enhanced = profile == 1;
+	const BOOL remaster = profile == 2;
+	// Resolution remains independent. Enhanced uses the existing 2x texture
+	// filter and optional packs; Original and Remaster preserve their source art.
+	if (pdSetInt("Mod.EnhanceTextures", enhanced ? 1 : 0)) {
 		videoSetTextureEnhance(modGetTextureEnhanceScale(), modGetSmoothTextScale());
 	}
 	if (pdSetInt("Mod.VividColours", 0)) {
@@ -332,17 +333,11 @@ void PDDefaultsApplyToEngine(void)
 		}
 	}
 
-	// One switch, all five parts (D-032). The parts are written first so that a
-	// pd.ini which had one of them off cannot leave the release half-applied;
-	// the whole-release switch is applied last because it writes all five
-	// itself (xblaswitch.c).
-	{
-		const BOOL on = PDDefBool(PDDefXblaWholeRelease);
-		pdSetInt("Mod.XblaMeshes", on);
-		pdSetInt("Mod.XblaMeshTextures", on);
-		pdSetInt("Mod.XblaStages", on);
-		pdSetInt("Mod.XblaFont", on);
-		pdSetInt("Mod.XblaExplosions", on);
+	// Use the asset setters before mutating their backing config values so
+	// live caches invalidate correctly. Original clears every part, including
+	// skies/reflections, even when a partial configuration was previously active.
+	if (remaster ? !xblaSwitchGetEnabled() : xblaSwitchGetParts() != 0) {
+		xblaSwitchSetEnabled(remaster);
 	}
 	// GoldenEye XBLA's switch (D-081). The engine reads it ONCE a run, at
 	// startup and from pd.ini (overlay 0050: the Combat Simulator's pool is
@@ -356,20 +351,13 @@ void PDDefaultsApplyToEngine(void)
 			PDDefBool(PDDefXblaGoldenEye) ? 1 : 0, gebeanSwitchIsOn());
 	}
 
-	// Same rule: xblaSwitchSetEnabled() reloads meshes and rooms, and
-	// texpackSetLoadEnabled() drops replacements - neither is free, and neither
-	// is asked for when the answer is already what it is.
-	if (xblaImportIsAvailable() && xblaSwitchGetEnabled() != (PDDefBool(PDDefXblaWholeRelease) ? 1 : 0)) {
-		xblaSwitchSetEnabled(PDDefBool(PDDefXblaWholeRelease));
-	}
-
 	// The master gain: volume x mute x the other-app duck, one multiplier the
 	// engine reads once a frame (D-033). Cheap and thread-safe - an atomic
 	// store - so it rides along with every other apply.
 	[PDAudio settingsChanged];
 
-	if (texpackLoadEnabled() != (PDDefBool(PDDefTexturePacks) ? 1 : 0)) {
-		texpackSetLoadEnabled(PDDefBool(PDDefTexturePacks));
+	if (texpackLoadEnabled() != (enhanced ? 1 : 0)) {
+		texpackSetLoadEnabled(enhanced);
 	}
 
 	// A pack dropped into Files with nothing selected: select it. Dropping a
@@ -386,7 +374,7 @@ void PDDefaultsApplyToEngine(void)
 	pdVision3dApplySettings();
 #endif
 
-	if (PDDefBool(PDDefTexturePacks) && texpackGetSelectedPack() < 0) {
+	if (enhanced && texpackGetSelectedPack() < 0) {
 		NSString *want = PDTexPacks.preferredPack;
 		if (want) {
 			texpackRefreshPacks();

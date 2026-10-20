@@ -67,6 +67,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Preflights every slot before mutation, backs up prior bindings in defaults, and persists engine bindings. Does not overwrite custom configurations automatically or on controller reconnect. First runtime attempt caught public API action-name mismatch without changing bindings; fixed names then applied successfully.
 - Verified 56 action assignments across four players, exact keyboard/mouse and D-pad preservation, and all binding sections unchanged after quit/relaunch (`goldenpad-applied.ini`, `goldenpad-bind-validation.json`). Simulator/device builds pass. This proves configuration, not physical controller behavior; gadget/CamSpy acceptance remains open.
 
+## Art profiles
+
+- Added Original (default), Enhanced (existing 2× texture filter plus optional installed packs), and Remaster (optional Xbox assets). Resolution remains independent. Original clears every remaster component through engine setters so live asset caches invalidate; unavailable Remaster assets fall back to N64 art with an explicit status.
+- Simulator checks passed for all three profiles, live return to Original, and Enhanced persistence across quit/relaunch. No optional art pack was supplied, so real replacement assets and their memory cost remain unqualified. Fresh roll gestures now default off; explicit existing preferences survive.
+- Final simulator and unsigned device builds pass (`app-art-profiles-final.log`, `app-device-art-profiles-final.log`). ROM/save hashes survived updates; Documents/Library backed up. Legacy development `xbla release on/off` now selects Remaster/Original.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
@@ -75,5 +81,5 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator session is a debug-entered Defection route used for native UI checks, no objective completion claimed. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
 - First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default control overlap with the display cutout is fixed on the tested iPhone; validate other sizes during control/layout work.
 - Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
-- Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Add original/enhanced profiles instead of forcing 2× texture enhancement and combat roll by default; gyro stays experimental until physical testing.
+- Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Art profiles are implemented; qualify optional pack memory/performance on hardware. Gyro stays experimental until physical testing.
 - P2 networking follows P1 acceptance; do not update engine prematurely. No physical target currently connected.

@@ -362,7 +362,9 @@ static NSString *pdErr(NSString *fmt, ...)
 		}
 		if (argv.count >= 3 && [argv[1].lowercaseString isEqualToString:@"release"]) {
 			BOOL on = [argv[2].lowercaseString isEqualToString:@"on"];
-			[PDSettingsViewController setSwitchRow:PDDefXblaWholeRelease to:on];
+			[NSUserDefaults.standardUserDefaults setInteger:on ? 2 : 0 forKey:PDDefGraphicsProfile];
+			[shell enqueue:^{ PDDefaultsApplyToEngine(); configSave("$S/pd.ini"); }];
+			[PDSettingsViewController reloadRows];
 			__block int now = -1;
 			if (![shell enqueueAndWait:^{ now = xblaSwitchGetEnabled(); } timeout:kEngineTimeout]) {
 				return pdErr(@"engine did not reach a frame boundary");

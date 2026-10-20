@@ -15,6 +15,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// Art profile: 0 Original, 1 Enhanced, 2 Remaster (user-supplied assets).
+extern NSString *const PDDefGraphicsProfile;
+
 // Look / aiming
 extern NSString *const PDDefLookDegPerPoint;   // float, degrees of view per point of drag
 extern NSString *const PDDefLookDegPerPointY;  // float, the vertical axis on its own
@@ -34,7 +37,7 @@ extern NSString *const PDDefButtonScale;       // float 0.6…1.8
 extern NSString *const PDDefButtonOpacity;     // float 0.05…0.9
 extern NSString *const PDDefHaptics;           // bool
 /**
- * Combat-roll by gesture (D-032, extended by D-037). Default ON.
+ * Combat-roll by gesture (D-032, extended by D-037). Default OFF.
  *
  * TOUCH: double-tap the stick region; the left half of the region (nearer the
  * screen edge) rolls left, the right half rolls right.

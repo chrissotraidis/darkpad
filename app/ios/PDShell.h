@@ -170,6 +170,7 @@ float videoGetAverageFPS(void);
 void screenshotRequest(void);
 
 int xblaSwitchGetEnabled(void);
+unsigned xblaSwitchGetParts(void);
 void xblaSwitchSetEnabled(int enabled);
 int xblaImportIsAvailable(void);
 int xblaImportGetState(void);
