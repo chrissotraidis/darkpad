@@ -230,6 +230,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Returned west through the Caution doors and south to Sector Two. Selected the collected CMP150 through Inventory and cleared guard 14 at the access door. Current paused position approximately (-512,159,-3872), heading 172.77, pitch -8.4, same health. Dr. Caroll and mission completion remain pending.
 - Preserve live PID 25917 and current installation. Same single simulator, ordinary touch actions and read-only diagnostics; no player-state/save edits. Next advance into Sector Two, clear remaining guards, then wait close to each laser barrier for its local opening.
 
+## Investigation: all three laser barriers crossed
+
+- Continued the same normal Agent retry through Sectors Two and Three. Cleared guards 12/13/15–24 and reached the laser approach with health 0.39399007; isotope objective remains complete.
+- Successfully crossed all three laser planes without health loss. Stopped at z=-10779 before the first, waited for the robot's return and local opening, then crossed to -11126. Stopped at -11388 before the second, waited for the next outbound robot pass, then crossed to -11760. Advanced to -12278 while the third opened and crossed to -12739. Read-only tagged-door/robot inspections confirmed timing; no gameplay changes or state edits.
+- This resolves the earlier test execution failure to traverse the lasers. Current Joanna position approximately (1195,157,-12739), heading 179.97, health unchanged at 0.39399007, paused in native Settings. Guard 25 is ahead around (1464,105,-13693). Dr. Caroll and mission completion still pending. Preserve PID 25917 and installation. Same single simulator.
+- Private evidence: `work/evidence/investigation/three-lasers-crossed.png`, `live-at-pause.json`, `lasers.json`. Earlier failed attempts remain recorded separately and are not completion evidence.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
