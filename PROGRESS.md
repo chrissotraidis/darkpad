@@ -121,6 +121,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Normal Investigation / Agent starts from the existing unlock and supplies CamSpy. Deployed through pause → Inventory. Verified touch yaw/pitch, forward flight, AIM-drag ascent (HUD 0.94 m → 1.42 m, pitch remains 9°), FIRE shutter animation and WHEEL exit to Joanna. Private screenshots `work/evidence/camspy/`; documented the controls in `docs/goldenpad-reference.md`.
 - First attempt ended deceased at 0:57 while Joanna stood exposed. Retried normally, then paused between short diagnostic touch sequences. No cheats, loadout mutation or save edits. Investigation objective/mission completion, descent/strafe and physical camera controls remain open. Current run is alive, at the starting lift, back in Joanna view and paused in Settings. Only the dedicated simulator used.
 
+## ROM classifier alignment with engine
+
+- Rejects unknown US revision numbers (previously every nonzero revision passed) and mismatched cartridge titles (the engine later rejects these). Non-regular files now receive an unreadable-file explanation. Retained the existing header-compatible modified-ROM policy; this does not establish strict stock-only validation.
+- Added read-only development `rom check PATH` and `tests/rom_classifier.py`. Fourteen synthetic fixture cases pass against the running simulator app: size/magic/byte order/regions/revisions/title/id, modified-content notice, directory and missing path. Fixtures contain no game assets and are removed afterward. Log `work/evidence/rom-classifier-test.log`. Installed ROM separately reports the expected stock MD5.
+- Simulator/device builds pass (`app-rom-validation-*.log`). Documents/Library backed up before update; ROM, EEPROM, configuration and multiplayer setup hashes match after install/tests (`rom-validation-preservation.json`). This update ended the unfinished Investigation test run; saved completed progression is preserved. Existing named-ROM startup bypass and loose-ROM adoption behavior remain to be reconciled with first-run validation/preservation requirements.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

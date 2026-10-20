@@ -271,7 +271,10 @@ static NSString *pdErr(NSString *fmt, ...)
 	}
 
 	if ([cmd isEqualToString:@"rom"]) {
-		NSString *path = [PDOnboarding installedRomPath];
+		// Read-only classifier probe: test malformed fixtures without replacing
+		// the installed ROM or restarting the engine against invalid game data.
+		NSString *path = argv.count > 2 && [argv[1] isEqualToString:@"check"]
+			? argv[2] : [PDOnboarding installedRomPath];
 		if (!path) {
 			return @"rom=none";
 		}

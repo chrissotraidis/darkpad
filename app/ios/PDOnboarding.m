@@ -80,6 +80,11 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 		c.explanation = [NSString stringWithFormat:@"Could not read the file (%@).", err.localizedDescription];
 		return c;
 	}
+	if (![attrs.fileType isEqualToString:NSFileTypeRegular]) {
+		c.verdict = PDRomUnreadable;
+		c.explanation = @"Choose a ROM file, not a folder or another kind of item.";
+		return c;
+	}
 
 	unsigned long long size = attrs.fileSize;
 	NSFileHandle *fh = [NSFileHandle fileHandleForReadingAtPath:path];
@@ -157,11 +162,20 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 			@"This is an N64 ROM, but not Perfect Dark (its cartridge id is “%s”).", id4];
 		return c;
 	}
-	if (rev == 0) {
+	if (rev != 1) {
 		c.verdict = PDRomWrongRevision;
-		c.explanation = @"This is the US v1.0 release. Perfect Dark was patched to v1.1 and the "
+		c.explanation = rev == 0 ? @"This is the US v1.0 release. Perfect Dark was patched to v1.1 and the "
 		                 "port is built from v1.1 — the two have different data in different "
-		                 "places. Look for “Perfect Dark (USA) (Rev 1)”, also called US V1.1.";
+		                 "places. Look for “Perfect Dark (USA) (Rev 1)”, also called US V1.1."
+		                 : [NSString stringWithFormat:@"This ROM reports unsupported US revision %u. "
+		                    "Choose Perfect Dark (USA) (Rev 1), also called US V1.1.", rev];
+		return c;
+	}
+	// Match the engine's title check before it can fail during startup.
+	if (memcmp(h + 0x20, "Perfect Dark", 12)) {
+		c.verdict = PDRomNotARom;
+		c.explanation = @"The cartridge title does not match Perfect Dark. "
+		                 "Choose Perfect Dark (USA) (Rev 1).";
 		return c;
 	}
 
