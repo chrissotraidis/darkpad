@@ -110,6 +110,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Documents/Library backed up before update. ROM, configuration and multiplayer setup hashes unchanged across update/tests. Existing agent loaded with Defection best 3m:31s and Investigation unlocked; EEPROM later changes as expected after starting another mission. App left paused in Settings on the roof. Actual held-finger cancellation, screen lock and physical interruptions remain to be exercised.
 - Existing audio recovery also passed a synthetic lost-interruption-end test: one device restart, queue drains again, dropping=0 (`audio-lifecycle-lost-end.txt`). Sent explicit end afterward. This is notification-path/queue evidence, not a real phone-call or audible quality test.
 
+## Lock and held-input lifecycle checks
+
+- On the same dedicated simulator, locked the phone during live Defection via Simulator → Device → Lock. Bridge reports engine pause=1, presentation=0, zero published touch input. Unlock returned pause=0/presentation=1 at the identical player position (`work/evidence/lifecycle-check/{locked,unlocked}.txt`). No second simulator was booted.
+- Held AIM through the existing diagnostic touch handler for 30 seconds: verified mask=0x10 and aim mode=1 before backgrounding. Home cleared mask to zero and aim mode to zero while paused; foreground retained zero input and resumed. Evidence `held-aim*.txt`. This proves shell input cancellation using a synthetic held touch; physical UIKit multi-touch cancellation remains unqualified.
+- Started the gadget-path audit: pinned engine `src/game/bondeyespy.c:688` uses a distinct PC-control path for camera movement/altitude, use, fire and exit. Needs runtime coverage in Investigation; ordinary walking/aim tests cannot qualify it. App remains safely paused in Settings during Defection.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
