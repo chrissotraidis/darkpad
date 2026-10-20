@@ -173,6 +173,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Exited with WHEEL and withdrew Joanna from the radiation corridor. Last readback: health 0.6875, position approximately (1556,157,-2638), heading 269.97; paused in Settings. Dr. Caroll and mission completion remain pending. Preserve PID 25917. Read-only diagnostics guided the inputs; no game-state mutations.
 - Exactly one booted simulator confirmed. Private route notes and current readback are updated for continuation.
 
+## Investigation Sector Two traversal
+
+- Continued the same live run through Sector Two toward Sector Three. Cleared guards 14, 12, 16, 15, 17, 18, 19 and 20 using normal touch firing; crossed the lab corridor and collected ammunition/reloaded normally. Isotope objective remains complete; Dr. Caroll remains pending.
+- Current paused live position is approximately (320,157,-8453), heading 269.97, health 0.394, approaching room 72 via room 71. Preserve PID 25917 and the existing container. Private readback, screenshot and route notes updated under `work/evidence/investigation/`.
+- This expands simulator campaign traversal evidence but does not establish a second completed mission or physical touch usability. No build/install or save modification during this run.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
