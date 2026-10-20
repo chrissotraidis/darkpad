@@ -708,10 +708,13 @@ static __weak PDTouchOverlay *sCurrent;
 {
 	UIButton *gear = [UIButton buttonWithType:UIButtonTypeSystem];
 	[gear setImage:[UIImage systemImageNamed:@"ellipsis"] forState:UIControlStateNormal];
-	gear.tintColor = [UIColor colorWithWhite:1.0 alpha:0.55];
-	gear.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.30];
+	gear.tintColor = UIColor.whiteColor;
+	[gear setPreferredSymbolConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightBold] forImageInState:UIControlStateNormal];
+	gear.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.62];
+	gear.layer.borderWidth = 1;
+	gear.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.34].CGColor;
 	gear.layer.cornerRadius = 22.0;
-	gear.accessibilityLabel = @"Utilities";
+	gear.accessibilityLabel = @"Darkpad menu";
 	gear.accessibilityHint = @"Settings, touch layout and diagnostics";
 	gear.translatesAutoresizingMaskIntoConstraints = YES;
 	[gear addTarget:self action:@selector(openUtilities) forControlEvents:UIControlEventTouchUpInside];

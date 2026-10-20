@@ -111,3 +111,14 @@ with diagnostic touches on the simulator; they do not establish physical touch
 usability or controller acceptance. Allow native Settings dismissal to complete
 before issuing diagnostic gameplay touches, because input remains suppressed
 while the native panel is closing.
+
+## Visual menu correction
+
+The initial Utilities hub reproduced the actions but used a full-screen table,
+which missed Goldenpad’s visual design. It is now a 280-point material popover
+with 14-point corners, 48-point minimum icon rows, a fine border/shadow, and
+outside-tap dismissal. The ellipsis uses the reference’s bold white symbol and
+black circular treatment. It stays on the left to preserve Darkpad’s separate
+START control. Settings remains the native settings form; the compact menu
+keeps truthful Darkpad actions (End Mission or Match and Diagnostics). Native
+simulator navigation, pause ownership and dismissal were verified.

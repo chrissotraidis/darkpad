@@ -199,32 +199,96 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 
 @end
 
-// Native utility hub. Ending play uses the engine's normal results path.
-@interface PDUtilitiesViewController : UITableViewController
+// Goldenpad's compact utility popover, rendered above the paused game.
+@interface PDUtilitiesViewController : UIViewController
 @end
-@implementation PDUtilitiesViewController
+@implementation PDUtilitiesViewController {
+    UIView *_panel;
+    UIScrollView *_scroll;
+    UIStackView *_rows;
+}
 - (void)viewDidLoad
 {
-	[super viewDidLoad];
-	self.title = @"Utilities";
-	self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-		initWithTitle:@"Resume" style:UIBarButtonItemStyleDone target:self action:@selector(resume)];
+    [super viewDidLoad];
+    self.view.backgroundColor = UIColor.clearColor;
+    self.view.accessibilityViewIsModal = YES;
+    UIButton *outside = [UIButton buttonWithType:UIButtonTypeCustom];
+    outside.frame = self.view.bounds;
+    outside.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    outside.accessibilityLabel = @"Close Darkpad menu";
+    [outside addTarget:self action:@selector(resume) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:outside];
+    _panel = [UIView new];
+    _panel.layer.cornerRadius = 14;
+    _panel.layer.borderWidth = 1;
+    _panel.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.22].CGColor;
+    _panel.layer.shadowColor = UIColor.blackColor.CGColor;
+    _panel.layer.shadowOpacity = 0.4;
+    _panel.layer.shadowRadius = 16;
+    _panel.layer.shadowOffset = CGSizeMake(0, 8);
+    [self.view addSubview:_panel];
+    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:
+        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
+    blur.frame = _panel.bounds;
+    blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    blur.layer.cornerRadius = 14;
+    blur.clipsToBounds = YES;
+    [_panel addSubview:blur];
+    _scroll = [UIScrollView new];
+    [blur.contentView addSubview:_scroll];
+    _rows = [UIStackView new];
+    _rows.axis = UILayoutConstraintAxisVertical;
+    [_scroll addSubview:_rows];
+    NSArray *titles = @[@"End Mission or Match…", @"Settings", @"Edit Touch Controls", @"Diagnostics"];
+    NSArray *icons = @[@"arrow.uturn.backward", @"gearshape", @"hand.draw", @"exclamationmark.bubble"];
+    NSArray *actions = @[@3, @0, @1, @2];
+    for (NSInteger i = 0; i < titles.count; i++) {
+        if (i) {
+            UIView *divider = [UIView new];
+            divider.backgroundColor = UIColor.separatorColor;
+            [divider.heightAnchor constraintEqualToConstant:0.5].active = YES;
+            [_rows addArrangedSubview:divider];
+        }
+        UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
+        config.title = titles[i];
+        config.image = [UIImage systemImageNamed:icons[i]];
+        config.imagePadding = 12;
+        config.contentInsets = NSDirectionalEdgeInsetsMake(10, 12, 10, 12);
+        config.baseForegroundColor = i == 0 ? UIColor.systemRedColor : UIColor.labelColor;
+        config.titleTextAttributesTransformer = ^NSDictionary *(NSDictionary *attributes) {
+            NSMutableDictionary *result = attributes.mutableCopy;
+            result[NSFontAttributeName] = [UIFontMetrics.defaultMetrics scaledFontForFont:
+                [UIFont systemFontOfSize:17 weight:UIFontWeightMedium]];
+            return result;
+        };
+        button.configuration = config;
+        button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
+        button.tag = [actions[i] integerValue];
+        [button.heightAnchor constraintGreaterThanOrEqualToConstant:48].active = YES;
+        [button addTarget:self action:@selector(selectAction:) forControlEvents:UIControlEventTouchUpInside];
+        [_rows addArrangedSubview:button];
+    }
+}
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    UIEdgeInsets inset = self.view.safeAreaInsets;
+    CGFloat width = MIN(280, self.view.bounds.size.width - inset.left - inset.right - 24);
+    CGFloat height = [_rows systemLayoutSizeFittingSize:CGSizeMake(width - 12, UILayoutFittingCompressedSize.height)
+        withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
+    CGFloat top = MAX(68, inset.top + 68);
+    CGFloat available = MAX(48, self.view.bounds.size.height - inset.bottom - top - 12);
+    _panel.frame = CGRectMake(inset.left + 12, top, width, MIN(height + 12, available));
+    _scroll.frame = CGRectInset(_panel.bounds, 6, 6);
+    _rows.frame = CGRectMake(0, 0, width - 12, height);
+    _scroll.contentSize = _rows.bounds.size;
 }
 - (void)resume { [PDSettingsViewController dismiss]; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return 4; }
-- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path
+- (BOOL)accessibilityPerformEscape { [self resume]; return YES; }
+- (void)selectAction:(UIButton *)sender
 {
-	UITableViewCell *cell = [table dequeueReusableCellWithIdentifier:@"utility"];
-	if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"utility"];
-	cell.textLabel.text = @[@"Settings", @"Edit Touch Controls", @"Diagnostics", @"End Mission or Match…"][path.row];
-	cell.textLabel.textColor = path.row == 3 ? UIColor.systemRedColor : UIColor.labelColor;
-	cell.imageView.image = [UIImage systemImageNamed:@[@"slider.horizontal.3", @"hand.draw", @"waveform.path.ecg", @"stop.circle"][path.row]];
-	cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-	return cell;
-}
-- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path
-{
-	[table deselectRowAtIndexPath:path animated:YES];
+    NSIndexPath *path = [NSIndexPath indexPathForRow:sender.tag inSection:0];
 	if (path.row == 3) {
 		UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"End this session?"
 			message:@"An unfinished mission will restart from the beginning. Completed progression is kept. A match will end at its results screen."
@@ -310,7 +374,10 @@ static CFTimeInterval sPresentStarted;
 	}
 	[self present];
 	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
-	[nav setViewControllers:@[[[PDUtilitiesViewController alloc] initWithStyle:UITableViewStyleInsetGrouped]] animated:NO];
+	[nav setNavigationBarHidden:YES animated:NO];
+	nav.view.backgroundColor = UIColor.clearColor;
+	sWindow.backgroundColor = UIColor.clearColor;
+	[nav setViewControllers:@[[PDUtilitiesViewController new]] animated:NO];
 }
 
 + (void)present
@@ -331,6 +398,7 @@ static CFTimeInterval sPresentStarted;
 		[self build];
 	}
 	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	[nav setNavigationBarHidden:NO animated:NO];
 	[nav setViewControllers:@[sSettingsController] animated:NO];
 	sWindow.hidden = NO;
 	[sWindow makeKeyAndVisible];

@@ -258,6 +258,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Current live run is paused by native Settings, PID 74642, health 0.8125, position approximately (-1707,-8442,964), heading 359.89. Dr. Caroll follows normally. The east-facing room at x≈-1278 is a dead end; the route leaves west to x≈-1707, then north through z=221 and z=667. Read-only room/portal inspection guided navigation; no game-state mutations.
 - Private evidence: `work/evidence/extraction/opening-checkpoint.json`, room/portal snapshots and Night Vision screenshot. Only the dedicated simulator is booted. Continue the opening foyer route from this paused session.
 
+## Goldenpad menu presentation correction
+
+- User review identified that the native Utilities table did not look like Goldenpad. Direct comparison against `RecompPrototypeApp.swift` confirmed the earlier implementation copied the action concept but missed its compact overlay presentation.
+- Replaced the full-screen Utilities table/navigation bar with a 280-point translucent rounded panel below the ellipsis. Goldenpad-derived spacing, 48-point minimum action rows, SF Symbols, material, border/shadow and outside-tap dismissal are implemented independently in UIKit. Ellipsis now matches its white bold symbol, 62% black fill and fine white border. Keeps Darkpad’s separate game START and truthful End Mission or Match / Diagnostics actions.
+- Simulator and unsigned device builds PASS (`app-compact-menu-build.log`, `app-compact-menu-device-build.log`). Native UI checks passed: menu appearance, Settings navigation and Done, outside dismissal, direct touch editor, exit confirmation and cancel. Pause/readback confirms menu and editor pause the engine, outside dismissal resumes, and held inputs are zero. Screenshot: `work/evidence/darkpad-compact-menu.png`.
+- Backed up Documents/Library before install; ROM, EEPROM and multiplayer setup hashes all preserved across installation. Same single simulator, current process 83526. Extraction attempt ended before this install: Dr. Caroll died and the helipad objective visibly FAILED, so it does not count as completed coverage. Prior Defection/Investigation saved completion remains preserved. Continue campaign with a fresh Extraction attempt after menu work.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
