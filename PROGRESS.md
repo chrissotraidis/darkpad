@@ -224,6 +224,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Traversed the lab exit door and reached approximately (-1140,157,-2488), heading 179.97, health 0.625. Both objectives are pending in this new attempt. Paused in native Settings, same PID 25917 and single dedicated simulator; preserve the live run.
 - Next approach z≈-2740, turn east through the Caution doors, clear isotope-access guards and verify CamSpy HUD before flight. Laser crossings remain unverified. Read-only diagnostics and ordinary touch inputs only; no save or player-state edits.
 
+## Investigation post-clearance retry: isotope completed
+
+- Cleared isotope-access guards 41/42 and the pursuing lab guard 6. Verified CamSpy active before movement, flew into the chamber and completed the isotope holograph objective; screenshot `work/evidence/investigation/post-clearance-isotope-completed.png` visibly confirms completion. Joanna stayed outside the chamber at (1594,159,-2788); health remained 0.502467 through camera flight and withdrawal.
+- Returned west through the Caution doors and south to Sector Two. Selected the collected CMP150 through Inventory and cleared guard 14 at the access door. Current paused position approximately (-512,159,-3872), heading 172.77, pitch -8.4, same health. Dr. Caroll and mission completion remain pending.
+- Preserve live PID 25917 and current installation. Same single simulator, ordinary touch actions and read-only diagnostics; no player-state/save edits. Next advance into Sector Two, clear remaining guards, then wait close to each laser barrier for its local opening.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
