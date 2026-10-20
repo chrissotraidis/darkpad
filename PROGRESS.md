@@ -116,6 +116,11 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Held AIM through the existing diagnostic touch handler for 30 seconds: verified mask=0x10 and aim mode=1 before backgrounding. Home cleared mask to zero and aim mode to zero while paused; foreground retained zero input and resumed. Evidence `held-aim*.txt`. This proves shell input cancellation using a synthetic held touch; physical UIKit multi-touch cancellation remains unqualified.
 - Started the gadget-path audit: pinned engine `src/game/bondeyespy.c:688` uses a distinct PC-control path for camera movement/altitude, use, fire and exit. Needs runtime coverage in Investigation; ordinary walking/aim tests cannot qualify it. App remains safely paused in Settings during Defection.
 
+## CamSpy runtime coverage
+
+- Normal Investigation / Agent starts from the existing unlock and supplies CamSpy. Deployed through pause → Inventory. Verified touch yaw/pitch, forward flight, AIM-drag ascent (HUD 0.94 m → 1.42 m, pitch remains 9°), FIRE shutter animation and WHEEL exit to Joanna. Private screenshots `work/evidence/camspy/`; documented the controls in `docs/goldenpad-reference.md`.
+- First attempt ended deceased at 0:57 while Joanna stood exposed. Retried normally, then paused between short diagnostic touch sequences. No cheats, loadout mutation or save edits. Investigation objective/mission completion, descent/strafe and physical camera controls remain open. Current run is alive, at the starting lift, back in Joanna view and paused in Settings. Only the dedicated simulator used.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

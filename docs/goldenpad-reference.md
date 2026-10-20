@@ -45,8 +45,10 @@ The button handles SDL's stale portrait safe-area insets in landscape.
 Simulator evidence: native menu navigation, direct editing, Diagnostics,
 zero held inputs, stable paused player position, and pause/resume transitions
 0 → 1 → 0. ROM/save hashes survived installation. Simulator and unsigned device
-builds pass. The native hub does not yet offer return-to-main-menu; a safe engine
-exit/save path needs validation first. Built-in gameplay buttons now translate as a group inside the safe area; custom
+builds pass. The hub now includes **End Mission or Match…**, with confirmation,
+using the native mission-abort/match-results path. Cancellation and both exit
+paths are simulator-verified; completed progression survives relaunch. Built-in
+gameplay buttons translate as a group inside the safe area; custom
 placements stay exact. An explicit **Use Goldenpad Controller Layout…** preset now lives in Settings →
 Aiming. It preserves keyboard/mouse and D-pad bindings, keeps a previous-binding
 backup, and applies to all four player slots:
@@ -71,3 +73,22 @@ need device acceptance. Test CamSpy, weapon wheel, secondary fire,
 backgrounding and physical controller interaction before acceptance.
 
 Controller connection events preserve live bindings, including custom R3 roll assignments. The inherited automatic R3 unbind was removed. Development builds expose `pad binds` for an actual engine binding snapshot; it does not modify configuration.
+
+## CamSpy touch controls
+
+Deploy CamSpy from the game's pause menu → Inventory, then resume. With the
+current dual-analogue touch profile:
+
+- Drag on the left movement area to fly forward/back or strafe.
+- Drag the open right-side view to turn and look up/down.
+- Hold the AIM chip and drag up/down to change altitude.
+- FIRE takes a holograph; tap WHEEL to return to Joanna.
+
+Simulator checks in normal Investigation / Agent verified deployment, yaw,
+pitch, forward travel, ascent, shutter and return to Joanna. AIM-drag raised
+height from 0.94 m to 1.42 m while retaining pitch. This is diagnostic-guided
+touch-path evidence, not physical usability or holograph-objective completion.
+The first attempt ended deceased while Joanna remained exposed; pause between
+observations. Descent, strafing, objective capture and physical controller camera
+controls still need runtime coverage. Evidence is private under
+`work/evidence/camspy/`.
