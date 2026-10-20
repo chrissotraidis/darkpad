@@ -217,6 +217,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Source `bondeyespy.c::eyespyTryLaunch` tests clearance at a launch point 100 units ahead and rejects obstructed launches. This reproduces a plausible cause of the earlier isotope doorway incident, without proving that incident's exact cause. Updated the control documentation to require clearance and visual activation confirmation.
 - WHEEL subsequently returned to Joanna (active=0, deployed=1) without moving her. New normal retry remains paused in native Settings at the initial lift, facing south, PID 25917. Private evidence: `camspy-clearance-rejected.png`, `camspy-clearance-launched.png` under `work/evidence/investigation/`. Same single simulator; no save edits or build/install changes.
 
+
+## Investigation post-clearance retry: lab traversed
+
+- Continued the normal run after the CamSpy clearance comparison. Cleared guard 0 and lab guards 3, 4 and 5; guard 6 remains alive behind Joanna. The display cases obstructed both shots and westward movement, requiring a route around their north end. No input/gameplay patch was made for these ordinary collision constraints.
+- Traversed the lab exit door and reached approximately (-1140,157,-2488), heading 179.97, health 0.625. Both objectives are pending in this new attempt. Paused in native Settings, same PID 25917 and single dedicated simulator; preserve the live run.
+- Next approach z≈-2740, turn east through the Caution doors, clear isotope-access guards and verify CamSpy HUD before flight. Laser crossings remain unverified. Read-only diagnostics and ordinary touch inputs only; no save or player-state edits.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
