@@ -141,6 +141,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Synthetic acceptance tests pass for empty/short recordings, steady 60 and 30 Hz, a five-second stall and p99-tail failure. Runtime 32-second simulator capture retained 1,909 intervals, 120 complete windows, no gaps (`frame-capture-smoke.jsonl`, `frame-capture-smoke-report.json`). Explicit histogram reset correctly invalidated another in-flight capture (`frame-capture-reset-test.log`). This is measurement-path evidence only.
 - Both simulator and unsigned device builds pass (`app-frame-capture-*.log`). Backed up Documents/Library before update; ROM, EEPROM, config and multiplayer setup hashes match afterward (`frame-capture-preservation.json`). Single existing simulator only. Physical 30-minute gameplay, GPU profiling and thermal acceptance remain not run.
 
+## Touch weapon and stance runtime coverage
+
+- Normal Defection / Agent from the saved agent; existing 3m:31s record remains visible. Tested on the dedicated simulator through the actual overlay handlers, with Settings pauses between sequences. No loadout, ammunition, position or save mutation.
+- ALT selects Falcon 2 Pistol Whip (gunfunc=1, highlighted ALT), then returns to Single Shot (gunfunc=0). RELOAD restored 7/72 rounds to 8/71. Three separate FIRE taps then reduced magazine to 5 with reserve 71; RELOAD restored 8/68. Screenshots/state in `work/evidence/touch-weapon-controls/`.
+- CROUCH cycles camera height 159 →114 →69 →159 at unchanged x/z. SWAP cycles Falcon 2 (weapon 3) → unarmed (1) → Falcon 2 (3). Input immediately after initiating Settings dismissal can remain suppressed during its transition; repeated checks waited 0.7 seconds for dismissal before sending touches.
+- These are synthetic touch correctness checks, not human usability or physical controller acceptance. No code change/build required. Current mission remains safely paused on the roof in Settings. Only the existing simulator used.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

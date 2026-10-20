@@ -92,3 +92,15 @@ The first attempt ended deceased while Joanna remained exposed; pause between
 observations. Descent, strafing, objective capture and physical controller camera
 controls still need runtime coverage. Evidence is private under
 `work/evidence/camspy/`.
+
+## Touch weapon and stance checks
+
+In a normal Defection Agent run, the overlay's ALT button switched the Falcon 2
+between Single Shot and Pistol Whip, with its highlight reflecting the selected
+function. FIRE produced one shot per separated tap; RELOAD restored the magazine
+from reserve. CROUCH cycles standing, crouching, low crouching, then standing.
+SWAP cycles the available weapons, including unarmed. These paths were exercised
+with diagnostic touches on the simulator; they do not establish physical touch
+usability or controller acceptance. Allow native Settings dismissal to complete
+before issuing diagnostic gameplay touches, because input remains suppressed
+while the native panel is closing.
