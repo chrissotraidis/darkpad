@@ -127,6 +127,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Added read-only development `rom check PATH` and `tests/rom_classifier.py`. Fourteen synthetic fixture cases pass against the running simulator app: size/magic/byte order/regions/revisions/title/id, modified-content notice, directory and missing path. Fixtures contain no game assets and are removed afterward. Log `work/evidence/rom-classifier-test.log`. Installed ROM separately reports the expected stock MD5.
 - Simulator/device builds pass (`app-rom-validation-*.log`). Documents/Library backed up before update; ROM, EEPROM, configuration and multiplayer setup hashes match after install/tests (`rom-validation-preservation.json`). This update ended the unfinished Investigation test run; saved completed progression is preserved. Existing named-ROM startup bypass and loose-ROM adoption behavior remain to be reconciled with first-run validation/preservation requirements.
 
+## Validated ROM startup and original preservation
+
+- Named ROMs now pass classification before startup. Validation and picker imports follow the engine's actual base-directory choice: Documents/data when present, otherwise Documents. Invalid input stays in place and shows its explanation in onboarding.
+- Automatic loose-ROM adoption copies atomically rather than moving the supplied original. More than one 32 MiB candidate requires explicit picker selection. Files polling runs once per second instead of hashing on every run-loop iteration.
+- Simulator checks passed: invalid root ROM shows actionable error; two loose candidates remain unselected; one candidate copies and retains its source; invalid data/ ROM is rejected even beside a valid root ROM; removing the invalid fixture allows the valid root input to be copied into data/ and starts the engine. Screenshots `work/evidence/rom-startup-invalid{,-data}.png`. Temporary inputs cleaned up and stock ROM restored.
+- Simulator and unsigned device builds pass (`app-rom-startup-*.log`). Documents/Library backed up before installation. ROM, EEPROM, configuration and multiplayer setup SHA-256 values match before/after (`rom-startup-preservation.json`). Only the dedicated simulator ran. Physical hardware validation and the inherited modified-ROM policy remain open.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

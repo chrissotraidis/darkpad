@@ -36,6 +36,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 
 @interface PDOnboardingViewController : UIViewController <UIDocumentPickerDelegate>
 @property (nonatomic, copy) void (^onAccepted)(void);
+- (void)showRomProblem:(NSString *)message;
 @end
 
 // ---------------------------------------------------------------------------
@@ -197,51 +198,58 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	return c;
 }
 
-+ (NSString *)installedRomPath
++ (NSString *)romDestination
 {
 	NSString *docs = PDShell.shared.documentsPath;
-	// Both places the engine looks: $B is Documents and Documents/data
-	// (docs/frame-map.md, overlay patch 0009).
-	for (NSString *candidate in @[ [docs stringByAppendingPathComponent:kRomFileName],
-	                               [[docs stringByAppendingPathComponent:@"data"]
-	                                 stringByAppendingPathComponent:kRomFileName] ]) {
-		if ([NSFileManager.defaultManager fileExistsAtPath:candidate]) {
-			return candidate;
-		}
-	}
-	return nil;
+	NSString *data = [docs stringByAppendingPathComponent:@"data"];
+	// Match iOS fsInit: an existing data/ location becomes the engine base.
+	NSString *base = [NSFileManager.defaultManager fileExistsAtPath:data] ? data : docs;
+	return [base stringByAppendingPathComponent:kRomFileName];
 }
 
-/**
- * A ROM the player dropped in with a different name, which is the single most
- * common way the first boot fails: "Perfect Dark (USA) (Rev 1).z64" sitting in
- * the folder next to nothing. If exactly one 32 MB .z64/.n64/.v64 is there and
- * it classifies as accepted, rename it into place rather than making somebody
- * type a file name on a phone keyboard.
- */
++ (NSString *)existingRomCandidate
+{
+	NSString *candidate = [self romDestination];
+	return [NSFileManager.defaultManager fileExistsAtPath:candidate] ? candidate : nil;
+}
+
+// Validate exactly the location the engine will open.
++ (NSString *)installedRomPath
+{
+	NSString *candidate = [self existingRomCandidate];
+	return candidate && [self classifyFileAtPath:candidate].ok ? candidate : nil;
+}
+
+/** Copy a single unambiguously named loose ROM, preserving the supplied file. */
 + (nullable NSString *)adoptLooseRom
 {
+	// Never replace a named input automatically, even if it is invalid.
+	if ([self existingRomCandidate]) return nil;
 	NSString *docs = PDShell.shared.documentsPath;
 	NSArray<NSString *> *names = [NSFileManager.defaultManager contentsOfDirectoryAtPath:docs error:NULL];
+	NSMutableArray<NSString *> *candidates = [NSMutableArray new];
 	for (NSString *name in names) {
-		NSString *ext = name.pathExtension.lowercaseString;
-		if (![@[ @"z64", @"n64", @"v64" ] containsObject:ext]) {
-			continue;
-		}
+		if (![@[ @"z64", @"n64", @"v64" ] containsObject:name.pathExtension.lowercaseString]) continue;
 		NSString *full = [docs stringByAppendingPathComponent:name];
-		PDRomCheck *c = [self classifyFileAtPath:full];
-		if (!c.ok) {
-			continue;
+		NSDictionary *attrs = [NSFileManager.defaultManager attributesOfItemAtPath:full error:NULL];
+		if ([attrs.fileType isEqualToString:NSFileTypeRegular] && attrs.fileSize == kRomSize) {
+			[candidates addObject:full];
 		}
-		NSString *dst = [docs stringByAppendingPathComponent:kRomFileName];
-		NSError *err = nil;
-		if ([NSFileManager.defaultManager moveItemAtPath:full toPath:dst error:&err]) {
-			NSLog(@"perfectdark: [onboard] adopted %@ as %@", name, kRomFileName);
-			return dst;
-		}
-		NSLog(@"perfectdark: [onboard] could not rename %@: %@", name, err);
 	}
-	return nil;
+	// Multiple possible inputs require the player's explicit picker selection.
+	if (candidates.count != 1) return nil;
+	NSString *source = candidates.firstObject;
+	if (![self classifyFileAtPath:source].ok) return nil;
+	NSString *dst = [self romDestination];
+	NSError *err = nil;
+	if (![PDXbla copyFileSafely:source to:dst same:NULL error:&err]) {
+		NSLog(@"perfectdark: [onboard] could not copy %@: %@", source.lastPathComponent, err);
+		return nil;
+	}
+	[NSFileManager.defaultManager setAttributes:@{ NSFileProtectionKey: NSFileProtectionNone }
+	                               ofItemAtPath:dst error:NULL];
+	NSLog(@"perfectdark: [onboard] copied %@ as %@", source.lastPathComponent, kRomFileName);
+	return dst;
 }
 
 + (void)runUntilRomPresent
@@ -275,6 +283,9 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	NSLog(@"perfectdark: [onboard] window frame=%@ scene=%@",
 		NSStringFromCGRect(win.frame), scene ? @"yes" : @"no");
 
+	NSString *candidate = [self existingRomCandidate];
+	if (candidate) [vc showRomProblem:[self classifyFileAtPath:candidate].explanation];
+	NSDate *nextScan = NSDate.date;
 	// The engine has not started, so nothing else is pumping the run loop.
 	while (!done) {
 		@autoreleasepool {
@@ -282,8 +293,14 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 			                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
 			// A ROM dropped in through Files while this screen is up: no picker
 			// involved, so poll for it.
-			if (!done && ([self installedRomPath] || [self adoptLooseRom])) {
-				done = YES;
+			if (!done && [nextScan timeIntervalSinceNow] <= 0) {
+				nextScan = [NSDate dateWithTimeIntervalSinceNow:1.0];
+				if ([self installedRomPath] || [self adoptLooseRom]) {
+					done = YES;
+				} else {
+					NSString *path = [self existingRomCandidate];
+					if (path) [vc showRomProblem:[self classifyFileAtPath:path].explanation];
+				}
 			}
 
 		}
@@ -401,6 +418,11 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	}
 }
 
+- (void)showRomProblem:(NSString *)message
+{
+	_status.text = message;
+}
+
 - (void)pickFile
 {
 	UTType *z64 = [UTType typeWithFilenameExtension:@"z64"] ?: UTTypeData;
@@ -438,7 +460,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 		return;
 	}
 
-	NSString *dst = [PDShell.shared.documentsPath stringByAppendingPathComponent:kRomFileName];
+	NSString *dst = [PDOnboarding romDestination];
 	NSError *err = nil;
 	// Copied beside the name and renamed over it only once complete (D-075): a
 	// copy that fails part-way leaves whatever was at that name as it was.
