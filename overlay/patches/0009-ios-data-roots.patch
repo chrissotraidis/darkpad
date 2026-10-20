@@ -1,0 +1,240 @@
+Subject: fs/system: both data roots resolve to Documents on iOS, cache to Caches
+
+Upstream picks $E from the executable's directory and $H from
+SDL_GetPrefPath(). On iOS the first is a read-only bundle and the second is
+~/Library/Application Support/perfectdark - real, writable and invisible in the
+Files app, which is where the player has to be able to drop their ROM.
+
+So on iOS:
+  - $E (exe dir), $H (home) and $S (save dir) all become the app's Documents
+    directory. pd.ini, eeprom.bin, crashreports/, ghosts/, screenshots/,
+    texture-packs/, model-packs/, xbla/ and mods/ therefore all land in one
+    Files-visible folder, which is also the onboarding surface.
+  - The base dir defaults to Documents itself rather than Documents/data, so
+    pd.ntsc-final.z64 dropped straight into the app's folder is found. A
+    Documents/data/ folder is still honoured if one exists.
+  - The savedir legacy/migration pick is skipped: there is no older location on
+    a platform this port has never shipped on, and $H is Documents anyway.
+  - A new $C placeholder expands to Caches, and fsChooseOutputDir() routes the
+    one directory that must not be in Documents - cache/, which is 250MB of
+    regenerable XBLA unpack - there. Caches is not backed up and the OS may
+    purge it; the importer already re-unpacks when its marker is gone.
+  - sysLogSetPath() writes pd.log to Documents. An iOS app's working directory
+    is "/" and is not writable, so upstream's "./pd.log first" would silently
+    produce no log at all.
+
+The two paths come from the environment (PD_IOS_DOCUMENTS / PD_IOS_CACHES),
+which the shell sets before it calls the engine. That keeps the engine free of
+Foundation and keeps this plain C.
+
+diff --git a/port/include/system.h b/port/include/system.h
+index 981fef3c0..63ad43567 100644
+--- a/port/include/system.h
++++ b/port/include/system.h
+@@ -7,6 +7,7 @@ extern "C" {
+ 
+ #include <stdint.h>
+ #include <PR/ultratypes.h>
++#include "platform.h"
+ 
+ enum LogLevel {
+   LOG_NOTE,
+@@ -44,6 +45,12 @@ s32 sysRestartRequested(void);
+ void sysGetExecutablePath(char *outPath, const u32 outLen);
+ void sysGetHomePath(char *outPath, const u32 outLen);
+ 
++#ifdef PLATFORM_IOS
++// Set by the iOS shell in the environment before pdEngineMain(); see system.c.
++const char *sysIosDocumentsPath(void);
++const char *sysIosCachesPath(void);
++#endif
++
+ void *sysMemAlloc(const u32 size);
+ void *sysMemZeroAlloc(const u32 size);
+ void *sysMemRealloc(void *ptr, const u32 newSize);
+diff --git a/port/src/fs.c b/port/src/fs.c
+index af913c8d7..05684af6f 100644
+--- a/port/src/fs.c
++++ b/port/src/fs.c
+@@ -44,6 +44,9 @@ static s32 portable;
+ static char saveDir[FS_MAXPATH + 1]; // replaces $S
+ static char homeDir[FS_MAXPATH + 1]; // replaces $H
+ static char exeDir[FS_MAXPATH + 1];  // replaces $E
++#ifdef PLATFORM_IOS
++static char cacheDir[FS_MAXPATH + 1]; // replaces $C - iOS only, see fsInit
++#endif
+ 
+ static s32 fsPathIsWritable(const char *path)
+ {
+@@ -100,6 +103,9 @@ const char *fsFullPath(const char *relPath)
+ 			case 'M': expStr = numModDirs ? modDirs[0] : NULL; break;
+ 			case 'B': expStr = baseDir; break;
+ 			case 'S': expStr = saveDir; break;
++#ifdef PLATFORM_IOS
++			case 'C': expStr = cacheDir; break;
++#endif
+ 			default: break;
+ 		}
+ 		if (expStr) {
+@@ -351,6 +357,14 @@ s32 fsInit(void)
+ {
+ 	sysGetExecutablePath(exeDir, FS_MAXPATH);
+ 
++#ifdef PLATFORM_IOS
++	// Caches: not backed up, purgeable by the OS, and re-created by the app.
++	// cache/xbla is 250MB of regenerable unpack and has no business in the
++	// user's Documents (see fsChooseOutputDir below).
++	strncpy(cacheDir, sysIosCachesPath(), FS_MAXPATH);
++	cacheDir[FS_MAXPATH] = '\0';
++#endif
++
+ 	// if this is set, default to exe path for everything
+ 	portable = sysArgCheck("--portable");
+ 	if (portable) {
+@@ -364,6 +378,17 @@ s32 fsInit(void)
+ 	if (!path) {
+ 		// check if there's a `data` directory in working directory or homeDir, otherwise default to exe directory
+ 		path = "$E/" DEFAULT_BASEDIR_NAME;
++#ifdef PLATFORM_IOS
++		// $E is Documents. A player drops pd.ntsc-final.z64 straight in there
++		// through the Files app, so Documents itself is the base dir; a
++		// Documents/data/ folder is still honoured for anyone who made one (and
++		// for a container pushed from a desktop layout).
++		if (fsFileSize("$E/" DEFAULT_BASEDIR_NAME) < 0) {
++			path = "$E";
++		}
++		strncpy(baseDir, fsFullPath(path), FS_MAXPATH);
++		goto basedir_done;
++#endif
+ 		if (!portable) {
+ 			if (fsFileSize("./" DEFAULT_BASEDIR_NAME) >= 0) {
+ 				path = "./" DEFAULT_BASEDIR_NAME;
+@@ -374,6 +399,10 @@ s32 fsInit(void)
+ 	}
+ 	strncpy(baseDir, fsFullPath(path), FS_MAXPATH);
+ 
++#ifdef PLATFORM_IOS
++basedir_done:
++#endif
++
+ 	// get paths to the mod dirs and expand them if needed
+ 	// mod directories are overlaid on top of the base directory, in order
+ 	{
+@@ -404,6 +433,15 @@ s32 fsInit(void)
+ 	// get path to save dir and expand it if needed
+ 	path = sysArgGetString("--savedir");
+ 	if (!path) {
++#ifdef PLATFORM_IOS
++		// Both roots are Documents: pd.ini, eeprom.bin, crashreports/, ghosts/
++		// and the screenshots all land where the player can see them. None of
++		// the legacy/migration dance below applies - there is no older location
++		// on a platform this port has never shipped on, and $H is Documents too.
++		path = "$E";
++	}
++	if (!path) {
++#endif
+ 		if (portable) {
+ 			path = "$E";
+ 		} else {
+@@ -703,9 +741,22 @@ void fsFileFree(FILE *f)
+ s32 fsChooseOutputDir(const char *name, char *dst, u32 dstSize)
+ {
+ 	static const char *const roots[] = { "$E", "$S" };
++	const char *const *rootv = roots;
++	u32 rootc = sizeof(roots) / sizeof(roots[0]);
++
++#ifdef PLATFORM_IOS
++	// Everything else the player made goes in Documents, which is $E and $S
++	// both. cache/ is the exception: regenerable, large, and purgeable, so it
++	// goes to Caches, which is what $C expands to.
++	static const char *const cacheRoots[] = { "$C" };
++	if (!strcmp(name, "cache")) {
++		rootv = cacheRoots;
++		rootc = 1;
++	}
++#endif
+ 
+-	for (u32 i = 0; i < sizeof(roots) / sizeof(roots[0]); i++) {
+-		snprintf(dst, dstSize, "%s/%s", roots[i], name);
++	for (u32 i = 0; i < rootc; i++) {
++		snprintf(dst, dstSize, "%s/%s", rootv[i], name);
+ 
+ 		// Existing and not a directory is not worth working around: it is
+ 		// somebody's file, and the next root will do.
+diff --git a/port/src/system.c b/port/src/system.c
+index fffbe04b9..22f137f0f 100644
+--- a/port/src/system.c
++++ b/port/src/system.c
+@@ -63,8 +63,43 @@ static char logPath[2048];
+ static s32 sysArgc;
+ static const char **sysArgv;
+ 
++#ifdef PLATFORM_IOS
++/**
++ * Where the app's Documents and Caches directories are.
++ *
++ * The shell puts them in the environment before it calls pdEngineMain(), which
++ * keeps the engine free of any Foundation dependency and keeps this a plain C
++ * lookup that works identically in the simulator, on device and under a unit
++ * test. The fallbacks are only ever reached if the shell did not run - a
++ * headless harness, say - and are deliberately somewhere writable rather than
++ * somewhere wrong.
++ */
++const char *sysIosDocumentsPath(void)
++{
++	const char *p = getenv("PD_IOS_DOCUMENTS");
++	return (p && *p) ? p : ".";
++}
++
++const char *sysIosCachesPath(void)
++{
++	const char *p = getenv("PD_IOS_CACHES");
++	return (p && *p) ? p : sysIosDocumentsPath();
++}
++#endif
++
+ static inline void sysLogSetPath(const char *fname)
+ {
++#ifdef PLATFORM_IOS
++	// An iOS app's working directory is "/" and is not writable, so the log has
++	// to start where the user can also read it: Documents, which is the same
++	// place both data roots resolve to (fs.c) and is Files-visible.
++	snprintf(logPath, sizeof(logPath), "%s/%s", sysIosDocumentsPath(), fname);
++	FILE *iosf = fopen(logPath, "wb");
++	if (iosf) {
++		fclose(iosf);
++	}
++	return;
++#endif
+ 	// figure out where the log is and clear it
+ 	// try working dir first
+ 	snprintf(logPath, sizeof(logPath), "./%s", fname);
+@@ -381,6 +416,15 @@ s32 sysRestartRequested(void)
+ 
+ void sysGetExecutablePath(char *outPath, const u32 outLen)
+ {
++#ifdef PLATFORM_IOS
++	// $E is upstream's "the folder the player already has open" - the one that
++	// gets screenshots, texture-packs/, model-packs/, xbla/ and, when it is
++	// writable, the saves. An app bundle is never writable, so on iOS $E is
++	// Documents: the one directory the player can actually see and drop a ROM
++	// into (UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace).
++	snprintf(outPath, outLen, "%s", sysIosDocumentsPath());
++	return;
++#endif
+ 	// try asking SDL
+ 	char *sdlPath = SDL_GetBasePath();
+ 
+@@ -415,6 +459,12 @@ void sysGetExecutablePath(char *outPath, const u32 outLen)
+ 
+ void sysGetHomePath(char *outPath, const u32 outLen)
+ {
++#ifdef PLATFORM_IOS
++	// SDL_GetPrefPath would give ~/Library/Application Support/perfectdark:
++	// real and writable, and invisible in Files. Both roots are Documents.
++	snprintf(outPath, outLen, "%s", sysIosDocumentsPath());
++	return;
++#endif
+ 	// try asking SDL
+ 	char *sdlPath = SDL_GetPrefPath("", "perfectdark");
+ 

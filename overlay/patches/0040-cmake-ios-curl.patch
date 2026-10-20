@@ -1,0 +1,89 @@
+Subject: build: find libcurl at PD_CURL_DIR on iOS/visionOS instead of searching for it
+
+D-010, executed. iOS and visionOS have no libcurl in the SDK, so upstream's
+`find_package(CURL QUIET)` on those platforms either finds nothing or - worse,
+and this is what actually happened - finds `/opt/homebrew`'s macOS dylib inside
+a cross configure and links it into an iOS binary. The port's answer until now
+was `-DCMAKE_DISABLE_FIND_PACKAGE_CURL=ON`, which bought safety at the price of
+the feature (docs/build.md, Traps earned (M1)).
+
+This adds a third arm to upstream's own two-arm block (WinHTTP / libcurl), on
+the same shape: when PD_IOS, nothing is searched for at all. `build-ios.sh`
+passes the slice's prefix as `-DPD_CURL_DIR=...` and the branch asserts
+`lib/libcurl.a` and `include/curl/curl.h` are there, then sets PD_HAVE_CURL,
+puts the static archive on LIBS and adds the three frameworks a SecureTransport
+curl needs from the SDK (Security, SystemConfiguration, CoreFoundation). zlib is
+deliberately not repeated: `find_package(ZLIB REQUIRED)` twenty lines above
+already put it on LIBS, and this curl is built `CURL_ZLIB=OFF`.
+
+No CA bundle is shipped or configured. SecureTransport validates against the
+system trust store - "certificates are the operating system's business", which
+is upstream's own phrase for the WinHTTP arm and is equally true here (proved
+against api.github.com over TLS, M-024).
+
+With PD_CURL_DIR unset the branch warns and builds the no-transport engine,
+which is upstream's supported stub configuration and what every build before
+this one was - so a tree without the symlinks still builds.
+
+The desktop path is untouched by a byte: WIN32 and the generic `else()` are
+exactly upstream's, and PD_IOS is false in every desktop configure.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3bc021b45..ecf3ef2a8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -315,6 +315,54 @@ if(WIN32)
+   # because certificates are the operating system's business.
+   message(STATUS "using WinHTTP - ghost server support enabled")
+   list(APPEND LIBS winhttp)
++elseif(PD_IOS)
++  # iOS and visionOS have no libcurl in the SDK, and find_package(CURL) inside a
++  # cross build happily resolves /opt/homebrew's *macOS* dylib and links it into
++  # an iOS binary (docs/build.md, Traps earned (M1)). So nothing is searched for
++  # on this path: scripts/build-ios.sh passes the slice's own prefix as
++  # PD_CURL_DIR and this branch asserts the two files it needs, loudly.
++  #
++  # The library is curl 8.11.0, static, HTTP-only, TLS by Apple SecureTransport
++  # (D-010; recipe and the four slices in work/curl-PROVENANCE.md). Nothing
++  # above ghostnetSend() changes: this is the same libcurl arm upstream already
++  # compiles on macOS and Linux.
++  if(PD_CURL_DIR)
++    set(PD_CURL_LIB "${PD_CURL_DIR}/lib/libcurl.a")
++    set(PD_CURL_INC "${PD_CURL_DIR}/include")
++    if(NOT EXISTS "${PD_CURL_LIB}")
++      message(FATAL_ERROR "PD_CURL_DIR=${PD_CURL_DIR} has no lib/libcurl.a")
++    endif()
++    if(NOT EXISTS "${PD_CURL_INC}/curl/curl.h")
++      message(FATAL_ERROR "PD_CURL_DIR=${PD_CURL_DIR} has no include/curl/curl.h")
++    endif()
++    message(STATUS "libcurl (static: ${PD_CURL_LIB}) - ghost server support enabled")
++    add_definitions(-DPD_HAVE_CURL)
++    include_directories(SYSTEM "${PD_CURL_INC}")
++    list(APPEND LIBS "${PD_CURL_LIB}")
++    # What a SecureTransport curl needs from the SDK. There is no CA bundle to
++    # ship or configure: SecureTransport validates against the system trust
++    # store, which is the operating system's business here exactly as it is in
++    # the WinHTTP arm above. zlib is NOT repeated - find_package(ZLIB REQUIRED)
++    # above already put it in LIBS, and this curl is built with CURL_ZLIB=OFF.
++    foreach(pdfw Security SystemConfiguration CoreFoundation)
++      find_library(PD_CURL_FW_${pdfw} ${pdfw})
++      if(NOT PD_CURL_FW_${pdfw})
++        message(FATAL_ERROR "libcurl needs ${pdfw}.framework and it was not found in the sysroot")
++      endif()
++      list(APPEND LIBS "${PD_CURL_FW_${pdfw}}")
++    endforeach()
++  else()
++    # Not fatal: the no-transport build is upstream's own supported
++    # configuration (ghostnet.c's stub, plus patch 0012 for the link bug), and
++    # it is what every build before D-010 was. But say so, because the rows it
++    # costs - Community Packs and Ghost Trials online - are hidden by patch 0018
++    # on exactly this condition.
++    message(WARNING
++      "PD_CURL_DIR not set - building for iOS/visionOS WITHOUT libcurl: no "
++      "Community Packs, no Ghost Trials accounts, leaderboards or uploads. "
++      "Pass -DPD_CURL_DIR=<prefix with lib/libcurl.a and include/curl> "
++      "(work/curl-PROVENANCE.md).")
++  endif()
+ else()
+   # libcurl everywhere else, there being no system HTTP API to use instead.
+   # macOS carries it in the SDK; on Linux it is libcurl4-openssl-dev to build

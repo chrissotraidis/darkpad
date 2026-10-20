@@ -1,0 +1,547 @@
+Subject: the floor is not flat: the stereo fold in the space the matrix consumes
+
+D-060, and the correction of D-055's second half.
+
+THE BUG THE USER SAW. On 0.0.0.10, in the headset: "anything that interacts with
+the floor feels like it's popping or hovering well above it, when you get close
+to it. from afar, things are on the floor fine, don't look weird. but as you
+approach, it looks like the objects hover above the floor. dead bodies,
+furniture, guns, etc. same with things that intersect with walls. computers or
+panels that are on walls, they look like they pop out a bit. doors hurt my eyes
+a little when i get close."
+
+THE CAUSE. D-055 left one piece of matrix-shape reasoning in the fold: sm64's
+own `P[3][3] > 0.5` gate, which meant "orthographic" and therefore FLAT - no
+eye offset, identical in both eyes, ON the panel. Patch 0030's comment named a
+dozen sites for it and called §2.4 "simply false" for saying this engine has no
+orthographic projection. §2.4 was right. `guOrthoF` is called NOWHERE in this
+tree. `camGetOrthogonalMtxL()` is misnamed: player.c:5909 builds it as
+mtx4MultMtx4(camGetMtxF1754() /*the perspective*/, &sp8c /*the view*/), which
+in this engine's row-vector convention is View * P - the world's own
+perspective with the camera baked in. Its [3][3] is the view-space z of the
+bg-space origin, so the test fired on it whenever the camera sat on the far
+side of the room's own draw offset.
+
+And bgRenderScene() draws THE ENTIRE WORLD through that matrix. The rooms, the
+wall hits and the bg translucent pass load camGetOrthogonalMtxL() as their
+projection with a per-room TRANSLATION as their modelview (room.c
+roomApplyMtx); every prop, chr and door loads camGetPerspectiveMtxL() - the
+plain one - with a modelview that already carries the view. So the floor and
+the walls were flat on the panel while the body lying on the floor was folded
+at its true depth. Far away both are near the panel and nothing looks wrong;
+walk up and the floor stays on the glass while the body comes forward. That is
+the user's sentence, and it is also his wall panels, his doors and his ramps.
+
+FIVE CHANGES.
+
+  1. The `P[3][3] > 0.5` gate is GONE. The class of a projection is the tag the
+     engine put on it (D-055) or the span it is inside, and nothing else.
+
+  2. THE FOLD IS WRITTEN IN THE FORM THAT SURVIVES THE BAKE. The eye matrix
+     wanted is View * (T * P') with T the view-space translation and P' the
+     convergence skew. Multiplied out against M = View * P, both terms collapse
+     onto M itself, because View's last column is (0,0,0,1):
+
+         M'[3][0] = M[3][0] - e*a                  (the translation)
+         M'[r][0] = M[r][0] + (a*e/C) * M[r][3]    (the skew, all four rows)
+
+     For a plain P this is ALGEBRAICALLY IDENTICAL to the two lines it
+     replaces, which is why 2D parity and the Stereo Depth 0 % identity are
+     untouched and the gates still run them. For a baked matrix it is the same
+     arithmetic in the only form that can still be written. `a` comes from the
+     matrix when the matrix is the plain guPerspectiveF output (an exact test:
+     those zeros survive guMtxF2L) and from the last plain load when it is not.
+
+  3. THE BG'S VIEW SPACE IS SCALED. The rooms' view matrix has had its linear
+     part multiplied by bgGetScaleBg2Gfx() (player.c, mtx00015f04), so its unit
+     is `scale` PD units - a half on Villa, Crash Site and Air Base, and
+     anything at all while a scope is zoomed. An eye offset of e VIEW units is
+     then e/scale PD units for the floor and e for the body on it: two
+     interoculars for one scene. bgRender() now emits the frame's scale as a
+     tag and the fold multiplies BOTH e and C by it, so the convergence plane
+     stays at the same physical distance and the disparities agree exactly.
+
+  4. THE VIEWMODEL CONVERGES AT ITS NEAREST VERTEX, not its origin. D-055 put
+     the origin on the panel, which left the whole muzzle end of the gun in
+     FRONT of it, carrying crossed disparity, under an ammo HUD that is 2D at
+     zero disparity and drawn over it. The user: "the gun goes behind the ammo
+     hud, but the gun, depth wise, is much closer to me, so a little
+     disorienting. HUD should probably be closest to me?" It is now: gfx_pc
+     measures every gun-classed vertex's clip w and the frame's minimum becomes
+     the next frame's convergence plane, frozen across both eye walks. Nothing
+     comes in front of the panel, which is quake3e D-028 v2's actual rule, and
+     which is also the answer to "the pause menu ... could be closer to me".
+
+  5. LIGHT GLARES GET THE DISPARITY OF THEIR OWN FIXTURE. PD projects a room
+     light to the screen itself and draws it as a 2D texture rectangle
+     (artifact.c), so it has no matrix, the fold never sees it, and both eyes
+     drew it in the same place - a bright, small, high-contrast thing sitting
+     on the panel while its fixture is at depth, which is the most
+     uncomfortable object a stereo scene can contain. The user: "every time i
+     look at a light, it hurts". artifact.c now tags each glare rectangle with
+     its view depth and gfx_draw_rectangle shifts it by exactly the disparity
+     the world fold would have given a point there, before the aspect
+     adjustment, so it lands on its fixture in both eyes.
+
+Counters for all of it in `3d state`: stereo_bg_scale, stereo_p_load,
+stereo_p_mul (which settles D-055's unsourced "PD's lists MULTIPLY into the
+projection" - read it, do not believe it), stereo_p_baked, stereo_glare_rects,
+stereo_gun_near, stereo_gun_verts.
+
+Everywhere but visionOS PD_VISION_STEREO is 0 and every line of this is
+preprocessed away; the engine-side tags are under #ifndef PLATFORM_N64 and cost
+one G_NOOP each, which changes no draw, tri, vert or texture counter.
+
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index 7e697bc46..fd753adf7 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -86,6 +86,11 @@ extern "C" int pdVisionEyeIsCapture(int eye);
+ extern "C" void pdVisionEyeBeginPair(void);
+ extern "C" void pdVisionStereoNoteClass(int cls);
+ extern "C" void pdVisionStereoNoteGunDepth(float depth);
++// D-060: the viewmodel's nearest vertex depth, measured last frame and frozen
++// for the whole of this frame's two eye walks, and the per-eye NDC x shift a
++// depth-tagged 2D rectangle (a light glare) needs to sit on its own fixture.
++extern "C" float pdVisionStereoGunNear(void);
++extern "C" void pdVisionStereoNoteGunVertex(float depth);
+ #else
+ #define PD_VISION_STEREO 0
+ #endif
+@@ -2324,19 +2329,79 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+ // the znear THEY WERE CALLED WITH rather than one read back out of a matrix),
+ // and menuRender's own flat span.
+ // ---------------------------------------------------------------------------
++// ---------------------------------------------------------------------------
++// ...AND THE OTHER HALF, WHICH D-055 GOT WRONG (D-060).
++//
++// D-055 kept one piece of matrix-shape reasoning: `P[3][3] > 0.5` meant an
++// ORTHOGRAPHIC projection, which was flattened. Patch 0030's comment named a
++// dozen sites for it (camGetOrthogonalMtxL: the star field, explosion and smoke
++// sprites, shards, the portals) and §2.4 called it a fact. It is not one.
++// `guOrthoF` is not called anywhere in this engine, and camGetOrthogonalMtxL()
++// is not an orthographic matrix: player.c:5909 builds it as
++//
++//     mtx4MultMtx4(camGetMtxF1754() /* the perspective */, &sp8c /* the view */)
++//
++// which, in this engine's row-vector convention, is View * P — a perspective
++// with the CAMERA BAKED IN. Its [3][3] is the view-space z of the bg-space
++// origin, which is large and either sign, so the "orthographic" test fired on
++// it whenever the camera sat on the far side of the room's own offset.
++//
++// And bgRenderScene() draws THE ENTIRE WORLD through that matrix: the rooms,
++// the wall hits and the bg translucent pass all load camGetOrthogonalMtxL() as
++// their projection with a per-room TRANSLATION as their modelview (room.c
++// roomApplyMtx), while every prop, chr and door loads camGetPerspectiveMtxL()
++// with a modelview that already carries the view. So the floor and the walls
++// were being classed FLAT — zero disparity, flat ON the panel — while the body
++// lying on that floor was folded at its true depth. From across a room both are
++// near the panel and nothing looks wrong; walk up to them and the floor stays
++// on the glass while the body comes forward. The user, on 0.0.0.10: "anything
++// that interacts with the floor feels like it's popping or hovering well above
++// it, when you get close to it. from afar, things are on the floor fine ...
++// same with things that intersect with walls. computers or panels that are on
++// walls, they look like they pop out a bit."
++//
++// So the shape test is gone and replaced by a shape QUESTION that has an exact
++// answer: is this matrix the plain guPerspectiveF output (row 0 = (a,0,0,0),
++// row 1 = (0,b,0,0), P[2][3] = -1, row 3 = (0,0,d,0)), or is it a product with
++// something baked in? Those zeros come through guMtxF2L's fixed point exactly,
++// so the test never rounds. A plain one is folded as before; a baked one is
++// folded by the same arithmetic written in the form that survives the bake
++// (gfx_stereo_projection below).
++// ---------------------------------------------------------------------------
+ struct PDStereoState {
+     int pending_class;  // the class the next projection LOAD will take
+     int p_class;        // the class of the projection now in rsp.P_matrix
+     int flat_span;      // inside menuRender: flatten everything
++    float bg_scale;     // bgGetScaleBg2Gfx() for this frame (PD_DLTAG_SCALE)
++    float depth_tag;    // the view depth of the next 2D rect, 0 = none
++    float world_a;      // P[0][0] of the last PLAIN perspective load
+ };
+-static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0 };
++static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0, 1.0f, 0.0f, 0.0f };
++
++// What one eye of the last completed frame saw, for `3d state`. The MUL count
++// is here because D-055 asserted "PD's lists MULTIPLY into the projection" with
++// no site to point at, and the counter is the only way to settle it.
++static uint32_t pd_stereo_mul_p, pd_stereo_load_p, pd_stereo_baked, pd_stereo_depth_rects;
++extern "C" void pdVisionStereoNoteFrameFacts(float bgScale, uint32_t mulP, uint32_t loadP,
++                                             uint32_t baked, uint32_t depthRects);
+ 
+ /** The tagged-G_NOOP reader. Untagged noops (gDPSetBlendMask) have w1 == 0. */
+ static void gfx_stereo_dl_tag(uint32_t w1) {
+     if (!PD_DLTAG_IS_OURS(w1)) {
+         return;
+     }
+-    switch (PD_DLTAG_PAYLOAD(w1)) {
++    const uint32_t payload = PD_DLTAG_PAYLOAD(w1);
++    if (payload & PD_DLTAG_DEPTH_BIT) {
++        // One rectangle's worth, consumed by gfx_draw_rectangle.
++        pd_stereo.depth_tag = (float)(payload & 0x7fffu);
++        return;
++    }
++    if (payload & PD_DLTAG_SCALE_BIT) {
++        const float s = (float)(payload & 0x3fffu) / PD_DLTAG_SCALE_SHIFT;
++        pd_stereo.bg_scale = (s > 0.01f) ? s : 1.0f;
++        return;
++    }
++    switch (payload) {
+         case PD_DLSPAN_FLAT_BEGIN: pd_stereo.flat_span = 1; break;
+         case PD_DLSPAN_FLAT_END:   pd_stereo.flat_span = 0; break;
+         case PD_DLCLASS_SKY:       pd_stereo.pending_class = PD_DLCLASS_SKY; break;
+@@ -2350,6 +2415,24 @@ static void gfx_stereo_reset_classes(void) {
+     pd_stereo.pending_class = PD_DLCLASS_WORLD;
+     pd_stereo.p_class = PD_DLCLASS_WORLD;
+     pd_stereo.flat_span = 0;
++    pd_stereo.bg_scale = 1.0f;
++    pd_stereo.depth_tag = 0.0f;
++    pd_stereo.world_a = 0.0f;
++    pd_stereo_mul_p = 0;
++    pd_stereo_load_p = 0;
++    pd_stereo_baked = 0;
++    pd_stereo_depth_rects = 0;
++}
++
++/**
++ * Is this the plain guPerspectiveF output, or a product with the view (or the
++ * camera's rotation) baked into it? Exact: every one of those zeros is written
++ * as a zero by guMtxF2L and read back as a zero by gfx_sp_matrix.
++ */
++static bool gfx_stereo_p_is_plain(const float P[4][4]) {
++    return P[0][1] == 0.0f && P[0][2] == 0.0f && P[0][3] == 0.0f &&
++           P[1][0] == 0.0f && P[1][2] == 0.0f && P[1][3] == 0.0f &&
++           P[2][3] == -1.0f && P[3][0] == 0.0f && P[3][1] == 0.0f && P[3][3] == 0.0f;
+ }
+ 
+ /**
+@@ -2420,13 +2503,14 @@ static void gfx_stereo_reset_classes(void) {
+  *         is projected geometry through func0f0d479c's own frustum - so under
+  *         the world fold the pause menu had depth, and in the headset it
+  *         intersected the world.
+- *       * an ORTHOGRAPHIC projection, which is sm64's own P[3][3] > 0.5 gate.
+- *         §2.4 asserted there is no orthographic matrix in this engine and that
+- *         is simply false: camGetOrthogonalMtxL() is loaded at a dozen sites
+- *         (the star field, explosion and smoke sprites, shards, bg.c's
+- *         portals). w is 1 there, so both the translation fold and the skew
+- *         degenerate into depth-dependent nonsense; and a sprite billboarded in
+- *         an orthographic projection has no parallax to show anyway.
++ *         The span is the whole of FLAT now. The second thing that used to
++ *         take it - sm64's P[3][3] > 0.5 "orthographic" gate - is GONE, and
++ *         D-060 explains why at length above: §2.4 asserted there is no
++ *         orthographic matrix in this engine and §2.4 was RIGHT (guOrthoF is
++ *         called nowhere). camGetOrthogonalMtxL() is misnamed: it is
++ *         View * P, the world's own perspective with the camera baked in, and
++ *         it is what bgRenderScene draws the rooms, the wall hits and the bg
++ *         translucent pass through. Flattening it flattened the floor.
+  *
+  * Returns false when 3D is off, in which case out[][] is untouched.
+  */
+@@ -2444,18 +2528,23 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+         return true;
+     }
+ 
+-    const float a = P[0][0];
++    // Is the camera baked into this matrix? A plain guPerspectiveF has its `a`
++    // in P[0][0]; a View * P product does not, and its own `a` is the world
++    // camera's, cached off the last plain load (which vi.c makes every frame,
++    // before anything bg-space draws).
++    const bool plain = gfx_stereo_p_is_plain(P);
++    const float a = plain ? P[0][0] : pd_stereo.world_a;
+     if (a == 0.0f || conv <= 0.0f) {
+         return false;
+     }
+-
+-    // The class, in the order that decides it: a span beats a shape, a shape
+-    // beats a tag. (An orthographic matrix inside the menu span is flat either
+-    // way, so the order only matters for the counters.)
+-    int cls = pd_stereo.p_class;
+-    if (pd_stereo.flat_span || P[3][3] > 0.5f) {
+-        cls = PD_DLCLASS_FLAT;
++    if (!plain) {
++        pd_stereo_baked++;
+     }
++
++    // The class: a span beats a tag, and nothing else has a say. The
++    // `P[3][3] > 0.5` "orthographic" test is GONE (D-060) — it was reading the
++    // baked view's z out of the world's own projection and flattening the floor.
++    int cls = pd_stereo.flat_span ? PD_DLCLASS_FLAT : pd_stereo.p_class;
+     pdVisionStereoNoteClass(cls);
+ 
+     if (cls == PD_DLCLASS_FLAT) {
+@@ -2463,30 +2552,74 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+         return true;
+     }
+ 
+-    float C = conv;
+-    float eEye = e;
++    // WHICH VIEW SPACE does this matrix consume? A baked one is the BG's, whose
++    // unit is bg_scale PD units (player.c mtx00015f04), and so is a plain one
++    // whose modelview is the scaled view — which is the same test, because the
++    // baked matrix IS the scaled view. Both e and C scale together, so the
++    // convergence PLANE stays at the same physical distance and only the
++    // separation changes: disparity a*e*s*(1/(s*d) - 1/(s*C)) = a*e*(1/d - 1/C),
++    // identically equal to the prop's. That is the whole of the fix.
++    const float s = plain ? 1.0f : pd_stereo.bg_scale;
++
++    float C = conv * s;
++    float eEye = e * s;
+     if (cls == PD_DLCLASS_GUN) {
+-        // The viewmodel's own depth, or the A/B's fixed plane.
+-        float d = fabsf(mv[3][2]);
++        // D-060: the viewmodel converges at its NEAREST vertex, not at its
++        // origin. D-055 put the origin on the panel, which left every vertex
++        // in front of the origin — the whole muzzle end of the gun — CROSSED,
++        // popping out of the glass in front of a HUD that is at zero disparity
++        // and drawn over it. The user: "the gun goes behind the ammo hud, but
++        // the gun, depth wise, is much closer to me, so a little disorienting.
++        // HUD should probably be closest to me?" It is now, because nothing
++        // else comes in front of the panel (quake3e D-028 v2).
++        float d = pdVisionStereoGunNear();
+         if (!(d > 1.0f)) {
+-            d = 1.0f;       // a modelview with no translation: nothing to converge on
+-        }
+-        if (d > 4000.0f) {
+-            d = 4000.0f;
++            // No measurement yet (the first frame, or a gun-classed list with
++            // no vertices): fall back to the modelview's own origin depth.
++            d = fabsf(mv[3][2]);
++            if (!(d > 1.0f)) {
++                d = 1.0f;
++            }
++            if (d > 4000.0f) {
++                d = 4000.0f;
++            }
+         }
+         C = (gunConv > 0.0f) ? gunConv : d;
+         eEye = e * C / conv;
+-        pdVisionStereoNoteGunDepth(d);
++        pdVisionStereoNoteGunDepth(fabsf(mv[3][2]));
+     }
+ 
++    // THE FOLD, in the form that survives the bake.
++    //
++    // The mono matrix is M (= P alone for a prop, View * P for the bg). The eye
++    // matrix wanted is the same one with a view-space translation T = (-e,0,0)
++    // inserted where the view ends and the projection begins, plus the
++    // convergence skew folded into the projection:
++    //
++    //     M' = View * (T * P')   where (T*P')[3] = P[3] - e*P[0]
++    //                            and   P'[2][0]  = P[2][0] - a*e/C
++    //
++    // Multiply that out against M = View * P and both terms collapse into
++    // operations on M itself, because View's own last column is (0,0,0,1):
++    //
++    //     M'[3][0] = M[3][0] - e*a                     (the translation)
++    //     M'[r][0] = M[r][0] + (a*e/C) * M[r][3]       (the skew, all four rows)
++    //
++    // For a plain P this is EXACTLY what the old two lines did (P[0] is
++    // (a,0,0,0) so only column 0 moved, and P[r][3] is -1 only at r = 2), which
++    // is why 2D parity and the 0 % identity are untouched. For the baked matrix
++    // it is the same arithmetic in the only form that can still be written.
+     if (cls != PD_DLCLASS_SKY) {
+-        for (int i = 0; i < 4; i++) {
+-            out[3][i] = P[3][i] - eEye * P[0][i];
+-        }
++        // The sky folds no translation: vi0000ab78 bakes the camera's ROTATION
++        // into P with an identity modelview, so a translation inserted there
++        // would be a world-space shift, and the sky at 2 x zfar wants only the
++        // infinity term anyway.
++        out[3][0] -= eEye * a;
++    }
++    const float skew = a * eEye / C;
++    for (int r = 0; r < 4; r++) {
++        out[r][0] += skew * out[r][3];
+     }
+-    // The skew: the whole of the sky's disparity, and the convergence of the
+-    // world's and the gun's.
+-    out[2][0] += -a * eEye / C;
+     return true;
+ }
+ 
+@@ -2542,9 +2675,21 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+             // pending tag is one-shot: an untagged load is WORLD (D-055).
+             pd_stereo.p_class = pd_stereo.pending_class;
+             pd_stereo.pending_class = PD_DLCLASS_WORLD;
++            pd_stereo_load_p++;
++            // The world camera's `a`, kept for the baked matrices that have no
++            // `a` of their own (D-060). vi.c loads the plain world perspective
++            // once a frame before anything bg-space draws, and bgRenderScene
++            // re-loads it between every pair of baked loads.
++            if (gfx_stereo_p_is_plain(rsp.P_matrix) && rsp.P_matrix[0][0] != 0.0f &&
++                pd_stereo.p_class != PD_DLCLASS_GUN) {
++                pd_stereo.world_a = rsp.P_matrix[0][0];
++            }
+ #endif
+         } else {
+             gfx_matrix_mul(rsp.P_matrix, matrix, rsp.P_matrix);
++#if PD_VISION_STEREO
++            pd_stereo_mul_p++;
++#endif
+             // A MUL into the projection KEEPS the class: it is the same camera
+             // and the same subject, with a transform folded in. This is the
+             // half the old matrix-shape test could not do — 4J's XBLA lists
+@@ -2805,6 +2950,15 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
+             x += taa_jx * w;
+             y += taa_jy * w;
+         }
++#if PD_VISION_STEREO
++        // D-060: how near does the VIEWMODEL actually come? w is the view depth
++        // under every projection this engine loads, so the gun's nearest vertex
++        // is a measurement rather than a guess, and it is what the gun class
++        // converges at. Only ever entered for a gun-classed list.
++        if (pd_stereo.p_class == PD_DLCLASS_GUN) {
++            pdVisionStereoNoteGunVertex(w);
++        }
++#endif
+ 
+         if (rsp.geometry_mode & G_LIGHTING) {
+             gfx_light_vertex(d, px, py, pz, vcn->x, vcn->y, vcn->z, &U, &V);
+@@ -7600,6 +7754,32 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+     lrxf = lrxf / (4.0f * HALF_SCREEN_WIDTH) - 1.0f;
+     lryf = -(lryf / (4.0f * HALF_SCREEN_HEIGHT)) + 1.0f;
+ 
++#if PD_VISION_STEREO
++    // A DEPTH-TAGGED rectangle is a light glare (D-060). PD projects the light
++    // to the screen itself and draws it as a 2D rectangle, so it has no matrix
++    // and the fold never sees it: both eyes drew it in the same place, which
++    // put it ON the panel while the fixture it belongs to sat at its own depth.
++    // A bright, small, high-contrast thing at the wrong depth is the single
++    // most uncomfortable object in a stereo scene, and the user said so: "every
++    // time i look at a light, it hurts".
++    //
++    // The shift is the disparity the WORLD fold would have given a point at
++    // that depth, in the same NDC the world's vertices land in — so it goes on
++    // BEFORE the aspect adjustment, exactly where a vertex's own x is, and a
++    // glare lands on its fixture in both eyes.
++    if (pd_stereo.depth_tag > 0.0f) {
++        const float d = pd_stereo.depth_tag;
++        pd_stereo.depth_tag = 0.0f;   // one tag, one rectangle
++        float eSigned = 0.0f, conv = 0.0f, gunConv = 0.0f;
++        if (pdVisionStereoFold(&eSigned, &conv, &gunConv) && eSigned != 0.0f &&
++            conv > 0.0f && pd_stereo.world_a != 0.0f) {
++            const float dx = pd_stereo.world_a * eSigned * (1.0f / conv - 1.0f / d);
++            ulxf += dx;
++            lrxf += dx;
++            pd_stereo_depth_rects++;
++        }
++    }
++#endif
+     ulxf = gfx_adjust_x_for_aspect_ratio(ulxf);
+     lrxf = gfx_adjust_x_for_aspect_ratio(lrxf);
+ 
+@@ -9085,6 +9265,15 @@ extern "C" void gfx_run(Gfx* commands) {
+     }
+ #endif
+     gfx_run_eye(commands);
++#if PD_VISION_STEREO
++    // The facts one eye of this frame saw, for `3d state` (D-060): the bg-space
++    // scale the fold used, how many projections were LOADed against how many
++    // MULTIPLIED into (D-055 asserted the latter happens constantly and never
++    // named a site), how many of the loads had the camera baked into them, and
++    // how many light glares got a per-eye shift.
++    pdVisionStereoNoteFrameFacts(pd_stereo.bg_scale, pd_stereo_mul_p, pd_stereo_load_p,
++                                 pd_stereo_baked, pd_stereo_depth_rects);
++#endif
+ }
+ 
+ extern "C" void gfx_set_pre_swap_callback(GfxPreSwapCallback cb) {
+diff --git a/src/game/artifact.c b/src/game/artifact.c
+index 775d7c9d1..1ab5e935f 100644
+--- a/src/game/artifact.c
++++ b/src/game/artifact.c
+@@ -924,6 +924,19 @@ Gfx *artifactsRenderGlaresForRoom(Gfx *gdl, s32 roomnum)
+ 						}
+ #endif
+ 
++#ifndef PLATFORM_N64
++						// The glare's own VIEW DEPTH (D-060). A glare is a
++						// screen-space texture rectangle at a position this
++						// function projected itself, so it has no matrix and
++						// the visionOS stereo fold cannot give it a disparity:
++						// it lands ON the panel while its light fixture is at
++						// its own depth. The user, in the headset on 0.0.0.10:
++						// "every time i look at a light, it hurts". The tag
++						// hands the renderer the depth, and it shifts the
++						// rectangle per eye. One tag, one rectangle.
++						gDPPdDlTag(gdl++, PD_DLTAG_DEPTH(
++							(s32)(-lightscreenpos.z < 1.0f ? 1.0f : -lightscreenpos.z)));
++#endif
+ 						func0f0b2740(&gdl, spdc, spd4, 64, 64, false, false, false, 1);
+ 
+ 						if (extra) {
+@@ -938,6 +951,12 @@ Gfx *artifactsRenderGlaresForRoom(Gfx *gdl, s32 roomnum)
+ 							spd4[0] = f24 * 0.4f;
+ 							spd4[1] = f26 * 0.4f;
+ 
++#ifndef PLATFORM_N64
++							// ...and the inner, brighter core of the same
++							// glare, at the same depth (D-060).
++							gDPPdDlTag(gdl++, PD_DLTAG_DEPTH(
++								(s32)(-lightscreenpos.z < 1.0f ? 1.0f : -lightscreenpos.z)));
++#endif
+ 							func0f0b2740(&gdl, spdc, spd4, 64, 64, false, false, false, 1);
+ 						}
+ 
+diff --git a/src/game/bg.c b/src/game/bg.c
+index 9ff66d801..37938369d 100644
+--- a/src/game/bg.c
++++ b/src/game/bg.c
+@@ -2583,6 +2583,18 @@ Gfx *bgRender(Gfx *gdl)
+ {
+ 	gdl = lightsSetDefault(gdl);
+ 
++#ifndef PLATFORM_N64
++	// The frame's BG-to-GFX scale, for the visionOS stereo fold (D-060). The
++	// rooms are drawn through a view matrix whose linear part has been
++	// multiplied by this (player.c, mtx00015f04(scale, &sp8c)), so the room's
++	// view space is `scale` times the one every prop, chr and viewmodel is in.
++	// An eye offset of e view units is then e/scale PD units for the floor and
++	// e for the body standing on it: two different interoculars for one scene.
++	// This is the first thing the whole frame emits, so nothing drawn under the
++	// BG's own matrices can miss it.
++	gDPPdDlTag(gdl++, PD_DLTAG_SCALE(bgGetScaleBg2Gfx()));
++#endif
++
+ 	gSPSegment(gdl++, SPSEGMENT_BG_DL, g_BgPrimaryData);
+ 
+ 	gdl = envStartFog(gdl, false);
+diff --git a/src/include/gbiex.h b/src/include/gbiex.h
+index 6eb88ea3d..e39bc4d38 100644
+--- a/src/include/gbiex.h
++++ b/src/include/gbiex.h
+@@ -257,6 +257,34 @@
+ #define PD_DLSPAN_FLAT_BEGIN  8
+ #define PD_DLSPAN_FLAT_END    9
+ 
++/*
++ * Two payloads that carry a NUMBER rather than a class (D-060). The class
++ * values above are all < 8, so the top two bits are free to say "this tag is a
++ * number, and here is which one".
++ *
++ *   0x8000 | d : the VIEW DEPTH, in PD units, of the next 2D rectangle. PD
++ *                draws its light glares as screen-space texture rectangles at
++ *                a position it projected itself (artifact.c), so they have no
++ *                matrix and therefore no disparity - they sit ON the panel
++ *                while the fixture they belong to sits at its own depth, which
++ *                is what the user reported as "every time i look at a light, it
++ *                hurts". The tag is consumed by ONE rectangle and hands the
++ *                renderer the depth it needs to shift that rectangle per eye.
++ *
++ *   0x4000 | s : bgGetScaleBg2Gfx() x 1024, STICKY for the rest of the frame.
++ *                The rooms are drawn in a view space scaled by this (player.c
++ *                mtx00015f04(scale, &sp8c)), so an eye offset expressed in
++ *                view units means a different PHYSICAL separation for the room
++ *                than for the body standing in it. Half on Villa, Crash Site
++ *                and Air Base, and anything at all while a scope is zoomed.
++ */
++#define PD_DLTAG_DEPTH_BIT    0x8000u
++#define PD_DLTAG_DEPTH(d)     (PD_DLTAG_DEPTH_BIT | ((unsigned int)(d) & 0x7fffu))
++#define PD_DLTAG_SCALE_BIT    0x4000u
++#define PD_DLTAG_SCALE_SHIFT  1024.0f
++#define PD_DLTAG_SCALE(s)     (PD_DLTAG_SCALE_BIT | \
++		((unsigned int)((s) * PD_DLTAG_SCALE_SHIFT) & 0x3fffu))
++
+ #define gDPPdDlTag(pkt, x) gDPNoOpTag(pkt, PD_DLTAG(x))
+ 
+ /* G_EXTRAGEOMETRYMODE flags */

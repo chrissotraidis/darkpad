@@ -1,0 +1,247 @@
+Subject: menu: a finger's drag scrolls by its size, and a tap off the item is LEFT/RIGHT or nothing
+
+D-083. The user, on the phone: "there's no way to scroll down, and taps on the left
+or right will register as a tap on the item menu when it should just go RIGHT or
+LEFT to next menu." The engine half of the fix (the other half, the click moving
+from touch-down to the lift, is the shell's - app/ios/PDTouchOverlay.m):
+
+  - inputs.mousescroll was built from the two wheel KEYS, which can only say
+    "at least one", so a thumb that dragged nine rows in a frame moved the
+    menu one line. While the touch pointer is live, menu.c takes the latched
+    tick COUNT instead (inputIosPointerWheelTicks()), capped at 8 a frame.
+    Every reader already multiplies it: LINEHEIGHT for an item-scrolled
+    dialog, LINEHEIGHT+1 for a smooth-scrolled one, a row for a list, a step
+    for a slider. menuIosRowFraction() tells the shell how big a tick is on
+    screen, so the content follows the finger.
+  - A list stepped by a drag stops at its ends instead of wrapping.
+  - A click on a LIST item chooses the entry under it. A list is one menu
+    item whose entries are drawn around its current index, so the focus walk
+    stops at the list and the click chose the centred entry wherever it
+    landed (tapping "New Agent..." under "Dark" loaded Dark). The render's
+    own geometry (menuitemListRender, menuitem0f0e5d2c) maps the point back.
+  - Upstream's "click beside the menu rotates it" only counts when the click
+    is level with the dialog (menu.c, after the pad loop). For the touch
+    pointer, left/right of the dialog is LEFT/RIGHT at ANY height, and a click
+    that is not on the focused item (above/below the dialog, its header, a
+    gap) is swallowed instead of being an Accept on whatever was highlighted.
+    A dimmed dialog (slider/dropdown being edited) keeps upstream's rule.
+
+Everything is inside PLATFORM_IOS.
+
+diff --git a/port/include/input.h b/port/include/input.h
+index c03a27fd9..2143540c9 100644
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -255,6 +255,9 @@ void inputIosPointerSet(f32 nx, f32 ny, s32 down);
+ void inputIosPointerClear(void);
+ void inputIosPointerAddWheel(s32 ticks);
+ s32 inputIosPointerIsActive(void);
++// This frame's wheel ticks WITH their size (D-083). The wheel keys can only say
++// "at least one", which clipped a thumb's drag to one line a frame.
++s32 inputIosPointerWheelTicks(void);
+ #endif
+ 
+ void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
+diff --git a/port/src/input.c b/port/src/input.c
+index e0dc3d5cb..38c2734fc 100644
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -1354,6 +1354,20 @@ s32 inputIosPointerIsActive(void)
+ {
+ 	return iosPointerActive;
+ }
++
++/**
++ * This frame's wheel, as a count (D-083).
++ *
++ * inputKeyPressed(VK_MOUSE_WHEEL_DN) is a yes/no, so menu.c's
++ * inputs.mousescroll could never be more than one, and a thumb that dragged
++ * nine rows' worth in a frame moved the menu one line. menu.c asks for the
++ * count instead while the pointer is live; the keys above still answer for
++ * anything else that reads them.
++ */
++s32 inputIosPointerWheelTicks(void)
++{
++	return iosPointerActive ? iosPointerWheelFrame : 0;
++}
+ #endif
+ 
+ s32 inputReadController(s32 idx, OSContPad *npad)
+diff --git a/src/game/menu.c b/src/game/menu.c
+index 9d6628d02..a2609a5b9 100644
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -1532,6 +1532,61 @@ s32 menuIosDialogIsOpen(void)
+ {
+ 	return g_Menus[0].curdialog != NULL;
+ }
++
++/**
++ * One menu line as a fraction of the screen's height (D-083).
++ *
++ * The touch layer turns a vertical drag into wheel ticks, and a tick is
++ * LINEHEIGHT in the units inputMouseGetPosition() reports (the native
++ * viewport). Sized from here, the menu follows the finger instead of a number
++ * the shell would have to guess.
++ */
++f32 menuIosRowFraction(void)
++{
++	const s32 h = videoGetNativeHeight();
++	return h > 0 ? (f32)LINEHEIGHT / (f32)h : 0.05f;
++}
++
++/**
++ * Is (mx, my) on the dialog's focused item? The same walk over the dialog's
++ * own columns and rows that dialogChangeItemFocusWithMouse() does, asking a
++ * different question: it moves the focus to a FOCUSABLE item under the point,
++ * so when the point is on no item at all (a header, a gap, a label, the space
++ * around the dialog) the focus stays where it was - and a click there used to
++ * be an Accept on whatever that was.
++ */
++static bool menuIosPointOnFocusedItem(struct menudialog *dialog, s32 mx, s32 my)
++{
++	struct menu *menu = &g_Menus[g_MpPlayerNum];
++	s32 col, row;
++	s32 curx = dialog->x;
++	s32 cury;
++	s32 colwidth = 0;
++
++	if (dialog->focuseditem == NULL) {
++		return false;
++	}
++
++	for (col = 0; col < dialog->numcols; col++, curx += colwidth) {
++		s32 colindex = dialog->colstart + col;
++		colwidth = menu->cols[colindex].width;
++		if (mx <= curx || mx >= curx + colwidth) {
++			continue;
++		}
++
++		cury = dialog->y + LINEHEIGHT + 1 + dialog->scroll;
++		for (row = 0; row < menu->cols[colindex].numrows; row++) {
++			s32 rowindex = menu->cols[colindex].rowstart + row;
++			s32 rowheight = menu->rows[rowindex].height;
++			if (my > cury && my < cury + rowheight) {
++				return &dialog->definition->items[menu->rows[rowindex].itemindex] == dialog->focuseditem;
++			}
++			cury += rowheight;
++		}
++	}
++
++	return false;
++}
+ #endif
+ 
+ #endif
+@@ -5332,6 +5387,17 @@ void menuProcessInput(void)
+ 				}
+ 			}
+ 			inputs.mousescroll = inputKeyPressed(VK_MOUSE_WHEEL_DN) - inputKeyPressed(VK_MOUSE_WHEEL_UP);
++#ifdef PLATFORM_IOS
++			// A finger's drag carries a size; the wheel keys only say "some"
++			// (D-083). Every reader of mousescroll multiplies it - LINEHEIGHT
++			// for the dialog, one row for a list, one step for a slider - so
++			// a count is what they were written for. Capped, so one hitch
++			// cannot fling a list end to end.
++			if (inputIosPointerIsActive()) {
++				s32 ticks = inputIosPointerWheelTicks();
++				inputs.mousescroll = ticks > 8 ? 8 : (ticks < -8 ? -8 : ticks);
++			}
++#endif
+ 			inputs.mousemoved = inputMouseGetPosition(&inputs.mousex, &inputs.mousey) || inputs.mousescroll;
+ 			// aspect correct the X
+ 			const f32 cx = ((f32)inputs.mousex - (f32)(SCREEN_WIDTH_LO / 2)) * (videoGetAspect() / SCREEN_ASPECT);
+@@ -5823,6 +5889,31 @@ void menuProcessInput(void)
+ 				}
+ 			}
+ 		}
++#ifdef PLATFORM_IOS
++		// A finger's click (D-083). Upstream's side-click above only counts
++		// when the click is LEVEL with the dialog; on a 2.16:1 phone most of a
++		// thumb's reach beside a short, centred dialog is above or below that,
++		// and there the click fell through to an Accept on whatever was
++		// already highlighted. For the touch pointer (mouseheld: the click
++		// came from the pointer, not from a pad's A):
++		//   - anywhere left/right of the dialog is LEFT/RIGHT, at any height;
++		//   - anywhere else that is not ON the focused item (above or below the
++		//     dialog, its header, a gap, a label) is nothing at all.
++		// A dimmed dialog (a slider or dropdown being edited) keeps upstream's
++		// rules: its targets are drawn outside the item's own row.
++		if (inputIosPointerIsActive() && g_MenuUsingMouse && inputs.mouseheld
++				&& inputs.select && !inputs.leftright && !inputs.leftrightheld && !dialog->dimmed) {
++			if (inputs.mousex < dialog->x) {
++				inputs.leftright = -1;
++				inputs.select = 0;
++			} else if (inputs.mousex > dialog->x + dialog->width) {
++				inputs.leftright = 1;
++				inputs.select = 0;
++			} else if (!menuIosPointOnFocusedItem(dialog, inputs.mousex, inputs.mousey)) {
++				inputs.select = 0;
++			}
++		}
++#endif
+ #endif
+ 
+ 		// Handle dialogs that allow pressing start to select,
+diff --git a/src/game/menuitem.c b/src/game/menuitem.c
+index b4276298b..ba87b67c0 100644
+--- a/src/game/menuitem.c
++++ b/src/game/menuitem.c
+@@ -798,6 +798,19 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
+ 			if (inputs->updown || inputs->mousescroll) {
+ 				prev2 = data->list.index;
+ 				data->list.index += inputs->updown + inputs->mousescroll;
++#ifdef PLATFORM_IOS
++				// A drag stops at the ends of a list rather than wrapping to the
++				// other end (D-083): a pad's single step wrapping is a feature,
++				// a thumb's overshoot landing on the first entry is not.
++				if (inputs->mousescroll && !inputs->updown && inputIosPointerIsActive()) {
++					if (data->list.index < 0) {
++						data->list.index = 0;
++					}
++					if (data->list.index >= (s16)handlerdata.list.value) {
++						data->list.index = handlerdata.list.value - 1;
++					}
++				}
++#endif
+ #endif
+ 
+ 				if (data->list.index < 0) {
+@@ -818,6 +831,37 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
+ 				}
+ 			}
+ 
++#ifdef PLATFORM_IOS
++			// A finger's click on a list chooses the ENTRY under it (D-083).
++			// A list is one menu item whose entries are drawn around its
++			// current index, so the pointer's focus walk (menu.c) stops at the
++			// list and a click chose the centred entry wherever it landed -
++			// tapping "New Agent..." under "Dark" loaded Dark. The entries sit
++			// where the render puts them (menuitemListRender: offset - curoffset
++			// + halfheight below the item's top), and menuitem0f0e5d2c() is the
++			// render's own offset -> index map. A click past the last entry is
++			// nothing. Only for the touch pointer's click (mouseheld).
++			if (inputs->select && inputs->mouseheld && g_MenuUsingMouse && inputIosPointerIsActive()
++					&& item->type == MENUITEMTYPE_LIST && data->list.viewheight > 0) {
++				struct menudialog *dialog = g_Menus[g_MpPlayerNum].curdialog;
++				if (dialog) {
++					const s32 half = (data->list.viewheight / 2) / g_LineHeight * g_LineHeight;
++					const s32 top = menuitemGetTop(item, dialog) + dialog->scroll;
++					const s32 rel = inputs->mousey - top - half + data->list.curoffsety;
++					if (inputs->mousey >= top && inputs->mousey < top + data->list.viewheight && rel >= 0) {
++						const s32 idx = menuitem0f0e5d2c(rel, item);
++						if (idx > (s32)last) {
++							inputs->select = 0;
++						} else if (idx != data->list.index) {
++							data->list.index = idx;
++							data->list.targetoffsety = menuitemListGetOffsetY(data->list.index, item);
++							handlerdata.list.value = data->list.index;
++							item->handler(MENUOP_LISTITEMFOCUS, item, &handlerdata);
++						}
++					}
++				}
++			}
++#endif
+ 			if (inputs->select) {
+ 				handlerdata.list.value = data->list.index;
+ 				handlerdata.list.unk04 = 0;

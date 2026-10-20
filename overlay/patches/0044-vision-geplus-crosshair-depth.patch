@@ -1,0 +1,72 @@
+Subject: visionOS 3D: GE Plus's crosshair gets the reticle's depth too (D-064)
+
+0035 gives the crosshair the depth of whatever it points at by opening a
+depth span around the sight types' switch in sightDraw(). GE Plus draws its
+own crosshair (gehud.c, GoldenEye's sight for anything of GoldenEye's in the
+hand on a converted level) from an early return ABOVE that switch, so in 3D
+it never got the span: measured in Dam on the Vision Pro simulator, the
+crosshair sat at 0 px disparity in both eyes while the cliff and barriers
+behind it were at +23..+29 px - on the panel, in front of what it aimed at.
+
+The span now opens before GE Plus's branch and that branch closes it before
+returning. Nothing else moves: in 2D (and on every other platform) the block
+is the same runtime-gated / compiled-out no-op it was, so the M-001 display
+list is unchanged.
+
+diff --git a/src/game/sight.c b/src/game/sight.c
+index 8fc733a07..e10ee72a4 100644
+--- a/src/game/sight.c
++++ b/src/game/sight.c
+@@ -1848,6 +1848,22 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+ 
+ 	sightTick(sighton);
+ 
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++	// D-064: one trace, one tag, and every rectangle of the reticle inside the
++	// span gets it. The tag is a G_NOOP, so on every other platform this is a
++	// dead branch the preprocessor removes entirely — and in 2D on visionOS the
++	// runtime gate makes the display list byte-identical to the one the oracle
++	// walks, which is what the M-001 replay compares. Opened before GE Plus's
++	// own crosshair below, which returns early: it had no depth in 3D (it sat
++	// on the panel in both eyes, in front of whatever it pointed at).
++	const bool stereo3d = pdVisionStereoIsActive() != 0;
++
++	if (stereo3d) {
++		gDPPdDlTag(gdl++, PD_DLTAG_DEPTH((s32)sightReticleDepth(crossx, crossy)));
++		gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++	}
++#endif
++
+ #ifndef PLATFORM_N64
+ 	// GoldenEye's own crosshair for anything of GoldenEye's in the hand on GE
+ 	// Plus's levels (gehud.c). The watch's SIGHT ON-SCREEN is Sight on Screen,
+@@ -1862,23 +1878,15 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+ 			gdl = geHudRenderSight(gdl, crossx, crossy);
+ 		}
+ 
+-		g_ScaleX = 1;
+-
+-		return gdl;
+-	}
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++		if (stereo3d) {
++			gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_END);
++		}
+ #endif
+ 
+-#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+-	// D-064: one trace, one tag, and every rectangle of the reticle inside the
+-	// span gets it. The tag is a G_NOOP, so on every other platform this is a
+-	// dead branch the preprocessor removes entirely — and in 2D on visionOS the
+-	// runtime gate makes the display list byte-identical to the one the oracle
+-	// walks, which is what the M-001 replay compares.
+-	const bool stereo3d = pdVisionStereoIsActive() != 0;
++		g_ScaleX = 1;
+ 
+-	if (stereo3d) {
+-		gDPPdDlTag(gdl++, PD_DLTAG_DEPTH((s32)sightReticleDepth(crossx, crossy)));
+-		gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++		return gdl;
+ 	}
+ #endif
+ 

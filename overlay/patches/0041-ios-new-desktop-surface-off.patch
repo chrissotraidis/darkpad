@@ -1,0 +1,207 @@
+Subject: iOS: switch off the new desktop-only surface of c18645860
+
+docs/ios-deadlist.md, the c18645860 rows. The things the 1,282-commit bump
+brought that a phone cannot use, each gated at the one place both its menu
+row and its automatic path go through:
+
+  update.c        updateIsAvailable() is false on iOS. With curl linked (D-010)
+                  it answered true, which was harmless while the only way in
+                  was the hidden Check for Updates row; the new update NOTICE
+                  (updatemenu.c, updatenoticeStart from main.c) asks GitHub at
+                  every launch and opens a "new version" dialog on the main
+                  menu offering to install a desktop build.
+  patchnotes.c    the once-after-an-update patch notes popup never opens: it is
+                  Dab's desktop changelog (and an install whose pd.ini predates
+                  the notes gets every entry), not this app's release notes.
+  optionsmenu.c   Video > Renderer is hidden: one renderer here, and it is
+                  ANGLE-Metal rather than the "OpenGL" the row names (Vulkan is
+                  never built for iOS, PD_VULKAN=OFF in build-ios.sh).
+                  Advanced > HiDPI Window and HIDAPI Controllers are hidden:
+                  0017 forces the native drawable whatever AllowHiDpi says, and
+                  the shell forces HIDAPI off (D-030). Raw Input stays hidden as
+                  upstream hides it off Windows.
+                  Video > SMAA, Upscaling, Supersampling and FSR Sharpness are
+                  hidden, and Anti-aliasing loses its TAA entry: upstream's own
+                  post chain does not run on GL ES (gfx_opengl_post_process:
+                  "SMAA and FSR need desktop GL 3.0, off"; gfx_pc: "TAA could
+                  not run on this renderer, off" - both seen on lane 3), so the
+                  rows were switches that did nothing, or a render scale with a
+                  plain blit under an FSR name. The shell owns render scale.
+
+Every hunk is PLATFORM_IOS-gated; no other platform changes by a byte.
+
+diff --git a/port/src/optionsmenu.c b/port/src/optionsmenu.c
+index 08bc1678e..af4b39916 100644
+--- a/port/src/optionsmenu.c
++++ b/port/src/optionsmenu.c
+@@ -892,6 +892,14 @@ static MenuItemHandlerResult menuhandlerGpuVertices(s32 operation, struct menuit
+ static MenuItemHandlerResult menuhandlerSmaa(s32 operation, struct menuitem *item, union handlerdata *data)
+ {
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// The post chain does not run on GL ES: gfx_opengl_post_process()
++		// turns SMAA and FSR off on gl_es, and supersampling and upscaling
++		// fall back to a plain scaled blit. The render scale on iOS is the
++		// shell's (PD_IOS_RENDER_SCALE), not these rows.
++		return true;
++#endif
+ 	case MENUOP_GET:
+ 		return videoGetSmaa();
+ 	case MENUOP_SET:
+@@ -917,6 +925,14 @@ static MenuItemHandlerResult menuhandlerUpscaling(s32 operation, struct menuitem
+ 	};
+ 
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// The post chain does not run on GL ES: gfx_opengl_post_process()
++		// turns SMAA and FSR off on gl_es, and supersampling and upscaling
++		// fall back to a plain scaled blit. The render scale on iOS is the
++		// shell's (PD_IOS_RENDER_SCALE), not these rows.
++		return true;
++#endif
+ 	case MENUOP_GETOPTIONCOUNT:
+ 		data->dropdown.value = VIDEO_UPSCALING_COUNT;
+ 		break;
+@@ -948,6 +964,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
+ 	};
+ 
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// The post chain does not run on GL ES: gfx_opengl_post_process()
++		// turns SMAA and FSR off on gl_es, and supersampling and upscaling
++		// fall back to a plain scaled blit. The render scale on iOS is the
++		// shell's (PD_IOS_RENDER_SCALE), not these rows.
++		return true;
++#endif
+ 	case MENUOP_GETOPTIONCOUNT:
+ 		data->dropdown.value = VIDEO_SUPERSAMPLING_COUNT;
+ 		break;
+@@ -969,6 +993,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
+ static MenuItemHandlerResult menuhandlerFsrSharpness(s32 operation, struct menuitem *item, union handlerdata *data)
+ {
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// The post chain does not run on GL ES: gfx_opengl_post_process()
++		// turns SMAA and FSR off on gl_es, and supersampling and upscaling
++		// fall back to a plain scaled blit. The render scale on iOS is the
++		// shell's (PD_IOS_RENDER_SCALE), not these rows.
++		return true;
++#endif
+ 	case MENUOP_GETSLIDER:
+ 		data->slider.value = (2.f - videoGetFsrSharpness()) * 10.f + 0.5f;
+ 		break;
+@@ -1010,7 +1042,14 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
+ 
+ 	switch (operation) {
+ 	case MENUOP_GETOPTIONCOUNT:
++#ifdef PLATFORM_IOS
++		// No TAA entry: it needs the post chain GL ES does not run (gfx_pc.cpp
++		// logs "TAA could not run on this renderer, off"), and choosing it
++		// would have turned MSAA off for nothing.
++		data->dropdown.value = menuMsaaCount();
++#else
+ 		data->dropdown.value = menuMsaaCount() + 1;
++#endif
+ 		break;
+ 	case MENUOP_GETOPTIONTEXT:
+ 		if (data->dropdown.value >= menuMsaaCount()) {
+@@ -1027,9 +1066,12 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
+ 		break;
+ 	case MENUOP_GETSELECTEDINDEX:
+ 		msaa = videoGetMSAA();
++#ifndef PLATFORM_IOS
+ 		if (videoGetTaa()) {
+ 			data->dropdown.value = menuMsaaCount();
+-		} else if (msaa < 2) {
++		} else
++#endif
++		if (msaa < 2) {
+ 			data->dropdown.value = 0;
+ 		} else if (msaa < 4) {
+ 			data->dropdown.value = 1;
+@@ -1054,6 +1096,12 @@ static MenuItemHandlerResult menuhandlerRenderer(s32 operation, struct menuitem
+ 	s32 count;
+ 
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// One renderer on iOS, and it is not the desktop OpenGL the row would
++		// name: ANGLE-Metal (D-008), with Vulkan never built (PD_VULKAN=OFF).
++		return true;
++#endif
+ 	case MENUOP_GETOPTIONCOUNT:
+ 		count = 1;
+ 		while (count < ARRAYCOUNT(names) && videoRendererAvailable(count)) {
+@@ -7537,6 +7585,10 @@ static const struct {
+ };
+ 
+ #define ADVANCED_ROW_RAWINPUT 3
++#ifdef PLATFORM_IOS
++#define ADVANCED_ROW_HIDPI     0
++#define ADVANCED_ROW_HIDAPI    2
++#endif
+ 
+ static const char *menutextAdvancedRestart(struct menuitem *item)
+ {
+@@ -7561,7 +7613,14 @@ static MenuItemHandlerResult menuhandlerAdvancedRestart(s32 operation, struct me
+ 	case MENUOP_SET:
+ 		advancedRestartRows[idx].set(data->checkbox.value);
+ 		break;
+-#ifndef _WIN32
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// HiDPI: a phone has one panel and one right answer - patch 0017 forces
++		// the native drawable whatever Video.AllowHiDpi says. HIDAPI: the shell
++		// forces SDL's HIDAPI off at OVERRIDE priority (D-030; on iOS it means
++		// CoreBluetooth, and a TCC abort). Neither row could change anything.
++		return idx == ADVANCED_ROW_HIDPI || idx == ADVANCED_ROW_HIDAPI || idx == ADVANCED_ROW_RAWINPUT;
++#elif !defined(_WIN32)
+ 	case MENUOP_CHECKHIDDEN:
+ 		// SDL's raw input back-end is Windows only
+ 		return idx == ADVANCED_ROW_RAWINPUT;
+diff --git a/port/src/patchnotes.c b/port/src/patchnotes.c
+index 7b468a467..da9ff6cd6 100644
+--- a/port/src/patchnotes.c
++++ b/port/src/patchnotes.c
+@@ -494,6 +494,18 @@ void patchnotesInit(void)
+ {
+ 	s32 mine = patchnotesBuildNumber();
+ 
++#ifdef PLATFORM_IOS
++	// The popup is Dab's Mod's desktop changelog, shown once after an UPDATE
++	// of the desktop build (and, to an install whose pd.ini predates the
++	// notes, every entry ever written). On iOS an update is an OTA/SideStore
++	// install with its own notes, and these name F-keys and Check for Updates.
++	// Marked seen, so it never opens; the notes page under Check for Updates
++	// is hidden with that row (patch 0018).
++	g_Seen = mine;
++	g_PopupDone = true;
++	return;
++#endif
++
+ 	if (g_Seen < 0 && fsFileSize(CONFIG_PATH) <= 0) {
+ 		g_Seen = mine;
+ 		g_PopupDone = true;
+diff --git a/port/src/update.c b/port/src/update.c
+index b32b6b917..540dcdb20 100644
+--- a/port/src/update.c
++++ b/port/src/update.c
+@@ -1203,7 +1203,13 @@ void updateInstall(void)
+ 
+ bool updateIsAvailable(void)
+ {
+-#ifdef PD_GHOST_NET
++#if defined(PD_GHOST_NET) && !defined(PLATFORM_IOS)
++	// Not on iOS (docs/ios-deadlist.md section 2): the updater replaces the
++	// running executable, which a signed app cannot do. curl being linked
++	// (D-010) used to be enough to make this true; since c18645860 that also
++	// starts the main menu's "a new version is out" notice (updatemenu.c),
++	// which would ask GitHub for a desktop build at every launch and offer to
++	// install it. Hidden rows were not enough - this is the one gate both use.
+ 	return true;
+ #else
+ 	return false;

@@ -1,0 +1,73 @@
+Subject: record: compile the ffmpeg recorder out on iOS
+
+The recorder drives an external encoder: fork()/execvp() (record.c:1126,1169),
+popen() (:1295) and system() (:817,:1493). iOS has no second process to start,
+and system() is marked `API_UNAVAILABLE(ios)` in the SDK, so this is a build
+error and not a subtlety. The ffmpeg *download* half is dead twice over: it is
+libcurl, and it fetches an executable.
+
+So the whole translation unit is compiled out behind PLATFORM_IOS and replaced
+by stubs for every entry point record.h declares. The call sites in main.c,
+pdsched.c, audio.c and pdmain.c are untouched — they keep calling into nothing,
+which is upstream's own pattern for PLATFORM_N64 — and recordIsEnabled() is
+false so the menu rows have nothing to show. docs/ios-deadlist.md section 1.
+
+diff --git a/port/src/record.c b/port/src/record.c
+index 705b38c28..c4943bc92 100644
+--- a/port/src/record.c
++++ b/port/src/record.c
+@@ -1,3 +1,12 @@
++// iOS has no second process to encode with: no fork(), no execvp(), no popen()
++// and system() is marked unavailable in the SDK, which is what stops the build
++// rather than anything subtle. The whole translation unit is therefore compiled
++// out here and replaced by the stubs at the bottom of this file; the callers
++// (main.c, pdsched.c, audio.c, pdmain.c) keep their call sites and the menu
++// rows are hidden by the shell. See docs/ios-deadlist.md section 1.
++#include "platform.h"
++#ifndef PLATFORM_IOS
++
+ // The build is -std=c11, which is strict enough that signal.h hides kill().
+ // Everything else this file needs off POSIX happens to be exposed anyway; this
+ // has to come before the first system header to be worth anything.
+@@ -2737,3 +2746,41 @@ PD_CONSTRUCTOR static void recordConfigInit(void)
+ 	// run, recordInit() settling it either way.
+ 	configRegisterInt("Mod.RecordEnabled", &recordEnabled, -1, 1);
+ }
++
++#else // PLATFORM_IOS
++
++#include <PR/ultratypes.h>
++#include "record.h"
++
++void recordInit(void) {}
++void recordTick(void) {}
++void recordToggle(void) {}
++void recordStop(void) {}
++s32 recordIsActive(void) { return 0; }
++s32 recordShowsIndicator(void) { return 0; }
++f32 recordGetElapsed(void) { return 0.f; }
++s32 recordGetKey(void) { return 0; }
++void recordSetKey(s32 vk) { (void)vk; }
++s32 recordGetFps(void) { return 0; }
++void recordSetFps(s32 fps) { (void)fps; }
++s32 recordGetQuality(void) { return 0; }
++void recordSetQuality(s32 crf) { (void)crf; }
++s32 recordGetCodecCount(void) { return 0; }
++const char *recordGetCodecLabel(s32 index) { (void)index; return ""; }
++s32 recordGetCodecIndex(void) { return 0; }
++void recordSetCodecIndex(s32 index) { (void)index; }
++void recordProbeCodecs(void) {}
++s32 recordIsEnabled(void) { return 0; }
++void recordSetEnabled(s32 enabled) { (void)enabled; }
++s32 recordEncoderIsMissing(void) { return 0; }
++s32 recordEncoderDownloadMb(void) { return 0; }
++s32 recordEncoderDownloadDiskMb(void) { return 0; }
++s32 recordEncoderIsFetching(void) { return 0; }
++const char *recordEncoderFetchStatus(void) { return ""; }
++s32 recordFetchEncoder(void) { return 0; }
++void recordFetchFromCommandLine(void) {}
++s32 recordGetIndicator(void) { return 0; }
++void recordSetIndicator(s32 on) { (void)on; }
++void recordPushAudio(const void *buf, u32 len) { (void)buf; (void)len; }
++
++#endif // PLATFORM_IOS

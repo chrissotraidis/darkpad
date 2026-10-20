@@ -1,0 +1,35 @@
+Subject: main: the entry point is pdEngineMain() on iOS
+
+UIKit owns main() on iOS. app/ios/pd_ios_main.m is the real entry point: it
+publishes the Documents/Caches paths, assembles argv and hands it to
+SDL_UIKitRunApp(), which brings up UIApplication and then calls back into the
+game on the main thread. The engine loop runs inside that call for the life of
+the app, exactly as it does on the desktop.
+
+Nothing else moves: with PLATFORM_IOS undefined this is upstream's main().
+
+diff --git a/port/src/main.c b/port/src/main.c
+index 2af38b9cb..fc8620c4d 100644
+--- a/port/src/main.c
++++ b/port/src/main.c
+@@ -196,7 +196,20 @@ static void mainApplySettingsRevision(void)
+ 	g_SettingsRevision = SETTINGS_REVISION;
+ }
+ 
++#ifdef PLATFORM_IOS
++/**
++ * On iOS the process entry point belongs to UIKit, not to the game.
++ *
++ * app/ios/pd_ios_main.m owns main(), hands the argv to SDL_UIKitRunApp() and is
++ * called back here on the main thread once UIApplication is up. The engine's
++ * own loop then runs inside that call for the life of the app, exactly as it
++ * does on the desktop, and SDL's event pump is what keeps the UIKit run loop
++ * turning underneath it.
++ */
++int pdEngineMain(int argc, const char **argv)
++#else
+ int main(int argc, const char **argv)
++#endif
+ {
+ 	sysInitArgs(argc, argv);
+ 

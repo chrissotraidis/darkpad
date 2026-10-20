@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Perfect Dark</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Perfect Dark</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Icons: the legacy CFBundleIconFiles list, with the PNGs at the bundle
+	     root. Xcode 26's actool rejects a classic single-size app-icon catalog
+	     ("a single 1024x1024 image is not a valid iOS app icon set"), and this
+	     form is what the siblings ship and what the OTA install page reads. -->
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>AppIcon60x60</string>
+		<string>AppIcon76x76</string>
+		<string>AppIcon83.5x83.5</string>
+		<string>AppIcon1024</string>
+	</array>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon60x60</string>
+			</array>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<!-- MANDATORY since Xcode 27 / the iOS 27 SDK (D-038, D-037 §4). Without
+	     it UIKit trips
+	     __UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption on the
+	     FrontBoard scene-creation path and kills the process with
+	     EXC_BREAKPOINT before any of our code runs - on the device AND on the
+	     simulator, because it is the LINKED SDK that is checked. TN3187.
+
+	     One scene, PDSceneDelegate, which also grafts SDL's sceneless UIWindow
+	     onto it: SDL 2.32.8 has no scene support and builds its window with
+	     -initWithFrame:, and with a manifest declared such a window appears in
+	     neither UIApplication.windows nor any scene's windows array, so nothing
+	     composites it (a black screen at a clean 60 fps). The key goes INSIDE
+	     the manifest dict; outside it, it is silently ignored. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>PDSceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+		<string>metal</string>
+	</array>
+	<!-- The ROM, xbla/, texture-packs/, pd.ini and the saves all live in
+	     Documents (overlay patch 0009). Both keys together are what makes that
+	     folder show up in Files as "Perfect Dark" and be editable in place. -->
+	<!-- Insurance, not a feature: nothing in this app scans for Bluetooth.
+	     SDL's iOS HIDAPI backend opens a CBCentralManager when the Steam
+	     HIDAPI hint is on (upstream input.c sets it), and iOS TERMINATES an app
+	     that touches CoreBluetooth without this key - the 0.0.0.2/0.0.0.3 device
+	     crash. pd_ios_main.m now overrides that hint off; if anything ever
+	     reaches CoreBluetooth anyway it must prompt, never abort. -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.rebelancap.perfectdark</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>perfectdark</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

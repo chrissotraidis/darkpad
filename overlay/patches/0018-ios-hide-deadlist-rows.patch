@@ -1,0 +1,114 @@
+Subject: menus: hide the rows that cannot work on iOS
+
+docs/ios-deadlist.md's "HIDE THE ROW" disposition, applied. Each row here is
+one a player can reach today and that either cannot do anything or actively
+harms them; the code behind each is left exactly as it is.
+
+  Check for Updates   replaces the running executable (update.c:879 ends in
+                      execv), which a signed, read-only app bundle cannot do.
+  Send Crash Report   the upload runs on the MAIN thread inside the crash
+                      (crashreport.c:309 from system.c:294). With curl on
+                      (D-010) crashReportCanSend() answers true again, so the
+                      row would now work - and that is exactly the problem:
+                      a blocking https POST from a signal handler is not a
+                      thing to hand a player. Stays hidden pending Q-012.
+                      The report itself is untouched: crashReportSave/Scan and
+                      the 200-line ring are file I/O and keep working, and the
+                      iOS shell adds the signal handler Apple platforms never
+                      had (crash.c:324).
+  Exit Game           an iOS app does not quit itself, and a row that looks as
+                      though it will is worse than no row.
+  Dump All Assets     writes gigabytes into the user's Documents container; the
+                      app is killed for disk pressure or the phone fills up.
+                      The CLI flags still work on the macOS oracle, which is
+                      where anyone dumping assets actually is.
+  Mods: Recording     the recorder is compiled out (patch 0011: system() is
+                      API_UNAVAILABLE(ios) and there is no second binary to
+                      spawn). It is the last page in the Dab's Mod chain, so
+                      ending the chain at Missions is what takes it off the
+                      phone.
+
+NOT hidden any more: **Community Packs**. It was on this list until patch 0040
+gave the iOS build a real libcurl (D-010), which is what community.c:444/602
+needed; the row and its one-tap PD Plus HD install are back on iOS and visionOS
+and are verified there (M-024, M-025). Ghost Trials' online rows were never
+hidden by this patch at all - they gate themselves on ghostnetIsAvailable()
+(ghostnet.c:1473), so they came back with curl on their own.
+
+Every hunk is `#ifndef PLATFORM_IOS` (or one `#ifdef`) around an existing array
+entry; no other platform's menus change by a byte.
+
+diff --git a/port/src/optionsmenu.c b/port/src/optionsmenu.c
+index f953d9c6b..08bc1678e 100644
+--- a/port/src/optionsmenu.c
++++ b/port/src/optionsmenu.c
+@@ -5724,7 +5724,16 @@ struct menudialogdef g_ExtendedDabsModMissionMenuDialog = {
+ 	g_ExtendedDabsModMissionMenuItems,
+ 	NULL,
+ 	MENUDIALOGFLAG_LITERAL_TEXT,
++	// Recording is the last page in the chain, and on iOS there is no recorder
++	// to configure: record.c is compiled out because system() is
++	// API_UNAVAILABLE(ios) and there is no second binary to spawn anyway
++	// (patch 0011, docs/ios-deadlist.md §1). Ending the chain here is what
++	// takes the page off the phone; nothing else in the file changes.
++#ifdef PLATFORM_IOS
++	NULL,
++#else
+ 	&g_ExtendedDabsModRecordingMenuDialog,
++#endif
+ };
+ 
+ struct menudialogdef g_ExtendedDabsModDisplayMenuDialog = {
+@@ -7024,6 +7033,11 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
+ 		0,
+ 		NULL,
+ 	},
++	// Dump All Assets writes gigabytes into the user's Documents container and
++	// then the app is killed for disk pressure, or the phone fills up
++	// (docs/ios-deadlist.md §6). The CLI flags still work on the macOS oracle,
++	// which is where anybody dumping assets actually is.
++#ifndef PLATFORM_IOS
+ 	{
+ 		MENUITEMTYPE_SELECTABLE,
+ 		0,
+@@ -7040,6 +7054,7 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
+ 		0,
+ 		menuhandlerAssetDumpStatus,
+ 	},
++#endif
+ 	{
+ 		MENUITEMTYPE_SELECTABLE,
+ 		0,
+diff --git a/src/game/mainmenu.c b/src/game/mainmenu.c
+index 9cb342aee..d02979124 100644
+--- a/src/game/mainmenu.c
++++ b/src/game/mainmenu.c
+@@ -5401,6 +5401,20 @@ struct menuitem g_MainMenuMenuItems[] = {
+ 		(void *)&g_ChangeAgentMenuDialog,
+ 	},
+ #ifndef PLATFORM_N64
++	// Three rows that cannot work on iOS (docs/ios-deadlist.md §2, §3, §9):
++	//   Check for Updates replaces the running executable (update.c:879 ends in
++	//     execv), which a signed, read-only app bundle can never do;
++	//   Send Crash Report uploads from the MAIN thread inside the crash
++	//     (crashreport.c:309 via system.c:294). With curl on (D-010)
++	//     crashReportCanSend() answers true again, so this row is hidden on
++	//     purpose rather than by absence - see Q-012;
++	//   Exit Game: an iOS app does not quit itself, and a row that looks like it
++	//     will is worse than no row. The shell writes pd.ini on resign-active
++	//     instead (patch 0009's job, main.c:124's atexit never runs here).
++	// The report itself is NOT hidden: crashReportSave/Scan and the 200-line
++	// ring are pure file I/O and keep working, and the shell adds a signal
++	// handler upstream does not have on Apple (app/ios/PDCrash.m).
++#ifndef PLATFORM_IOS
+ 	{
+ 		MENUITEMTYPE_SELECTABLE,
+ 		0,
+@@ -5425,6 +5439,7 @@ struct menuitem g_MainMenuMenuItems[] = {
+ 		0x00000007,
+ 		(void *)&g_ExitGameMenuDialog,
+ 	},
++#endif
+ #endif
+ 	{ MENUITEMTYPE_END },
+ };

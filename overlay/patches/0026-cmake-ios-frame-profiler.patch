@@ -1,0 +1,46 @@
+Subject: build: PD_IOS_PROF_SRC, the in-app frame-breakdown instrument
+
+Phase 3 needs to know where the frame goes, and on this device nothing outside
+the app can tell it: xctrace/Instruments cannot attach to a sideloaded build
+without a CoreDevice tunnel, which needs sudo on the Mac. So the profiler is
+in the app (app/gfx/pd_frame_prof.c) and is read over the :8775 bridge.
+
+This patch is the switch only. Without -DPD_IOS_PROF_SRC nothing is compiled,
+PD_IOS_PROFILER is undefined, and every begin/end pair patch 0027 places
+compiles to nothing - the oracle keeps building and replaying byte for byte.
+With it, the file is added to SRC_PORT at -O2 and its directory goes on the
+include path so the patched engine files can #include "pd_frame_prof.h".
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0c5b821e2..3bc021b45 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -678,6 +678,28 @@ if(PD_GL_ANGLE)
+   set_source_files_properties("${PD_ANGLE_GLUE}" PROPERTIES COMPILE_OPTIONS "-O2")
+ endif()
+ 
++# PD_IOS_PROF_SRC: the frame-breakdown instrument (app/gfx/pd_frame_prof.c).
++#
++# Instruments cannot be attached from outside on a sideloaded iOS build -
++# xctrace needs a CoreDevice tunnel this environment does not have - so the
++# profiler lives in the app and is read over the :8775 bridge. It is additive
++# and outside the vendored tree, like the ANGLE glue; the directory holding it
++# goes on the include path so the overlay patches that place the begin/end
++# pairs can just #include "pd_frame_prof.h".
++#
++# Without the flag nothing here is compiled and PD_IOS_PROFILER is undefined,
++# so every begin/end pair the patches added compiles to nothing.
++if(PD_IOS_PROF_SRC)
++  if(NOT EXISTS "${PD_IOS_PROF_SRC}")
++    message(FATAL_ERROR "PD_IOS_PROF_SRC: no profiler at ${PD_IOS_PROF_SRC}")
++  endif()
++  get_filename_component(PD_IOS_PROF_DIR "${PD_IOS_PROF_SRC}" DIRECTORY)
++  include_directories("${PD_IOS_PROF_DIR}")
++  add_definitions(-DPD_IOS_PROFILER)
++  list(APPEND SRC_PORT "${PD_IOS_PROF_SRC}")
++  set_source_files_properties("${PD_IOS_PROF_SRC}" PROPERTIES COMPILE_OPTIONS "-O2")
++endif()
++
+ set(SRC
+   ${SRC_GAME}
+   ${SRC_PORT}

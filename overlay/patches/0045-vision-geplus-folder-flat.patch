@@ -1,0 +1,38 @@
+Subject: visionOS 3D: GE Plus's folder screens are flat, like every menu (D-055)
+
+menuRender() draws every menu inside the flat span (D-055): identical in both
+eyes, exactly on the panel. GE Plus's front end (gexfront.c, GoldenEye's own
+folder screens) is handed over to BEFORE that span opens, and it draws the
+folder as a model through its own camera and scale matrices - so in 3D the
+fold took it for WORLD. Measured on the Vision Pro simulator over Multiplayer
+Options: stereo_frame_world=7, stereo_frame_flat=0, the paper and folder at
++3 px disparity and the text (rectangles) at 0 px, i.e. the words floating a
+little in front of the page they are printed on.
+
+gexFrontRender() now runs inside a flat span of its own. The tags are G_NOOPs:
+nothing changes in 2D or on any other platform, and the M-001 replay never
+opens GE Plus.
+
+GoldenEye's intro (geIntroRender, the gun barrel and cast reel) is left as it
+is - a cinematic, which the fold treats as the world like Perfect Dark's own
+cutscenes.
+
+diff --git a/src/game/menu.c b/src/game/menu.c
+index 604829745..9d6628d02 100644
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -6056,7 +6056,14 @@ Gfx *menuRender(Gfx *gdl)
+ 
+ 		overfront = true;
+ 	} else if (gexFrontIsActive()) {
++		// GE Plus's folder screens are menus too (D-055's flat span), but they
++		// are drawn here, before the span below opens, through gexfront.c's own
++		// camera and scale matrices - so in 3D the folder was folded as WORLD
++		// (+3 px behind the panel) under its own text at 0 px. Flat, like
++		// every other menu.
++		gDPPdDlTag(gdl++, PD_DLSPAN_FLAT_BEGIN);
+ 		gdl = gexFrontRender(gdl);
++		gDPPdDlTag(gdl++, PD_DLSPAN_FLAT_END);
+ 
+ 		if (!traceReportIsOpen()) {
+ 			return gdl;

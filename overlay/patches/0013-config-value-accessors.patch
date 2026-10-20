@@ -1,0 +1,104 @@
+Subject: config: get and set one setting by its "Section.Key" name
+
+The settings table is private to config.c and the only ways in are a line of
+pd.ini and a direct write to the registered variable. The iOS shell needs a
+third: the :8775 console bridge's `cfg get/set` (docs/remote-console.md) and
+the native settings page, whose NSUserDefaults truth is pushed into the live
+game key by key.
+
+Both new functions are thin wrappers over what configLoad() already does per
+line, so parsing, clamping and type dispatch are shared rather than
+re-implemented - a value the file would reject is rejected here too. An
+unregistered key returns 0 instead of being silently dropped, which is what
+makes a typo in a bridge command visible.
+
+Nothing else in the tree calls them; with the iOS shell absent this is dead
+code of about sixty lines.
+
+diff --git a/port/include/config.h b/port/include/config.h
+index e979c0265..4a3a25c2c 100644
+--- a/port/include/config.h
++++ b/port/include/config.h
+@@ -13,6 +13,12 @@ s32 configLoad(const char *fname);
+ // saves config to file (path extensions such as ! apply)
+ s32 configSave(const char *fname);
+ 
++// One setting by its full "Section.Key" name, in the string form pd.ini uses.
++// configSetValue() parses and clamps exactly as a line of the file does.
++// Both return 0 if the key is not registered.
++s32 configSetValue(const char *key, const char *val);
++s32 configGetValue(const char *key, char *dst, u32 dstsize);
++
+ // One section's live settings as "key=value" lines. See the definition.
+ u32 configDumpSection(const char *section, char *dst, u32 dstsize);
+ 
+diff --git a/port/src/config.c b/port/src/config.c
+index 06678ef36..8aae7d455 100644
+--- a/port/src/config.c
++++ b/port/src/config.c
+@@ -214,6 +214,65 @@ static void configSetFromString(const char *key, const char *val)
+ 	}
+ }
+ 
++/**
++ * One setting by its full "Section.Key" name, as the string pd.ini would hold.
++ *
++ * The iOS shell has two callers that cannot reach the settings table any other
++ * way: the :8775 console bridge's `cfg get/set`, and the native settings page,
++ * whose NSUserDefaults truth is pushed into the live game through exactly this
++ * call (docs/remote-console.md, docs/settings.md). Both go through the same
++ * clamping, parsing and type dispatch a line of pd.ini does, so a value that
++ * cannot come out of the file cannot come out of these either.
++ *
++ * Returns 0 when the key is not registered - which is also what a typo looks
++ * like, and is why the bridge reports it rather than swallowing it.
++ */
++s32 configSetValue(const char *key, const char *val)
++{
++	if (!key || !val || !configFindEntry(key)) {
++		return 0;
++	}
++
++	configSetFromString(key, val);
++
++	return 1;
++}
++
++s32 configGetValue(const char *key, char *dst, u32 dstsize)
++{
++	struct configentry *cfg;
++
++	if (!key || !dst || dstsize == 0) {
++		return 0;
++	}
++
++	dst[0] = '\0';
++	cfg = configFindEntry(key);
++
++	if (!cfg) {
++		return 0;
++	}
++
++	switch (cfg->type) {
++	case CFG_S32:
++		snprintf(dst, dstsize, "%d", *(s32 *)cfg->ptr);
++		break;
++	case CFG_F32:
++		snprintf(dst, dstsize, "%f", *(f32 *)cfg->ptr);
++		break;
++	case CFG_U32:
++		snprintf(dst, dstsize, "%u", *(u32 *)cfg->ptr);
++		break;
++	case CFG_STR:
++		snprintf(dst, dstsize, "%s", (char *)cfg->ptr);
++		break;
++	default:
++		return 0;
++	}
++
++	return 1;
++}
++
+ static void configSaveEntry(struct configentry *cfg, FILE *f)
+ {
+ 	switch (cfg->type) {

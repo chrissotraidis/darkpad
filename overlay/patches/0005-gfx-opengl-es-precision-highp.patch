@@ -1,0 +1,43 @@
+Subject: gfx_opengl: highp, not mediump, in the ES shaders
+
+Audit patches P2 and P3 (docs/substrate-audit.md 1.4), two lines.
+
+`precision mediump float;` is emitted into BOTH generated shaders when the
+context is ES. On every Apple GPU mediump is fp16. In the vertex shader that
+is gl_Position and the interpolated texture coordinates computed at half
+precision, and ESSL 3.00's own default there is highp, so the line makes
+things strictly worse than saying nothing. In the fragment shader the line
+cannot simply be deleted (ESSL leaves fragment float undeclared-by-default)
+but it has to say highp: the stretched-edge clamp computes 0.5/texSize, and
+an XBLA record at the 4096 cap makes that 1.2e-4 - below fp16's resolution
+next to a coordinate near 1.0, i.e. visible smearing on the largest tiles.
+
+diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
+index ccc08fa02..7ca66e188 100644
+--- a/port/fast3d/gfx_opengl.cpp
++++ b/port/fast3d/gfx_opengl.cpp
+@@ -285,7 +285,10 @@ static struct ShaderProgram* gfx_opengl_create_and_load_new_shader(uint64_t shad
+     vs_len += sprintf(vs_buf + vs_len, "#version %s\n", gl_glsl_version_str);
+ 
+     if (gl_es) {
+-        append_line(vs_buf, &vs_len, "precision mediump float;");
++        // highp, not mediump: mediump is fp16 on every Apple GPU, and this is
++        // the shader that computes gl_Position and interpolates the texture
++        // coordinates. ESSL 3.00's own default for vertex float is highp.
++        append_line(vs_buf, &vs_len, "precision highp float;");
+     }
+ 
+     if (gl_glsl_version >= 130) {
+@@ -388,7 +391,11 @@ static struct ShaderProgram* gfx_opengl_create_and_load_new_shader(uint64_t shad
+     fs_len += sprintf(fs_buf + fs_len, "#version %s\n", gl_glsl_version_str);
+ 
+     if (gl_es) {
+-        append_line(fs_buf, &fs_len, "precision mediump float;");
++        // Fragment float has no default in ESSL, so the line has to stay, but
++        // it has to say highp: XBLA texture records go up to 4096 across
++        // (xblatex.c XBLATEX_MAXDIM), and texEdge's 0.5/texSize is then 1.2e-4,
++        // which fp16 cannot resolve next to a coordinate near 1.0.
++        append_line(fs_buf, &fs_len, "precision highp float;");
+     }
+ 
+     if (gl_glsl_version >= 130) {

@@ -1,0 +1,100 @@
+Subject: player: where the player is standing, and whether it is paused (iOS only)
+
+Analogue movement is a claim about SPEED, and no screenshot can check one. Two
+samples of this a second apart with the touch stick held at a known deflection
+is the measurement: half a push should cover about half the ground of a full
+one, and a digital C-button mapping covers the same ground either way.
+
+playerIosIsPaused() is the same idea for the settings gear (D-037). The gear
+must be reachable in EVERY paused state and hidden only in live gameplay, and
+`g_Menus[0].curdialog` (menuIosDialogIsOpen, overlay 0019) answers for a menu
+dialog but says nothing about the frames where the player has pressed Start and
+the pause is still opening or closing - PAUSEMODE_PAUSING / PAUSEMODE_UNPAUSING.
+pausemode is the field menu.c:3857 itself writes when the pause menu is pushed,
+so it is the one the shell asks.
+
+Read-only, entirely inside PLATFORM_IOS, called from the shell's frame hook like
+every other engine read.
+
+diff --git a/src/game/player.c b/src/game/player.c
+index 2d1cfc030..a451d9f84 100644
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -8760,3 +8760,77 @@ void player0f0c3320(Mtxf *matrices, s32 count)
+ 		mtxF2L(&sp40, matrices + i);
+ 	}
+ }
++
++#ifdef PLATFORM_IOS
++/**
++ * Where the player is standing, for the :8775 bridge.
++ *
++ * Analogue movement is a claim about SPEED, and a claim about speed cannot be
++ * checked from a screenshot. Two samples of this a second apart, with the touch
++ * stick held at a known deflection, is the measurement: half a push should
++ * cover about half the ground of a full one. Read-only, iOS-only, and the
++ * bridge calls it from the frame hook like everything else.
++ */
++s32 playerIosGetPos(f32 *x, f32 *y, f32 *z)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (!p || !p->prop) {
++		return 0;
++	}
++
++	if (x) *x = p->prop->pos.x;
++	if (y) *y = p->prop->pos.y;
++	if (z) *z = p->prop->pos.z;
++
++	return 1;
++}
++
++/**
++ * Is the game paused, in any of the states that word covers?
++ *
++ * The settings gear (app/ios/PDTouchOverlay.m) is the only route into the iOS
++ * settings page, so it has to appear the moment play stops and disappear only
++ * while the player is really playing. menuIosDialogIsOpen() (overlay 0019)
++ * answers for an open menu dialog, which is most of it, but the pause has two
++ * transitional frames either side of that - PAUSEMODE_PAUSING before the
++ * dialog exists and PAUSEMODE_UNPAUSING after it is gone - and on a gamepad
++ * those are exactly the frames the player is looking at the screen expecting
++ * the gear. pausemode is what menu.c:3857 sets when the pause menu is pushed.
++ *
++ * Anything other than PAUSEMODE_UNPAUSED counts, and no player at all counts
++ * as paused: every failure mode here must SHOW the gear.
++ */
++s32 playerIosIsPaused(void)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (!p) {
++		return 1;
++	}
++
++	return p->pausemode != PAUSEMODE_UNPAUSED;
++}
++
++/**
++ * Is the player in aim mode right now?
++ *
++ * The on-screen AIM chip is hold-and-drag (D-046): pressing it holds R_TRIG,
++ * which under CONTROLMODE_PC is the aim button (bondmove.c:1272), and lifting
++ * the finger drops it. Whether that really LEAVES aim mode is an engine
++ * question - AIMCONTROL_HOLD is the default but a save may carry
++ * AIMCONTROL_TOGGLE - and insightaimmode is the field the engine itself sets
++ * either way. No screenshot answers this: PD's aim crosshair is a small centre
++ * reticle that a busy frame hides. Read-only, iOS-only.
++ */
++s32 playerIosGetAimMode(void)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (!p) {
++		return 0;
++	}
++
++	return p->insightaimmode ? 1 : 0;
++}
++#endif

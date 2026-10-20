@@ -1,0 +1,96 @@
+Subject: iOS: GE Plus's startup notices keep the run loop turning, and do not draw in the background
+
+upstream converts the player's GoldenEye ROM (gexPlusRomConvert) and unpacks
+the GoldenEye XBLA archive (gebeanUnpackAtStartup) and the Community Edition
+patch (gebeanCePrepareAtStartup) at startup, each on a worker thread, while
+the game thread draws gexPlusRomNotice() every 16 ms. On a desktop that is
+all a window needs. On iOS the game thread is UIKit's main thread, and
+nothing in those loops turns its run loop: for the whole conversion (1.7 s on
+the lane-3 simulator) or unpack (7 s there, longer on a phone) the app does
+not answer the system at all - a resign-active or a background is not
+delivered until it ends, and the shell's synchronous pd.ini + eeprom save
+on resign cannot run until then. The notice itself draws fine (measured, see
+D-071), so the first half of the fix is one SDL_PumpEvents() per notice call
+on iOS, which is SDL's own way of turning the UIKit run loop.
+
+The second half (D-075): once a background IS delivered, the shell suspends
+the renderer and the display-link pacer, and the game loop's frames stop at
+the pacer. These loops never reach the pacer - they call videoStartFrame /
+videoEndFrame directly - so without a check they would go on issuing GL and
+asking for presents for the rest of the unpack while the app is in the
+background, which iOS does not allow an app to do with the GPU. The notice
+now pumps FIRST and draws nothing while the shell says the app may not
+present (pdIosPresentAllowed, app/ios/PDPacing.m); the caller's loop keeps
+polling and sleeping, the worker carries on, and the notice draws again when
+the app returns to the foreground. Two counters (drawn / held) are exported
+for the shell's console bridge.
+
+Every other platform is unchanged.
+
+diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
+index 79673ec32..dc6763d2e 100644
+--- a/port/src/gexplusrom.c
++++ b/port/src/gexplusrom.c
+@@ -236,12 +236,62 @@ static Gfx *noticeText(Gfx *gdl, const char *text, s32 y)
+ 	return gdl;
+ }
+ 
++#ifdef PLATFORM_IOS
++// app/ios/PDPacing.m: 0 from the app entering the background until it is about
++// to return to the foreground.
++extern int pdIosPresentAllowed(void);
++// app/gfx/gfx_angle_egl.mm: presents so far, for the two log lines below.
++extern unsigned long long pdAngleSwapCount(void);
++
++// Notice frames drawn, and notice calls that drew nothing because the app was
++// in the background; read by the shell's console bridge.
++s32 g_GexPlusNoticeDrawn;
++s32 g_GexPlusNoticeHeld;
++#endif
++
+ void gexPlusRomNotice(const char *title, const char *line, s32 done, s32 total)
+ {
+ 	Gfx *gdl = g_NoticeGfx;
+ 	const s32 barw = 160;
+ 	const s32 fill = total > 0 ? barw * done / total : 0;
+ 
++#ifdef PLATFORM_IOS
++	// The game thread is UIKit's main thread on iOS, and every caller of this
++	// notice waits in a loop on it for seconds (the GoldenEye conversion, the
++	// GoldenEye XBLA unpack, the Community Edition patch). Turning the run loop
++	// once a notice call keeps the app answering the system - a resign-active,
++	// a background - while the worker thread does the work.
++	//
++	// And once the app is in the background, the notice must not draw: the
++	// shell has suspended the renderer and the pacer, and the game loop's own
++	// frames stop at the pacer, which these loops never reach. No frame is
++	// started, no GL issued and nothing presented until the app is coming back;
++	// the caller's loop keeps polling (and sleeping 16 ms) while the worker
++	// carries on.
++	{
++		static s32 held;
++
++		SDL_PumpEvents();
++
++		if (!pdIosPresentAllowed()) {
++			if (held++ == 0) {
++				sysLogPrintf(LOG_NOTE, "gexplus: notice held, app in the background (notice frames drawn %d, presents %llu)",
++					g_GexPlusNoticeDrawn, pdAngleSwapCount());
++			}
++			g_GexPlusNoticeHeld++;
++			return;
++		}
++
++		if (held) {
++			sysLogPrintf(LOG_NOTE, "gexplus: notice drawing again after %d calls held in the background (notice frames drawn %d, presents %llu)",
++				held, g_GexPlusNoticeDrawn, pdAngleSwapCount());
++			held = 0;
++		}
++
++		g_GexPlusNoticeDrawn++;
++	}
++#endif
++
+ 	gDPSetColorImage(gdl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 320, g_NoticeColourImage);
+ 	gDPSetScissor(gdl++, G_SC_NON_INTERLACE, 0, 0, 320, 240);
+ 	gDPSetCycleType(gdl++, G_CYC_FILL);

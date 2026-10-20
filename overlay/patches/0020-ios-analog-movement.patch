@@ -1,0 +1,92 @@
+Subject: input: the iOS touch stick as analogue movement, on the right stick
+
+Q-003 asked which control style iOS should default to, because D-013's touch
+stick drives the four C buttons and so has no speed between "still" and "run".
+The answer is that the default style already has analogue movement and the port
+was feeding the wrong stick.
+
+Under CONTROLMODE_PC the LEFT stick is the look axis and the RIGHT stick is
+movement: bondmove.c:1281-1283 assigns c2stickx/c2sticky straight into
+movedata.analogstrafe/analogwalk. And CONTROLMODE_PC is what this port already
+runs in - Game.PlayerN.ExtendedControls defaults to 1 (mplayer.c:286) and
+gamefile.c:169 and :344 force the mode from it on both the new-file and
+load paths. D-013 read "the analog stick is the look axis" off the W/A/S/D
+binds, which is true of the left stick and only of it.
+
+So: one more injected axis, merged exactly as the left stick's already is
+("only where the real pad is not already pushing"), and the touch layer sends
+the curved stick magnitude as -128..127 instead of four booleans. No control
+style changes, no bind moves, nothing outside PLATFORM_IOS.
+
+diff --git a/port/include/input.h b/port/include/input.h
+index 043b1dd13..c03a27fd9 100644
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -242,6 +242,10 @@ void inputMouseGetRawDelta(s32 *dx, s32 *dy);
+ // :8775 bridge share. See the definitions in port/src/input.c.
+ void inputIosLookAddDegrees(f32 degx, f32 degy);
+ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
++// The touch stick as analogue movement. Under CONTROLMODE_PC (the port's
++// default) the right stick is movedata.analogstrafe/analogwalk - see the
++// definition in port/src/input.c.
++void inputIosPadSetRStick(s32 x, s32 y);
+ void inputIosPadSetButton(u32 button, s32 down);
+ u32 inputIosPadGetButtons(void);
+ // The absolute touch pointer that drives PD's own menu-mouse path. nx/ny are
+diff --git a/port/src/input.c b/port/src/input.c
+index 21dc7d8d9..6bc04fec8 100644
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -1202,6 +1202,7 @@ static s32 iosPointerWheel = 0, iosPointerWheelFrame = 0;
+ static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
+ static u32 iosPadButtons = 0;
+ static s32 iosPadStickX = 0, iosPadStickY = 0;
++static s32 iosPadRStickX = 0, iosPadRStickY = 0;
+ 
+ void inputIosLookAddDegrees(f32 degx, f32 degy)
+ {
+@@ -1216,6 +1217,30 @@ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
+ 	iosPadStickY = (sticky < -128) ? -128 : ((sticky > 127) ? 127 : sticky);
+ }
+ 
++/**
++ * The touch stick as ANALOG MOVEMENT (Q-003, D-0xx).
++ *
++ * D-013 sent the touch stick in as the four C buttons because "the analog
++ * stick is the look axis". That is true of the LEFT stick, and only of it.
++ * Under CONTROLMODE_PC - which is the port's default, because
++ * Game.PlayerN.ExtendedControls defaults to 1 (mplayer.c:286) and gamefile.c
++ * forces the mode from it on every load - the RIGHT stick is analogue
++ * movement: bondmove.c:1281-1283 assigns c2stickx/c2sticky straight into
++ * movedata.analogstrafe/analogwalk, which is the path that has a walk speed
++ * between "still" and "run" at all.
++ *
++ * So no control style has to change and no bind has to move: the touch stick
++ * belongs on rstick. Range is the N64 pad's, -128..127, and the merge below is
++ * "only where the real pad is not already pushing", exactly as the left
++ * stick's is - a physical stick always wins over a stale touch value, and the
++ * two are never averaged into a direction neither asked for.
++ */
++void inputIosPadSetRStick(s32 x, s32 y)
++{
++	iosPadRStickX = (x < -128) ? -128 : ((x > 127) ? 127 : x);
++	iosPadRStickY = (y < -128) ? -128 : ((y > 127) ? 127 : y);
++}
++
+ void inputIosPadSetButton(u32 button, s32 down)
+ {
+ 	if (down) {
+@@ -1249,6 +1274,13 @@ static void inputIosMergePad(OSContPad *npad)
+ 		npad->stick_y = iosPadStickY;
+ 	}
+ 
++	if (!npad->rstick_x && iosPadRStickX) {
++		npad->rstick_x = iosPadRStickX;
++	}
++
++	if (!npad->rstick_y && iosPadRStickY) {
++		npad->rstick_y = iosPadRStickY;
++	}
+ }
+ 
+ static void inputIosLatchFrame(void)

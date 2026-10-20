@@ -1,0 +1,50 @@
+Subject: pdsched: call the iOS shell once per frame, before inputUpdate()
+
+The iOS shell (app/ios/) has work that must happen on the game's own thread at
+a known point in the frame and nowhere else: draining the :8775 console
+bridge's command queue, publishing the injected touch/pad state, consuming a
+queued perfectdark:// deep link, and reading the frame counters the pacing
+instrument reports (docs/pacing.md).
+
+Before inputUpdate() is the one correct place. Anything the shell injects -
+the floating stick, the drag-look degrees, a bridge `pad` press - is then read
+by THIS frame's inputReadController() rather than the next one, so a bridge
+command and its effect are never a frame apart, which is what makes
+scripts/sim-validate.sh's assertions deterministic.
+
+One function, one call, behind PLATFORM_IOS: on every other platform this file
+is byte for byte upstream's.
+
+diff --git a/port/src/pdsched.c b/port/src/pdsched.c
+index fe47662cb..da6d3f44d 100644
+--- a/port/src/pdsched.c
++++ b/port/src/pdsched.c
+@@ -247,6 +247,11 @@ void schedSubmitTask(OSSched *sc, OSScTask *t)
+ 	}
+ }
+ 
++#ifdef PLATFORM_IOS
++// app/ios/PDShell.m — the iOS shell's per-frame entry point.
++extern void pdIosFrameHook(void);
++#endif
++
+ void schedStartFrame(OSSched *sc)
+ {
+ 	videoStartFrame();
+@@ -282,6 +287,16 @@ void schedEndFrame(OSSched *sc)
+ {
+ 	sc->frameCount++;
+ 
++#ifdef PLATFORM_IOS
++	// The iOS shell's one call into the frame, on the game's own thread and at
++	// a known point: before inputUpdate(), so anything it injects (the touch
++	// layer's stick and look, a pad button, a :8775 bridge command) is read by
++	// this frame rather than the next. Everything the shell does to the engine
++	// happens here; nothing else in the app touches engine state off-thread.
++	// app/ios/PDShell.m.
++	pdIosFrameHook();
++#endif
++
+ #if PAL
+ 	if (!g_Resetting && (sc->frameCount & 1)) {
+ 		// osStopTimer(&g_SchedRspTimer);

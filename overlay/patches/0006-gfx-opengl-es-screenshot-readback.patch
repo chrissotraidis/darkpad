@@ -1,0 +1,56 @@
+Subject: gfx_opengl: read the screen back as RGBA on ES, and pack it down
+
+Audit patch P4 (docs/substrate-audit.md 1.4).
+
+`glReadPixels(..., GL_RGB, GL_UNSIGNED_BYTE, ...)` is not legal in OpenGL ES
+3.0: the only formats guaranteed for the default framebuffer are
+GL_RGBA/GL_UNSIGNED_BYTE and the implementation-preferred pair queried through
+GL_IMPLEMENTATION_COLOR_READ_FORMAT/TYPE. ANGLE-Metal takes the spec at its
+word and returns GL_INVALID_OPERATION, which this function detects and reports
+as a clean failure - so F12 takes no screenshot, and neither does
+`--screenshot-frame`, which is the seeded replay's evidence (M-001).
+
+The read therefore goes into a scratch RGBA buffer under gl_es and is packed
+to RGB for the caller, which is unchanged. The desktop path is untouched, so
+the oracle's screenshots are still the same bytes as before.
+
+diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
+index 7ca66e188..8349def05 100644
+--- a/port/fast3d/gfx_opengl.cpp
++++ b/port/fast3d/gfx_opengl.cpp
+@@ -2783,9 +2783,33 @@ static bool gfx_opengl_read_screen_pixels(int x, int y, int width, int height, v
+         // drain anything that was already pending, so the check below is ours
+     }
+ 
+-    glReadPixels(x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, rgb);
++    bool ok;
+ 
+-    const bool ok = (glGetError() == GL_NO_ERROR);
++    if (gl_es) {
++        // GL_RGB is not a legal glReadPixels format in ES 3.0 - only
++        // GL_RGBA/GL_UNSIGNED_BYTE plus the one pair the implementation
++        // advertises are guaranteed - so the read goes into a scratch RGBA
++        // buffer and is packed down to the RGB the caller asked for. Without
++        // this the read fails cleanly and takes F12 and --screenshot-frame
++        // (the port's regression instrument) with it.
++        static std::vector<uint8_t> scratch;
++        const size_t npx = (size_t)width * (size_t)height;
++        scratch.resize(npx * 4);
++        glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, scratch.data());
++        ok = (glGetError() == GL_NO_ERROR);
++        if (ok) {
++            const uint8_t *src = scratch.data();
++            uint8_t *dst = (uint8_t *)rgb;
++            for (size_t i = 0; i < npx; ++i, src += 4, dst += 3) {
++                dst[0] = src[0];
++                dst[1] = src[1];
++                dst[2] = src[2];
++            }
++        }
++    } else {
++        glReadPixels(x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, rgb);
++        ok = (glGetError() == GL_NO_ERROR);
++    }
+ 
+     glPixelStorei(GL_PACK_ALIGNMENT, prevalign);
+     glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[current_framebuffer].fbo);

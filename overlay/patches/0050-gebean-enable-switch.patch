@@ -1,0 +1,120 @@
+Subject: GE Plus: a switch for the GoldenEye XBLA release, on by default
+
+The user wants the GoldenEye XBLA release to have an off switch in the iOS
+settings, the way Perfect Dark's own release has (D-019, D-032): off is
+GoldenEye's N64 look in GE Plus, without taking the release out of the
+added-content folder. Upstream had exactly that key, Mod.XblaGoldenEye
+("Enable GoldenEye Characters"), and retired it in be757a939 (2026-09-21)
+because it was OFF by default and a player who had put the release in the
+right folder still saw none of it. The port followed the retirement (D-072:
+no switch). This brings the key back ON by default (D-081), which keeps the
+reason upstream retired it answered: adding the release still needs nothing
+else.
+
+Off is "the release is not here": gebeanLocate() returns before it scans, so
+archivePath and rootPath stay empty, gebeanIsAvailable() and
+gebeanGetEnabled() say no (GoldenEye X borrowing is left alone), nothing is
+unpacked at startup, the Combat Simulator pool is built from GE Plus's own
+converted characters (gebeanPoolRefreshRom()), and every one of the ~26
+gebeanGetEnabled() call sites (HD levels, props, guns, skies, menu art, hit
+puffs, the HUD) takes the path it takes with no release added - a state the
+port already ships and tests. Gating gebeanGetEnabled() alone was the old
+switch's shape, but the pool and gun refreshes now ask gebeanIsAvailable(),
+so it would leave the release's characters in the pool with nothing to draw.
+
+The value is read ONCE a run, the first time anything asks (after
+configInit()): gebeanPoolRefresh() and gebeanUnpackAtStartup() build from the
+release at startup, so a release that disappeared mid-run would strand the
+pool's rows. A change takes effect the next time the game starts; the
+settings page says so, and the shell saves pd.ini as soon as the row moves.
+
+diff --git a/port/include/gebean.h b/port/include/gebean.h
+index ce3af719d..b18c84e9b 100644
+--- a/port/include/gebean.h
++++ b/port/include/gebean.h
+@@ -62,6 +62,13 @@ struct modelnode;
+ /** Whether there is GoldenEye content to draw on: the release, or GoldenEye X to borrow from. */
+ s32 gebeanGetEnabled(void);
+ 
++/**
++ * Mod.XblaGoldenEye (overlay 0050): whether the player has the GoldenEye XBLA
++ * release switched on. Read once a run, at the first ask; off is the same as
++ * the release not being there.
++ */
++s32 gebeanSwitchIsOn(void);
++
+ /** Whether a copy was found in xbla/, unpacked or not. Never unpacks. */
+ s32 gebeanIsAvailable(void);
+ 
+diff --git a/port/src/gebean.c b/port/src/gebean.c
+index e93f9d462..afdf50867 100644
+--- a/port/src/gebean.c
++++ b/port/src/gebean.c
+@@ -2482,6 +2482,46 @@ static char archivePath[FS_MAXPATH + 1]; // what the player dropped, when it is
+ static s32 scanned;
+ static s32 unpackFailed;
+ 
++/**
++ * Mod.XblaGoldenEye (overlay 0050, D-081): the player's switch for the
++ * GoldenEye XBLA release, ON by default. Upstream retired the old checkbox of
++ * this name on 2026-09-21 because it was OFF by default and a player who had
++ * added the release saw none of it; the port's settings page wants the switch
++ * back so the release can be turned off for GoldenEye's own N64 look, the way
++ * Perfect Dark's release can.
++ *
++ * Off means the release is not here at all: gebeanLocate() finds nothing, so
++ * gebeanIsAvailable() and gebeanGetEnabled() say no, nothing is unpacked at
++ * startup, the Combat Simulator's pool is GE Plus's own converted characters
++ * (gebeanPoolRefreshRom()) and every HD level, prop, gun and menu picture
++ * falls back exactly as it does with no release added. That is decided once a
++ * run: the pool and the gun rows are built at startup from what the release
++ * gave, and a release that vanished under them mid-run would leave rows with
++ * nothing to draw. So the value is read the first time anything asks, and a
++ * change takes effect the next time the game starts.
++ */
++static s32 switchOn = 1;        // what pd.ini (and the settings page) says
++static s32 switchThisRun = -1;  // what this run went with, at the first look
++
++PD_CONSTRUCTOR static void gebeanSwitchConfigInit(void)
++{
++	configRegisterInt("Mod.XblaGoldenEye", &switchOn, 0, 1);
++}
++
++s32 gebeanSwitchIsOn(void)
++{
++	if (switchThisRun < 0) {
++		switchThisRun = switchOn ? 1 : 0;
++
++		if (!switchThisRun) {
++			sysLogPrintf(LOG_NOTE, "gebean: the GoldenEye XBLA release is switched off (Mod.XblaGoldenEye=0), "
++					"GE Plus keeps GoldenEye's N64 look this run");
++		}
++	}
++
++	return switchThisRun;
++}
++
+ /**
+  * On when there is GoldenEye content to draw on: the release in added-content/
+  * (unpacked or not) or GoldenEye X installed to borrow from. Until 2026-09-21
+@@ -2489,6 +2529,7 @@ static s32 unpackFailed;
+  * and a player who had put the release in the right folder still saw none of
+  * it until they found the box. There is nothing to choose: without the content
+  * the switch did nothing, and with it there is no reason to leave it off.
++ * (The port brings the key back ON by default, gebeanSwitchIsOn() above.)
+  */
+ s32 gebeanGetEnabled(void)
+ {
+@@ -3566,6 +3607,12 @@ static s32 gebeanLocate(s32 mayUnpack)
+ 		return 1;
+ 	}
+ 
++	// switched off (overlay 0050): as if nothing were in added-content/, so
++	// archivePath stays empty and every caller takes its no-release path
++	if (!gebeanSwitchIsOn()) {
++		return 0;
++	}
++
+ 	if (!scanned) {
+ 		scanned = 1;
+ 

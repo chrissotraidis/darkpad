@@ -1,0 +1,186 @@
+Subject: gfx_opengl: framebuffer 0 can be a visionOS eye instead of the window
+
+The visionOS 3D mode renders each eye into an app-owned MTLTexture that ANGLE
+draws through an EGLImage-wrapped FBO (app/vision3d/PDEyeTargets.mm, D-048).
+This patch is the engine's whole half of that: slot 0 of the backend's
+`framebuffers` vector - "the screen" - stops being hard-wired to GL name 0 and
+asks pdVisionEyeFBO() instead.
+
+Six paths aim at slot 0 and every one of them follows the redirect unchanged:
+the game's direct draw (start_draw_to_framebuffer), the MSAA resolve out of
+game_framebuffer, copy_framebuffer, the Vivid Colours / Black Level grade pass,
+read_screen_pixels (F12 and --screenshot-frame), and the restore-bind after
+each of those. That is why the seam is here and not in gfx_pc: nothing above
+the backend learns that a frame is now an eye.
+
+Two latent bugs are fixed on the way, both of which only bite once slot 0 has a
+non-zero name:
+
+  * resolve_msaa_color_buffer restored the binding with the framebuffer INDEX
+    where the NAME was wanted (`current_framebuffer`, not
+    `framebuffers[current_framebuffer].fbo`). The two are the same number only
+    while the current slot is 0 and slot 0 is the window.
+  * copy_framebuffer and the grade pass asked for GL_BACK as the read buffer of
+    slot 0. GL_BACK is legal only for the DEFAULT framebuffer; ES 3.0 raises
+    GL_INVALID_OPERATION for the mismatch, which is the same trap patch 0007
+    already had to fix once.
+
+Everything is behind TARGET_OS_VISION: on iOS, macOS, Linux and Windows
+pd_screen_fbo() is a compile-time `return 0`, the compiler folds every use back
+to the literal the code had before, and pdVisionEyeFBO is not referenced at
+all. The streaming capture entry points (gfx_opengl_capture_*) still name 0
+directly - they are the ffmpeg recorder, which patch 0011 compiles out on iOS
+and visionOS entirely.
+
+diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
+index 58c2f416f..eac1889d3 100644
+--- a/port/fast3d/gfx_opengl.cpp
++++ b/port/fast3d/gfx_opengl.cpp
+@@ -73,6 +73,48 @@ static uint32_t frame_count;
+ 
+ static std::vector<Framebuffer> framebuffers;
+ static size_t current_framebuffer;
++
++// ---------------------------------------------------------------------------
++// visionOS 3D mode: framebuffer 0 is an EYE, not the window (D-048).
++//
++// Slot 0 of `framebuffers` is "the screen": GL name 0, the window's back
++// buffer. Everything the renderer does at the end of a frame is aimed at it -
++// the game draws straight into it when MSAA is off, the multisampled
++// game_framebuffer is RESOLVED into it when MSAA is on, copy_framebuffer reads
++// it, the Vivid Colours / Black Level grade pass blits out of it and draws back
++// over it, and read_screen_pixels is how F12 and --screenshot-frame get a
++// picture.
++//
++// In the visionOS 3D mode there is no window to present into: each eye is an
++// app-owned MTLTexture wrapped as a real FBO (app/vision3d/PDEyeTargets.mm).
++// Redirecting slot 0 to that FBO is therefore the WHOLE seam - all six paths
++// above follow it for free, and not one line above the backend has to know that
++// a frame is now an eye. The alternative, teaching gfx_pc about eyes, would
++// have put the MSAA resolve, the grade pass and the screenshot on three
++// separate special cases.
++//
++// pdVisionEyeFBO() answers 0 whenever 3D is off, which is the plain window
++// again. On iOS, macOS and every other platform the call does not exist: the
++// helper is a compile-time `return 0` and every use below is the literal the
++// code had before.
++// ---------------------------------------------------------------------------
++#ifdef __APPLE__
++#include <TargetConditionals.h>
++#endif
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++extern "C" unsigned int pdVisionEyeFBO(int *w, int *h);
++#define PD_VISION_EYE_FB 1
++#else
++#define PD_VISION_EYE_FB 0
++#endif
++
++static inline GLuint pd_screen_fbo(void) {
++#if PD_VISION_EYE_FB
++    return (GLuint)pdVisionEyeFBO(NULL, NULL);
++#else
++    return 0;
++#endif
++}
+ static float current_noise_scale;
+ static int current_anisotropy_level;
+ static FilteringMode current_filter_mode = FILTER_LINEAR;
+@@ -2116,14 +2158,15 @@ static void gfx_opengl_grade_frame(void) {
+     } else {
+         glDisable(GL_SCISSOR_TEST);
+ 
+-        // The window into the texture
+-        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+-        glReadBuffer(GL_BACK);
++        // The window - or, in 3D, the eye - into the texture
++        const GLuint screen_fbo = framebuffers[0].fbo;
++        glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_fbo);
++        glReadBuffer(screen_fbo ? GL_COLOR_ATTACHMENT0 : GL_BACK);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, grade_fbo);
+         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+ 
+-        // And back over the window, graded
+-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
++        // And back over it, graded
++        glBindFramebuffer(GL_FRAMEBUFFER, screen_fbo);
+         glDisable(GL_BLEND);
+         glDisable(GL_DEPTH_TEST);
+         glDisable(GL_CULL_FACE);
+@@ -2564,6 +2607,13 @@ static void gfx_opengl_update_framebuffer_parameters(int fb_id, uint32_t width,
+                                                      bool can_extract_depth) {
+     Framebuffer& fb = framebuffers[fb_id];
+ 
++    // Slot 0's GL name is not a constant any more (see pd_screen_fbo above):
++    // in 3D it is the eye the engine is about to draw, and the eye rotates
++    // through a ring. Re-read it wherever slot 0 is about to be used.
++    if (fb_id == 0) {
++        fb.fbo = pd_screen_fbo();
++    }
++
+     width = max(width, 1U);
+     height = max(height, 1U);
+ 
+@@ -2637,6 +2687,9 @@ bool gfx_opengl_start_draw_to_framebuffer(int fb_id, float noise_scale) {
+ 
+     if (gfx_framebuffers_enabled && fb_id < (int)framebuffers.size()) {
+         Framebuffer& fb = framebuffers[fb_id];
++        if (fb_id == 0) {
++            fb.fbo = pd_screen_fbo();
++        }
+         if (noise_scale != 0.0f) {
+             current_noise_scale = 1.0f / noise_scale;
+         }
+@@ -2682,7 +2735,10 @@ void gfx_opengl_resolve_msaa_color_buffer(int fb_id_target, int fb_id_source) {
+     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_src.fbo);
+     glBlitFramebuffer(0, 0, fb_src.width, fb_src.height, 0, 0, fb_dst.width, fb_dst.height, GL_COLOR_BUFFER_BIT,
+                       GL_NEAREST);
+-    glBindFramebuffer(GL_FRAMEBUFFER, current_framebuffer);
++    // The framebuffer NAME, not the slot index. They are the same number only
++    // while the current slot is 0 and slot 0 is the window - which is exactly
++    // what stops being true in 3D.
++    glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[current_framebuffer].fbo);
+     glEnable(GL_SCISSOR_TEST);
+ }
+ 
+@@ -2752,18 +2808,23 @@ void gfx_opengl_copy_framebuffer(int fb_dst, int fb_src, int left, int top, bool
+         std::swap(dstY0, dstY1);
+     }
+ 
+-    if (fb_src == 0) {
++    if (fb_src == 0 && src.fbo == 0) {
+         // GLES does not support GL_FRONT here
+         glReadBuffer((use_back || gl_es) ? GL_BACK : GL_FRONT);
+     } else {
++        // Slot 0 with a non-zero name is the eye FBO, and GL_BACK is only a
++        // legal read buffer for the DEFAULT framebuffer - ES 3.0 raises
++        // GL_INVALID_OPERATION for the mismatch (the same trap patch 0007
++        // found in the grade pass).
+         glReadBuffer(GL_COLOR_ATTACHMENT0);
+     }
+ 
+     glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+ 
+-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[current_framebuffer].fbo);
++    const GLuint cur_fbo = framebuffers[current_framebuffer].fbo;
++    glBindFramebuffer(GL_FRAMEBUFFER, cur_fbo);
+ 
+-    glReadBuffer(GL_BACK);
++    glReadBuffer(cur_fbo ? GL_COLOR_ATTACHMENT0 : GL_BACK);
+ 
+     glEnable(GL_SCISSOR_TEST);
+ }
+@@ -2789,8 +2850,12 @@ void gfx_opengl_set_mipmap_filter(MipmapFilteringMode mode) {
+ // told about it, because the one caller writing a PNG walks the rows anyway.
+ static bool gfx_opengl_read_screen_pixels(int x, int y, int width, int height, void *rgb) {
+     gl_mesh_leave();
+-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+-    glReadBuffer(GL_BACK);
++    // Slot 0 is the window in 2D and the eye the frame was just drawn into in
++    // 3D, so --screenshot-frame and F12 are the same instrument in both - which
++    // is what makes the M2 gate a pixel comparison against the 2D oracle.
++    const GLuint screen_fbo = framebuffers.empty() ? 0 : framebuffers[0].fbo;
++    glBindFramebuffer(GL_FRAMEBUFFER, screen_fbo);
++    glReadBuffer(screen_fbo ? GL_COLOR_ATTACHMENT0 : GL_BACK);
+ 
+     GLint prevalign = 4;
+     glGetIntegerv(GL_PACK_ALIGNMENT, &prevalign);

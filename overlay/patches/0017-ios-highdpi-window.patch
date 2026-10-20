@@ -1,0 +1,61 @@
+Subject: gfx_sdl2: ask SDL for a high-DPI window on iOS
+
+Without SDL_WINDOW_ALLOW_HIGHDPI, SDL's UIKit Metal view takes
+contentScaleFactor 1.0, so the CAMetalLayer's drawable is the window's size in
+POINTS and the whole game renders at a ninth of the pixels the panel has
+(844x390 instead of 2532x1170 on the lane-3 iPhone 17e) and is upscaled by the
+compositor. It looks like a soft texture filter and it is not one; it is the
+single most common silent regression in this family of ports, and it survives
+a screenshot because the screenshot is upscaled too.
+
+Measured on the simulator before this patch: `state` reported
+drawable=844x390, contents_scale=3.00, native_resolution=MISMATCH. After it,
+drawable=2532x1170 and the assertion in scripts/sim-validate.sh passes - that
+assertion exists precisely because this is invisible by eye.
+
+The replay gate still runs at 844x390, through PD_IOS_RENDER_SCALE=1 in the
+ANGLE glue, because the committed oracle frame is that size and a pixel diff
+is only a gate at matched resolution.
+
+diff --git a/port/fast3d/gfx_sdl2.cpp b/port/fast3d/gfx_sdl2.cpp
+index 0eb8b0530..56df84d34 100644
+--- a/port/fast3d/gfx_sdl2.cpp
++++ b/port/fast3d/gfx_sdl2.cpp
+@@ -138,6 +138,13 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+     window_height = set->height;
+ 
+ #ifdef SDL_HINT_VIDEO_HIGHDPI_DISABLED
++    // On iOS the flag below is not enough on its own: SDL_CreateWindow strips
++    // SDL_WINDOW_ALLOW_HIGHDPI whenever this hint is set (SDL_video.c:1742),
++    // and Video.AllowHiDpi defaults to 0. A phone has one panel and one right
++    // answer, so the setting does not get to turn native resolution off here;
++    // PD_IOS_RENDER_SCALE (app/gfx/gfx_angle_egl.mm) is the render-scale lever
++    // instead, and it is what the seeded replay uses to match the oracle.
++#ifndef PLATFORM_IOS
+     if (!set->allow_hidpi) {
+         // HiDPI control, if available
+         SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1");
+@@ -146,6 +153,7 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+         SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitor");
+ #endif
+     }
++#endif
+ #endif
+ 
+     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+@@ -207,6 +215,15 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+     // ANGLE draws into the window's CAMetalLayer; SDL must not make a GL
+     // context of its own, so SDL_WINDOW_OPENGL must NOT be set here.
+     flags |= SDL_WINDOW_METAL;
++#ifdef PLATFORM_IOS
++    // Without this SDL's Metal view takes contentScaleFactor 1.0 and the whole
++    // game renders at a third of the panel's pixels and is upscaled by the
++    // compositor - a soft picture that looks like a filtering bug and is not
++    // one. With it the drawable is UIScreen.nativeScale x points, i.e. the
++    // 2532x1170 the iPhone 17e actually has. The charter's acceptance is
++    // "native drawable resolution"; this is the line that makes it true.
++    flags |= SDL_WINDOW_ALLOW_HIGHDPI;
++#endif
+ #else
+     flags |= SDL_WINDOW_OPENGL;
+ #endif

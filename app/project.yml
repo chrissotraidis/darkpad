@@ -1,0 +1,252 @@
+# Perfect Dark iOS — xcodegen project (D-009).
+#
+# CMake cross-builds the engine into build/ios-{device,simulator}/libpd.a
+# (scripts/build-ios.sh); this project is only the bundle: the shell sources,
+# the Info.plist, the ANGLE xcframeworks, the static SDL2, the signing and the
+# OTA export. Regenerate with scripts/gen-app-project.sh — never edit the
+# .xcodeproj, it is generated and gitignored.
+#
+# The per-configuration library search path is what selects device vs simulator
+# libpd.a and SDL2: $(PLATFORM_NAME) is iphoneos or iphonesimulator, and the
+# work/deps-$(PLATFORM_NAME) symlinks are named to match.
+name: perfectdark
+options:
+  bundleIdPrefix: com.rebelancap
+  createIntermediateGroups: true
+settings:
+  base:
+    # Your own team. Set DEVELOPMENT_TEAM in the environment, or pass it to
+    # xcodebuild: a signed build needs a team, and it is never this repo's.
+    DEVELOPMENT_TEAM: "$(DEVELOPMENT_TEAM)"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    # visionOS floors at 26.0, not 1.0/2.0: the ANGLE xrOS slices are built
+    # minos 26.0 because Chromium links libclang_rt.xros.a, which is 26.0-only
+    # (verified with vtool; dhewm3-ios D-016 found the same). Harmless on the
+    # iOS target, which never reads it.
+    XROS_DEPLOYMENT_TARGET: "26.0"
+    CLANG_ENABLE_OBJC_ARC: "YES"
+    ENABLE_BITCODE: "NO"
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    # Xcode 26's Debug configuration otherwise links the app as a stub plus a
+    # "debug dylib", and the stub's entry point wants a main() that lives in the
+    # dylib: "Undefined symbols: _main". Off, so Debug and Release link the same
+    # way and a Debug .app is a real .app that simctl can install.
+    ENABLE_DEBUG_DYLIB: "NO"
+    OTHER_CFLAGS: "-fno-strict-aliasing -Wno-deprecated-declarations"
+    HEADER_SEARCH_PATHS:
+      - "$(SRCROOT)/ios"
+      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include"
+      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include/SDL2"
+    # $(PLATFORM_NAME) is iphoneos / iphonesimulator / xros / xrsimulator, and
+    # the work/deps-* prefixes are named to match on all four — so the header
+    # paths above need no visionOS case at all. The library path below is iOS's
+    # only because the engine build dirs are build/ios-*; the visionOS target
+    # overrides it with build/{visionos,xrsimulator}.
+    LIBRARY_SEARCH_PATHS:
+      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/lib"
+      - "$(SRCROOT)/../work/curl-$(PLATFORM_NAME)/lib"
+      - "$(SRCROOT)/../build/ios-$(PD_SLICE)"
+targets:
+  perfectdark:
+    type: application
+    platform: iOS
+    sources:
+      # The whole shell. PDBridge.m compiles to nothing when PD_PUBLIC is set
+      # (scripts/gen-app-project.sh PD_PUBLIC=1), which is how the :8775
+      # console stays out of public builds.
+      - path: ios/pd_ios_main.m
+      - path: ios/PDShell.m
+      - path: ios/PDGeometry.m
+      - path: ios/PDCrash.m
+      - path: ios/PDWatchdog.m
+      - path: ios/PDPacing.m
+      - path: ios/PDDefaults.m
+      - path: ios/PDOnboarding.m
+      - path: ios/PDDeepLink.m
+      - path: ios/PDSceneDelegate.m
+      - path: ios/PDTouchOverlay.m
+      - path: ios/PDController.m
+      - path: ios/PDSettingsViewController.m
+      - path: ios/PDXbla.m
+      - path: ios/PDTexPacks.m
+      - path: ios/PDAudio.m
+      - path: ios/PDBridge.m
+      # The icon PNGs go in at the bundle ROOT (no group folder), which is
+      # where CFBundleIconFiles looks for them.
+      - path: ios/icon
+        type: folder
+        buildPhase: none
+      - path: ios/icon/AppIcon60x60@2x.png
+      - path: ios/icon/AppIcon60x60@3x.png
+      - path: ios/icon/AppIcon76x76@2x.png
+      - path: ios/icon/AppIcon83.5x83.5@2x.png
+      - path: ios/icon/AppIcon1024.png
+    settings:
+      base:
+        SDKROOT: iphoneos
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_NAME: perfectdark
+        INFOPLIST_FILE: ios/Info.plist
+        MARKETING_VERSION: "PD_MARKETING_VERSION"
+        CURRENT_PROJECT_VERSION: "PD_BUILD_NUMBER"
+        # build/ios-device vs build/ios-simulator, chosen by the SDK in use.
+        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) PD_PUBLIC_FLAG"
+        PD_SLICE: device
+        PD_SLICE[sdk=iphonesimulator*]: simulator
+        # -lz for the SDK's zlib; SDL2main is NOT linked (the shell owns main()
+        # and calls SDL_UIKitRunApp itself, which is all SDL2main would do).
+        # -lcurl is the static curl 8.11.0 from work/curl-$(PLATFORM_NAME)
+        # (D-010, patch 0040); Security/SystemConfiguration below are what its
+        # SecureTransport TLS needs.
+        OTHER_LDFLAGS: "-lpd -lSDL2 -lcurl -lz -lc++"
+    dependencies:
+      - sdk: UIKit.framework
+      # ANGLE supplies every gl* the renderer calls. OpenGLES.framework is
+      # linked AFTER it only because SDL2's iOS backend still references EAGL
+      # symbols; the linker searches in order, so the core gl* entry points
+      # still bind to ANGLE (dhewm3-ios D-011, same arrangement).
+      - framework: ../work/angle-xcframeworks/libGLESv2.xcframework
+        embed: true
+        codeSign: true
+      - framework: ../work/angle-xcframeworks/libEGL.xcframework
+        embed: true
+        codeSign: true
+      - sdk: OpenGLES.framework
+      - sdk: QuartzCore.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreHaptics.framework
+      - sdk: CoreMotion.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: GameController.framework
+      - sdk: Foundation.framework
+      - sdk: UniformTypeIdentifiers.framework
+      # What the static libcurl's SecureTransport TLS pulls in (D-010). No CA
+      # bundle is shipped: SecureTransport uses the system trust store.
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: CoreFoundation.framework
+
+  # ---- visionOS (Phase 5) ---------------------------------------------------
+  # The SAME app: same bundle id, same shell sources, same engine, same
+  # ANGLE-Metal substrate (charter Phase 5; GoldenEye D-024 — visionOS is a
+  # fourth build of one app, every difference behind TARGET_OS_VISION). Only
+  # the platform settings and the Info.plist/icon differ. The iOS target above
+  # is deliberately untouched by this phase.
+  perfectdark-visionos:
+    type: application
+    platform: visionOS
+    sources:
+      - path: ios/pd_ios_main.m
+      - path: ios/PDShell.m
+      - path: ios/PDGeometry.m
+      - path: ios/PDCrash.m
+      - path: ios/PDWatchdog.m
+      - path: ios/PDPacing.m
+      - path: ios/PDDefaults.m
+      - path: ios/PDOnboarding.m
+      - path: ios/PDDeepLink.m
+      - path: ios/PDSceneDelegate.m
+      - path: ios/PDTouchOverlay.m
+      - path: ios/PDController.m
+      - path: ios/PDSettingsViewController.m
+      - path: ios/PDXbla.m
+      - path: ios/PDTexPacks.m
+      - path: ios/PDAudio.m
+      - path: ios/PDBridge.m
+      # No icon PNGs at the bundle root here: a flat PNG is a BLANK tile on
+      # visionOS. The icon is a layered .solidimagestack in this catalog,
+      # generated by scripts/gen-icons.py.
+      - path: ios/Assets-visionos.xcassets
+      # ---- Phase 6: the 3D mode, visionOS TARGET ONLY -----------------------
+      # PDVisionApp.swift is this target's @main (an ImmersiveSpace can only be
+      # declared by a SwiftUI App, D-047), which is why the iOS target above
+      # still links pd_ios_main.m's main() and this one does not: that main() is
+      # #if !TARGET_OS_VISION. Every file here is self-gated on TARGET_OS_VISION
+      # as well, so listing one in the wrong target would be a link error and
+      # not a silently different app.
+      - path: vision3d/PDVisionApp.swift
+      - path: vision3d/PDHostViewController.m
+      - path: vision3d/PDImmersive.m
+      # M2: the eye render targets. .mm because it needs Metal and ANGLE's own
+      # EGL/GLES headers in one translation unit (work/angle-include, on the
+      # header path below).
+      - path: vision3d/PDEyeTargets.mm
+      # M6: the 3D settings sheet's UIKit table, the `vp3d.*` apply, and the
+      # sheet's open/close state (plan §2.10). Hosted by PDVisionApp.swift.
+      - path: vision3d/PDVisionSettingsViewController.m
+    settings:
+      base:
+        SDKROOT: xros
+        TARGETED_DEVICE_FAMILY: "7"
+        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_NAME: perfectdark
+        INFOPLIST_FILE: ios/Info-visionos.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "PD_MARKETING_VERSION"
+        CURRENT_PROJECT_VERSION: "PD_BUILD_NUMBER"
+        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) PD_PUBLIC_FLAG PD_VISION_3D=1"
+        # The Swift half of the 3D mode (D-047). SWIFT_VERSION is required the
+        # moment a .swift file is in a target; the bridging header is how
+        # PDVisionApp.swift sees the ObjC shell. Both are set on THIS target
+        # only, so the iOS target never compiles a line of Swift.
+        SWIFT_VERSION: "5.0"
+        SWIFT_OBJC_BRIDGING_HEADER: vision3d/pd-vision-bridging.h
+        # build/visionos vs build/xrsimulator (scripts/build-ios.sh
+        # visionos|xrsimulator), chosen by the SDK in use — the same shape as
+        # the iOS target's PD_SLICE, over differently-named dirs.
+        PD_SLICE: visionos
+        PD_SLICE[sdk=xrsimulator*]: xrsimulator
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/vision3d"
+          # ANGLE's EGL/GLES headers, for PDEyeTargets.mm. The engine half of
+          # the substrate gets them from CMake (PD_ANGLE_INCLUDE_DIR); this is
+          # the same directory, for the one shell file that also speaks EGL.
+          - "$(SRCROOT)/../work/angle-include"
+        LIBRARY_SEARCH_PATHS:
+          - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/lib"
+          - "$(SRCROOT)/../work/curl-$(PLATFORM_NAME)/lib"
+          - "$(SRCROOT)/../build/$(PD_SLICE)"
+        OTHER_LDFLAGS: "-lpd -lSDL2 -lcurl -lz -lc++"
+    dependencies:
+      - sdk: UIKit.framework
+      - framework: ../work/angle-xcframeworks/libGLESv2.xcframework
+        embed: true
+        codeSign: true
+      - framework: ../work/angle-xcframeworks/libEGL.xcframework
+        embed: true
+        codeSign: true
+      # NO OpenGLES.framework: it does not exist on visionOS. The iOS target
+      # links it only because SDL2's iOS backend still references EAGL symbols;
+      # our xrOS SDL2 is built with SDL_OPENGLES=OFF, so the xros slice has
+      # none (scripts/build-sdl2-visionos.sh).
+      - sdk: QuartzCore.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreHaptics.framework
+      - sdk: CoreMotion.framework
+      - sdk: GameController.framework
+      - sdk: Foundation.framework
+      - sdk: UniformTypeIdentifiers.framework
+      # Phase 6: the 3D mode. CompositorServices vends the per-eye drawables
+      # and ARKit the device anchor the compositor reprojects with; SwiftUI is
+      # this target's app entry. None of the three exists on iOS, which is why
+      # they are here and not in the base settings.
+      - sdk: CompositorServices.framework
+      - sdk: ARKit.framework
+      - sdk: SwiftUI.framework
+      # What the static libcurl's SecureTransport TLS pulls in (D-010). No CA
+      # bundle is shipped: SecureTransport uses the system trust store.
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: CoreFoundation.framework
