@@ -198,6 +198,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - First deployment did not remain active: a subsequent movement went to Joanna, caught on screenshot, and she was withdrawn. Re-selected CamSpy and verified its HUD before flight. This is a test-sequencing risk to investigate; do not assume successful activation from a menu tap alone. The second flight/shutter completed normally with no further health loss.
 - Preserve PID 25917. Same simulator, no install or state mutation. Private current readback and route notes updated. Continue west through the Caution door, then south through Sector Two; laser timing remains unverified.
 
+## Investigation retry: Sector Two cleared
+
+- Continued the normal retry through Sector Two, clearing guards 14, 13, 16, 15, 12, 17, 18, 19 and 20. Normal movement, weapon fire, ammunition collection and reload; no game-state edits. Isotope remains complete.
+- Reached Sector Three entrance with health 0.65625, position approximately (315,157,-8444), heading 269.97. Paused in Settings; preserve PID 25917. This is stronger health margin than the previous attempt at the same point, but mission completion and the laser crossing remain unverified.
+- Current private readback and route notes updated. Next clear guards 21–24, approach the lasers, and inspect the robot/opening cycle before crossing. Only the existing simulator used.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
