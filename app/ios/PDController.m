@@ -17,12 +17,8 @@
 //      frame rate, anchored at 120 Hz.
 //   3. **Hide the touch overlay while a pad is connected**, and bring it back
 //      when the pad goes away.
-//   4. **The combat roll**, which is the user's on 0.0.0.7: "on gamepad, right
-//      thumbstick click does a right roll. instead, it should be double tapping
-//      left joystick LEFT or RIGHT to do a roll." Both halves live here - the
-//      R3 bind is taken off the roll and the double flick replaces it (D-037) -
-//      but the roll ITSELF is played by PDTouchOverlay, which is where the
-//      touch layer's proven frame script already is.
+//   4. Optional double-flick roll, using the touch layer's existing gesture
+//      playback. Connection changes never rewrite the player's bindings.
 #import <GameController/GameController.h>
 
 #import "PDShell.h"
@@ -32,9 +28,7 @@
 #import "PDVision.h"
 #import "PDWatchdog.h"
 
-// port/include/input.h — the public bind API, declared here rather than in
-// PDShell.h because taking R3 off the combat roll (D-037) is this file's
-// business and nothing else asks.
+// Public engine binding API used only by the explicitly selected preset.
 extern void inputKeyBind(int idx, unsigned ck, int bind, unsigned vk);
 extern const unsigned *inputKeyGetBinds(int idx, unsigned ck);
 extern int inputGetKeyByName(const char *name);
@@ -68,7 +62,6 @@ static const NSTimeInterval kFlickWindow = 0.30;
 	// While a script is feeding the left stick by hand, the REAL pad must stop
 	// feeding it too - see -injectLeftStickX:.
 	NSTimeInterval _injectUntil;
-	BOOL _unbound;
 }
 
 + (instancetype)shared
@@ -118,47 +111,6 @@ static const NSTimeInterval kFlickWindow = 0.30;
 	                                           name:GCControllerDidDisconnectNotification object:nil];
 	[GCController startWirelessControllerDiscoveryWithCompletionHandler:^{}];
 	[self padsChanged];
-}
-
-/**
- * Take the combat roll off R3 (the user, 0.0.0.7; D-037).
- *
- * Upstream binds it there by default - `{ CK_0800, SDL_CONTROLLER_BUTTON_
- * RIGHTSTICK }`, input.c:239, plus inputMigrateRollBind() which moves Third
- * Person off the right stick to make room for it. On a twin-stick phone pad
- * that is a click a thumb makes by accident while looking, and it costs a roll
- * every time. The double flick below replaces it.
- *
- * Only the R3 SLOT is cleared, and only for the one contkey: the keyboard's C
- * and anything the player bound themselves are left exactly as they are, and
- * the whole thing runs ONCE per launch, so a player who deliberately binds R3
- * back to the roll from PD's own options page keeps it for that session.
- *
- * All four controllers, because a pad can be assigned to any of them. Public
- * input.h API throughout (no overlay patch); engine thread.
- */
-static void pdUnbindRollFromR3(void)
-{
-	const int ck = inputGetContKeyByName("CK_0800");
-	if (ck < 0) {
-		NSLog(@"perfectdark: [pad] no CK_0800 — the roll bind was left alone");
-		return;
-	}
-	for (int ctrl = 0; ctrl < 4; ctrl++) {
-		char name[32];
-		snprintf(name, sizeof(name), "JOY%d_RSTICK", ctrl + 1);
-		const int vk = inputGetKeyByName(name);
-		const unsigned *binds = inputKeyGetBinds(ctrl, (unsigned)ck);
-		if (vk <= 0 || !binds) {
-			continue;
-		}
-		for (int b = 0; b < 4; b++) {
-			if (binds[b] == (unsigned)vk) {
-				inputKeyBind(ctrl, (unsigned)ck, b, 0);
-				NSLog(@"perfectdark: [pad] %s unbound from the combat roll (player %d)", name, ctrl + 1);
-			}
-		}
-	}
 }
 
 + (NSString *)applyGoldenpadLayout
@@ -248,15 +200,6 @@ static void pdUnbindRollFromR3(void)
 			!ov ? "not installed" : (ov.hidden ? "hidden" : "visible"));
 	}
 
-	if (any && !_unbound) {
-		_unbound = YES;
-		// Engine state, so: frame boundary, like everything else.
-		[PDShell.shared enqueue:^{
-			NSLog(@"perfectdark: [pad] engine sees controller 0 %@",
-				inputControllerConnected(0) ? @"connected" : @"NOT connected");
-			pdUnbindRollFromR3();
-		}];
-	}
 
 	if (!any) {
 		// Nothing half-done survives the pad going away: an excursion in

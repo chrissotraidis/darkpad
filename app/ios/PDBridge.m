@@ -770,6 +770,31 @@ static NSString *pdErr(NSString *fmt, ...)
 		return [NSString stringWithFormat:@"hit=%@", what];
 	}
 
+    // Read actual live bindings, not merely the last saved config values.
+    if ([cmd isEqualToString:@"pad"] && argv.count >= 2 && [argv[1] isEqualToString:@"binds"]) {
+        extern const unsigned *inputKeyGetBinds(int, unsigned);
+        extern const char *inputGetContKeyName(unsigned);
+        extern const char *inputGetKeyName(int);
+        __block NSString *out = nil;
+        if (![shell enqueueAndWait:^{
+            NSMutableDictionary *players = [NSMutableDictionary dictionary];
+            for (int player = 0; player < 4; player++) {
+                NSMutableDictionary *keys = [NSMutableDictionary dictionary];
+                for (unsigned ck = 0; ck < 32; ck++) {
+                    NSMutableArray *slots = [NSMutableArray array];
+                    const unsigned *binds = inputKeyGetBinds(player, ck);
+                    for (int slot = 0; slot < 4; slot++)
+                        [slots addObject:@(inputGetKeyName((int)binds[slot]))];
+                    keys[@(inputGetContKeyName(ck))] = slots;
+                }
+                players[[NSString stringWithFormat:@"Player%d", player + 1]] = keys;
+            }
+            NSData *json = [NSJSONSerialization dataWithJSONObject:players options:NSJSONWritingSortedKeys error:nil];
+            out = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
+        } timeout:kEngineTimeout]) return pdErr(@"engine did not reach a frame boundary");
+        return out ?: pdErr(@"binding snapshot failed");
+    }
+
 	// --- round Q (D-037): the two `pad` sub-commands a simulator needs --------
 	// A simulator cannot be handed or taken away a controller, and injected
 	// events bypass UIKit, so the two things the user reported - the gear on a

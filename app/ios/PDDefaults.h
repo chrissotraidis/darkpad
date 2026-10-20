@@ -47,7 +47,8 @@ extern NSString *const PDDefHaptics;           // bool
  * screen edge) rolls left, the right half rolls right.
  * GAMEPAD: double-flick the LEFT stick to one side (out past 0.70, back inside
  * 0.30, out again within 300 ms). One setting for both, as the user asked - and
- * with it, R3 is no longer bound to the roll at all (PDController.m).
+ * existing button bindings remain unchanged. The explicit Goldenpad preset
+ * assigns R3 to alternate fire.
  *
  * Turning this on is also what turns Dab's combat roll ON in the engine
  * (Mod.CombatRoll, which upstream ships as MODROLL_OFF) - a gesture for a move

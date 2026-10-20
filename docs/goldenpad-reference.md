@@ -69,3 +69,5 @@ were read back from pd.ini and survived relaunch; keyboard/mouse and D-pad value
 matched their backups. Physical button behavior, CamSpy and wheel usability still
 need device acceptance. Test CamSpy, weapon wheel, secondary fire,
 backgrounding and physical controller interaction before acceptance.
+
+Controller connection events preserve live bindings, including custom R3 roll assignments. The inherited automatic R3 unbind was removed. Development builds expose `pad binds` for an actual engine binding snapshot; it does not modify configuration.

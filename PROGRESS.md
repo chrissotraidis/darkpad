@@ -84,6 +84,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Portable integration checks pass for 30/60/90/120 Hz, duplicate samples, orientation flips, inversion, sensitivity, aim release, gaps and stale/nonfinite data (`gyro-math-test.log`). Run with `xcrun --sdk macosx clang -isysroot "$(xcrun --sdk macosx --show-sdk-path)" -std=c11 -Wall -Wextra -Werror tests/gyro_math.c -o /tmp/darkpad-gyro-test && /tmp/darkpad-gyro-test`. Explicit SDK avoids this host's mismatched default CLT SDK/linker.
 - Simulator/device builds pass. Native toggle persists across relaunch; unavailable sensor reports correctly with zero motion input. Restored off. ROM/save hashes preserved (`gyro-preservation.json`). Physical axis feel, drift, latency and lifecycle sensor shutdown remain **not run**, so this is experimental, not accepted gyro quality.
 
+## Controller reconnect preservation
+
+- Found and removed inherited first-connect R3 unbinding, which contradicted custom-binding preservation. Connection events now only update overlay/gesture state; the explicit Goldenpad preset owns its binding changes.
+- Added development-only `pad binds` snapshot of actual engine bindings. Staged reversible custom R3 roll binds for four players, then checked all 512 live slots before/after repeated simulated disconnect/reconnect. Exact match, including all custom R3 slots (`pad-preserve-live-{before,after}.json`). Restored original pd.ini byte-for-byte after testing.
+- Simulator/device builds pass (`app-pad-preserve.log`, `app-device-pad-preserve.log`); update preserves ROM/save hashes. This is notification-path evidence, not a physical Bluetooth hot-plug test.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
