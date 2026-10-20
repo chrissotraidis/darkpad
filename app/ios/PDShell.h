@@ -56,6 +56,8 @@ void inputIosPointerClear(void);
 void inputIosPointerAddWheel(int ticks);
 int inputIosPointerIsActive(void);
 int menuIosDialogIsOpen(void);
+// overlay 0056 — confirmed native abort/end-match; frame queue only.
+int mainIosEndSession(void);
 
 // overlay 0020 — the touch stick as analogue movement. Under CONTROLMODE_PC
 // (the port's default) the right stick is movedata.analogstrafe/analogwalk.

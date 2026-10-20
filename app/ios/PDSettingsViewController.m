@@ -199,7 +199,7 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 
 @end
 
-// Small native utility hub; no game assets or unsafe stage-reset action.
+// Native utility hub. Ending play uses the engine's normal results path.
 @interface PDUtilitiesViewController : UITableViewController
 @end
 @implementation PDUtilitiesViewController
@@ -211,20 +211,41 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 		initWithTitle:@"Resume" style:UIBarButtonItemStyleDone target:self action:@selector(resume)];
 }
 - (void)resume { [PDSettingsViewController dismiss]; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return 3; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return 4; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path
 {
 	UITableViewCell *cell = [table dequeueReusableCellWithIdentifier:@"utility"];
 	if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"utility"];
-	cell.textLabel.text = @[@"Settings", @"Edit Touch Controls", @"Diagnostics"][path.row];
-	cell.imageView.image = [UIImage systemImageNamed:@[@"slider.horizontal.3", @"hand.draw", @"waveform.path.ecg"][path.row]];
+	cell.textLabel.text = @[@"Settings", @"Edit Touch Controls", @"Diagnostics", @"End Mission or Match…"][path.row];
+	cell.textLabel.textColor = path.row == 3 ? UIColor.systemRedColor : UIColor.labelColor;
+	cell.imageView.image = [UIImage systemImageNamed:@[@"slider.horizontal.3", @"hand.draw", @"waveform.path.ecg", @"stop.circle"][path.row]];
 	cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 	return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path
 {
 	[table deselectRowAtIndexPath:path animated:YES];
-	if (path.row == 1) {
+	if (path.row == 3) {
+		UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"End this session?"
+			message:@"An unfinished mission will restart from the beginning. Completed progression is kept. A match will end at its results screen."
+			preferredStyle:UIAlertControllerStyleAlert];
+		[confirm addAction:[UIAlertAction actionWithTitle:@"Keep Playing" style:UIAlertActionStyleCancel handler:nil]];
+		[confirm addAction:[UIAlertAction actionWithTitle:@"End Session" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+			[PDShell.shared enqueue:^{
+				if (mainIosEndSession()) {
+					pdIosSaveConfigNow();
+					[PDSettingsViewController dismiss];
+				} else {
+					UIAlertController *notice = [UIAlertController alertControllerWithTitle:@"No active session"
+						message:@"Start or resume a mission or match before ending it. This action is unavailable during cutscenes or in the training area."
+						preferredStyle:UIAlertControllerStyleAlert];
+					[notice addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+					[self presentViewController:notice animated:YES completion:nil];
+				}
+			}];
+		}]];
+		[self presentViewController:confirm animated:YES completion:nil];
+	} else if (path.row == 1) {
 		[PDSettingsViewController dismiss];
 		[PDTouchOverlay.current beginLayoutEditing];
 	} else {

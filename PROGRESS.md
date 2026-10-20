@@ -96,6 +96,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - No working-checkout dependency libraries or game assets copied into the clean tree. This proves an empty **project** cache on this Mac with installed prerequisites; system developer tools/vpython caches remain host dependencies. No claim of a second Mac test.
 - Installed the clean-produced simulator app after Documents/Library backup; all four ROM/save hashes match (`clean-build-update.json`). Only the existing dedicated simulator remained booted. Mission/save-reload acceptance proceeds on this clean build.
 
+## Confirmed utility session exit
+
+- Added **End Mission or Match…** to the three-dot Utilities menu, following Goldenpad's confirmation pattern with independent implementation. Explains unfinished mission restart and retained completed progression; Keep Playing cancels.
+- Overlay 0056 calls the active port's native abort/end-match path from the shell frame queue. Rejects menu/training, cutscene, dead-player and already-ended states; no forced stage reset. Configuration flush follows a successful request.
+- Simulator verified: no-active-session notice at agent selection; cancel then Resume preserves the live mission; confirmation produces normal Aborted / Disavowed results (`work/evidence/utility-end-mission.png`). Full app relaunch retains Defection Agent best time 3m:31s and Investigation unlock (`utility-end-reloaded-time.png`). Multiplayer setup file unchanged. Match-specific and physical-device runtime checks remain pending.
+- All overlay patches apply from the pristine pin; simulator/device engine and app builds pass (`overlay-end-session.log`, `engine-end-session-*.log`, `app-end-session-*.log`). One simulator only; private pre-update save/preferences backup in `work/evidence/before-end-session/`.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

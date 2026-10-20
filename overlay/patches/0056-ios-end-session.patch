@@ -1,0 +1,27 @@
+Subject: iOS: confirmed utility action through native end-session path
+
+--- a/port/src/pdmain.c
++++ b/port/src/pdmain.c
+@@ -831,3 +831,22 @@
+ 	objectivesDisableChecking();
+ 	mainEndStage();
+ }
++
++#include "platform.h"
++#ifdef PLATFORM_IOS
++/* Called only by the shell's frame queue, following explicit confirmation.
++ * Use the same result/save path as the native Abort Mission and End Game rows.
++ * Menu, training, cutscene and already-ended states are not active sessions.
++ */
++s32 mainIosEndSession(void)
++{
++	if (!g_Vars.currentplayer || !g_Vars.currentplayer->prop
++			|| g_Vars.stagenum == STAGE_CITRAINING || g_MainIsEndscreen
++			|| g_InCutscene || g_Vars.currentplayer->isdead) {
++		return 0;
++	}
++	g_Vars.currentplayer->aborted = true;
++	mainEndStage();
++	return 1;
++}
++#endif
