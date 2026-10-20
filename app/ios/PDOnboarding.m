@@ -186,14 +186,12 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 		c.verdict = PDRomAccepted;
 		c.explanation = @"Perfect Dark (USA) (Rev 1) — this is the one.";
 	} else {
-		// The header is right and the size is right, so this is very probably a
-		// hacked or patched copy rather than the wrong game. Accepted, with the
-		// difference said out loud: upstream will refuse it later if it is
-		// really broken, and refusing a Randomizer ROM here would be wrong.
-		c.verdict = PDRomAccepted;
-		c.explanation = [NSString stringWithFormat:
-			@"Header matches US v1.1, but the contents differ from the stock ROM "
-			 "(md5 %@). A modified or patched copy — loading it anyway.", c.md5];
+		c.verdict = c.md5.length ? PDRomContentMismatch : PDRomUnreadable;
+		c.explanation = c.md5.length ? [NSString stringWithFormat:
+			@"The header matches US v1.1, but the contents differ from the supported ROM "
+			 "(MD5 %@). The file may be modified or damaged. Choose an unmodified "
+			 "Perfect Dark (USA) (Rev 1) ROM. Your original file has not been changed.", c.md5]
+			: @"Could not read the complete ROM. Check that the file is available locally and try again.";
 	}
 	return c;
 }

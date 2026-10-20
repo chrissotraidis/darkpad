@@ -49,8 +49,8 @@ cases = [
     ('unknown-revision', {0x3f: 2}, 33554432, 3),
     ('wrong-title', {0x20: ord('X')}, 33554432, 6),
     ('wrong-id', {0x3c: ord('X')}, 33554432, 6),
-    # Preserve the inherited patched-ROM policy; this is not stock validation.
-    ('modified-content', {}, 33554432, 0),
+    # A plausible header cannot establish that the game data is supported.
+    ('modified-content', {}, 33554432, 8),
 ]
 with tempfile.TemporaryDirectory(prefix='rom-classifier-', dir=a.container / 'tmp') as d:
     root = Path(d)

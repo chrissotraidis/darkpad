@@ -14,6 +14,7 @@ typedef NS_ENUM(NSInteger, PDRomVerdict) {
 	PDRomWrongSize,
 	PDRomNotARom,
 	PDRomUnreadable,
+	PDRomContentMismatch, // Header matches, but data differs from supported US Rev 1.
 };
 
 @interface PDRomCheck : NSObject
