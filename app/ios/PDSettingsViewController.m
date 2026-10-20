@@ -286,7 +286,13 @@ static CFTimeInterval sPresentStarted;
 
 + (void)updateNativePause
 {
-	const BOOL wanted = self.isPresented || PDTouchOverlay.current.layoutEditing;
+	BOOL wanted = self.isPresented || PDTouchOverlay.current.layoutEditing;
+#if !TARGET_OS_VISION
+	// The pacer blocks presentation in the background, but still pumps the
+	// run loop and may permit engine ticks. Also cover transient inactivity
+	// (Control Center, calls) before the app actually enters the background.
+	wanted |= UIApplication.sharedApplication.applicationState != UIApplicationStateActive;
+#endif
 	if (wanted && !sUtilityOwnsPause && !lvIsPaused()) {
 		sUtilityOwnsPause = YES;
 		lvSetPaused(1);

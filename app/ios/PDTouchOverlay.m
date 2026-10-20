@@ -2547,7 +2547,11 @@ static CGVector pdStickCurve(CGVector raw)
 	// they have to keep being asked whether or not a finger can reach anything.
 	[v refreshEngineChrome];
 
-	if (v && PDSettingsViewController.isPresented) {
+	BOOL suppressInput = PDSettingsViewController.isPresented;
+#if !TARGET_OS_VISION
+	suppressInput |= UIApplication.sharedApplication.applicationState != UIApplicationStateActive;
+#endif
+	if (v && suppressInput) {
 		// Nothing here has to run while the settings page is up (bean's tick
 		// returns the same way), and whatever the player was holding must not
 		// stay held behind the page - that is walking into a wall under a sheet.

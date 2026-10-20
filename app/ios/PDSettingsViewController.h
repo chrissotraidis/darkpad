@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)present;
 /** Goldenpad-inspired utilities, using the same focus-safe native window. */
 + (void)presentUtilities;
-/** Engine-frame hook: preserve prior pause state across native UI and editing. */
+/** Engine-frame hook: preserve prior pause state across native UI, editing and iOS inactivity. */
 + (void)updateNativePause;
 /** Hide it. */
 + (void)dismiss;
