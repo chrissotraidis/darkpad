@@ -36,8 +36,6 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 
 @interface PDOnboardingViewController : UIViewController <UIDocumentPickerDelegate>
 @property (nonatomic, copy) void (^onAccepted)(void);
-/** Re-read Documents/added-content (and the legacy xbla/) and say what is in it. Main thread. */
-- (void)refreshXbla;
 @end
 
 // ---------------------------------------------------------------------------
@@ -244,7 +242,6 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	NSLog(@"perfectdark: [onboard] no ROM in Documents — presenting onboarding");
 
 	__block BOOL done = NO;
-	int spins = 0;
 	PDOnboardingViewController *vc = [PDOnboardingViewController new];
 	vc.onAccepted = ^{ done = YES; };
 
@@ -274,12 +271,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 			if (!done && ([self installedRomPath] || [self adoptLooseRom])) {
 				done = YES;
 			}
-			// A package dropped through Files while this screen is up gets
-			// acknowledged without anybody touching the picker. Once a second,
-			// not every 50 ms: it is a directory walk four levels deep.
-			if (++spins % 20 == 0) {
-				[vc refreshXbla];
-			}
+
 		}
 	}
 
@@ -294,25 +286,6 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 
 @implementation PDOnboardingViewController {
 	UILabel *_status;
-	UILabel *_xbla;
-	UIButton *_xblaPick;
-}
-
-- (void)refreshXbla
-{
-	PDXblaFind *f = PDXbla.scan;
-	_xbla.text = f.found ? [NSString stringWithFormat:@"%@\n%@", f.headline, f.plan] : f.plan;
-	[_xblaPick setTitle:f.found ? @"Replace the Xbox 360 release…" : @"Add the Xbox 360 release…"
-	           forState:UIControlStateNormal];
-}
-
-- (void)pickXbla
-{
-	__weak typeof(self) weakSelf = self;
-	[PDXbla presentImporterFrom:self done:^(PDXblaFind *f) {
-		NSLog(@"perfectdark: [onboard] xbla after import: %@", f.headline);
-		[weakSelf refreshXbla];
-	}];
 }
 
 - (NSUInteger)supportedInterfaceOrientations { return UIInterfaceOrientationMaskLandscape; }
@@ -332,12 +305,8 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	body.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
 	body.font = [UIFont systemFontOfSize:15];
 	body.text =
-		@"This app contains no game data. You need your own copy of the Nintendo 64 game "
-		 "Perfect Dark (USA) (Rev 1) — also called ntsc-final or US V1.1.\n\n"
-		 "Put the file here, named pd.ntsc-final.z64:\n"
-		 "    Files → On My iPhone → Perfect Dark\n\n"
-		 "Then come back — this screen goes away by itself. Or use Choose a file… below "
-		 "and it will be copied and renamed for you.";
+		@"Choose your Perfect Dark Nintendo 64 ROM: USA Rev 1 (US V1.1), in .z64 format. "
+		 "Game data is not included. Your file will be copied into the app and checked before play.";
 
 	_status = [UILabel new];
 	_status.numberOfLines = 0;
@@ -345,44 +314,19 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	_status.textColor = [UIColor colorWithRed:1.0 green:0.6 blue:0.4 alpha:1.0];
 
 	UIButton *pick = [UIButton buttonWithType:UIButtonTypeSystem];
-	[pick setTitle:@"Choose a file…" forState:UIControlStateNormal];
+	[pick setTitle:@"Choose Perfect Dark ROM…" forState:UIControlStateNormal];
 	pick.titleLabel.font = [UIFont systemFontOfSize:19 weight:UIFontWeightSemibold];
 	[pick addTarget:self action:@selector(pickFile) forControlEvents:UIControlEventTouchUpInside];
 
-	// The optional half: the Xbox 360 (XBLA) release. Its own label rather than
-	// a sentence in the body, because it says what is actually in the folder
-	// right now - "Found Perfect Dark.rar - a RAR archive, 227 MB" is a very
-	// different screen from "put one here", and a player who dropped the file
-	// and saw no acknowledgement has no way to tell which one they are looking
-	// at. Refreshed by the same poll that watches for the ROM.
-	_xbla = [UILabel new];
-	_xbla.numberOfLines = 0;
-	_xbla.font = [UIFont systemFontOfSize:14];
-	_xbla.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
-
-	_xblaPick = [UIButton buttonWithType:UIButtonTypeSystem];
-	[_xblaPick setTitle:@"Add the Xbox 360 release…" forState:UIControlStateNormal];
-	_xblaPick.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-	[_xblaPick addTarget:self action:@selector(pickXbla) forControlEvents:UIControlEventTouchUpInside];
-
-	[self refreshXbla];
-
-	// The other optional extras, in one plain sentence: GE Plus (D-072). No
-	// button here - the screen is about the one file the game cannot start
-	// without, and the settings page has the GoldenEye rows.
-	UILabel *ge = [UILabel new];
-	ge.numberOfLines = 0;
-	ge.font = [UIFont systemFontOfSize:14];
-	ge.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
-	ge.text = @"Also optional: your own GoldenEye 007 (US) N64 ROM, and the GoldenEye XBLA "
-	           "release (its .7z or .zip, or its Xbox 360 package), in the same added-content "
-	           "folder under any name. With them, "
-	           "GoldenEye's missions and arenas are playable as GE Plus in the Perfect Menu, "
-	           "and the Goldfinger 64 ROM hack (its zip, patch or ROM) beside them. "
-	           "They can be added later from Settings too.";
+	UILabel *help = [UILabel new];
+	help.numberOfLines = 0;
+	help.font = [UIFont systemFontOfSize:14];
+	help.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+	help.text = @"You can also add the ROM through Files → On My iPhone → Perfect Dark. "
+	             "Return here to continue. Optional artwork can be added later in Settings.";
 
 	UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:
-		@[ title, body, _status, pick, _xbla, _xblaPick, ge ]];
+		@[ title, body, _status, pick, help ]];
 	stack.axis = UILayoutConstraintAxisVertical;
 	stack.spacing = 14;
 	stack.translatesAutoresizingMaskIntoConstraints = NO;
