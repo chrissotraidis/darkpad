@@ -6,15 +6,10 @@
 // an SDL_GameController without this file doing anything at all. So what is
 // left for the shell is the three things SDL cannot know:
 //
-//   1. **Nothing, for the binds** - and that is worth writing down, because the
-//      family rule is "seed still-unbound binds and re-apply on connect" and
-//      here it is already done: inputInit() calls inputSetDefaultKeyBinds() for
-//      every controller slot (input.c:906-908) and inputParseBindString()
-//      explicitly keeps those defaults for a key whose pd.ini string is empty
-//      (input.c:650-655). So a fresh container and a pad paired after launch
-//      both get upstream's PC bind set with no help from us. What this file
-//      does is CHECK that on connect and say so in the log, rather than seed
-//      blindly over something the player chose.
+//   1. **Explicit Goldenpad preset.** Existing engine bindings load normally.
+//      The native settings action applies the requested semantic layout only
+//      when chosen, preserving keyboard/D-pad binds and backing up the prior
+//      state. Connecting a controller never reapplies this preset over edits.
 //   2. **Look.** PD's right stick is NOT a look axis (docs/frame-map.md): it
 //      goes into the N64 pad struct for the game's control styles. Twin-stick
 //      look on a modern pad therefore has to come from the same degrees seam
@@ -44,6 +39,7 @@ extern void inputKeyBind(int idx, unsigned ck, int bind, unsigned vk);
 extern const unsigned *inputKeyGetBinds(int idx, unsigned ck);
 extern int inputGetKeyByName(const char *name);
 extern int inputGetContKeyByName(const char *name);
+extern const char *inputGetContKeyName(unsigned ck);
 
 // Radial deadzone, the family constant.
 static const float kPadDeadzone = 0.15f;
@@ -163,6 +159,72 @@ static void pdUnbindRollFromR3(void)
 			}
 		}
 	}
+}
+
++ (NSString *)applyGoldenpadLayout
+{
+	// Goldenpad's semantic actions, plus PD's distinct reload/alternate/radial.
+	static const struct { const char *key; const char *button; } map[] = {
+		{ "Z_TRIG", "RTRIGGER" }, { "R_TRIG", "LTRIGGER" },
+		{ "CK_8000", "LSHOULDER" },
+		{ "Y_BUTTON", "RSHOULDER" }, { "Y_BUTTON", "A" }, { "Y_BUTTON", "Y" },
+		{ "B_BUTTON", "B" }, { "B_BUTTON", "X" },
+		{ "X_BUTTON", "LSTICK" }, { "L_TRIG", "RSTICK" },
+		{ "D_JPAD", "BACK" }, { "START_BUTTON", "START" },
+		{ "ACCEPT_BUTTON", "A" }, { "CANCEL_BUTTON", "B" },
+	};
+	unsigned proposed[4][32][4];
+	unsigned original[4][32][4];
+	// This engine's public contkey enumeration has 32 entries. Refuse a new
+	// incompatible engine rather than indexing a silently changed table.
+	if (!inputGetContKeyName(31)[0] || inputGetContKeyName(32)[0])
+		return @"Controller layout could not be applied to this engine version.";
+	for (int player = 0; player < 4; player++) {
+		NSMutableSet<NSNumber *> *buttons = [NSMutableSet set];
+		for (unsigned i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+			char name[64]; snprintf(name, sizeof(name), "JOY%d_%s", player + 1, map[i].button);
+			int vk = inputGetKeyByName(name);
+			if (vk <= 0) return @"A controller button is unavailable in this engine.";
+			[buttons addObject:@(vk)];
+		}
+		for (unsigned ck = 0; ck < 32; ck++) {
+			const unsigned *old = inputKeyGetBinds(player, ck);
+			for (int slot = 0; slot < 4; slot++) {
+				original[player][ck][slot] = old[slot];
+				proposed[player][ck][slot] = [buttons containsObject:@(old[slot])] ? 0 : old[slot];
+			}
+		}
+		for (unsigned i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+			int ck = inputGetContKeyByName(map[i].key);
+			if (ck < 0 || ck >= 32) return @"A Perfect Dark action is unavailable.";
+			int slot = 0;
+			while (slot < 4 && proposed[player][ck][slot]) slot++;
+			if (slot == 4) return @"Your custom bindings leave no free slot. No bindings were changed.";
+			char name[64]; snprintf(name, sizeof(name), "JOY%d_%s", player + 1, map[i].button);
+			proposed[player][ck][slot] = inputGetKeyByName(name);
+		}
+	}
+	// Keep an inspectable backup of the previous bindings before changing any.
+	NSMutableArray *backup = [NSMutableArray array];
+	for (int player = 0; player < 4; player++) {
+		NSMutableArray *keys = [NSMutableArray array];
+		for (int ck = 0; ck < 32; ck++) {
+			[keys addObject:@[@(original[player][ck][0]), @(original[player][ck][1]),
+				@(original[player][ck][2]), @(original[player][ck][3])]];
+		}
+		[backup addObject:keys];
+	}
+	if (![NSUserDefaults.standardUserDefaults objectForKey:@"pd.controller.beforeGoldenpad"])
+		[NSUserDefaults.standardUserDefaults setObject:backup forKey:@"pd.controller.beforeGoldenpad"];
+	for (int player = 0; player < 4; player++)
+		for (unsigned ck = 0; ck < 32; ck++)
+			for (int slot = 0; slot < 4; slot++)
+				inputKeyBind(player, ck, slot, proposed[player][ck][slot]);
+	// Goldenpad's LT always aims; the optional dual-trigger-fire mode conflicts.
+	configSetValue("Mod.AkimboTriggers", "0");
+	inputSaveBinds();
+	if (!configSave("$S/pd.ini")) return @"Layout applied for this session, but saving pd.ini failed.";
+	return @"Goldenpad layout applied. RT fires, LT aims, LB crouches; A/Y/RB change weapons; B/X interact. Click left stick to reload, right stick for alternate fire, and View/Back for the weapon wheel. D-pad navigation is unchanged.";
 }
 
 - (void)padsChanged

@@ -47,5 +47,25 @@ zero held inputs, stable paused player position, and pause/resume transitions
 0 → 1 → 0. ROM/save hashes survived installation. Simulator and unsigned device
 builds pass. The native hub does not yet offer return-to-main-menu; a safe engine
 exit/save path needs validation first. Built-in gameplay buttons now translate as a group inside the safe area; custom
-placements stay exact. Controller mappings are still pending. Test CamSpy, weapon wheel, secondary fire,
+placements stay exact. An explicit **Use Goldenpad Controller Layout…** preset now lives in Settings →
+Aiming. It preserves keyboard/mouse and D-pad bindings, keeps a previous-binding
+backup, and applies to all four player slots:
+
+| Action | Controller input |
+|---|---|
+| Fire / Aim | RT / LT |
+| Crouch | LB |
+| Next weapon | A, Y, RB |
+| Interact | B, X |
+| Reload | Left-stick click |
+| Alternate fire | Right-stick click |
+| Weapon wheel / gadgets | View/Back |
+| Game pause | Start |
+| Menu accept / cancel | A / B |
+
+The preset disables the conflicting optional dual-trigger-fire mode. It does
+not auto-overwrite existing custom layouts. Applied bindings for all four players
+were read back from pd.ini and survived relaunch; keyboard/mouse and D-pad values
+matched their backups. Physical button behavior, CamSpy and wheel usability still
+need device acceptance. Test CamSpy, weapon wheel, secondary fire,
 backgrounding and physical controller interaction before acceptance.

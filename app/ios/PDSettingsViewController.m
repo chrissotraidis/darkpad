@@ -16,6 +16,7 @@
 #import "PDDefaults.h"
 #import "PDPacing.h"
 #import "PDTouchOverlay.h"
+#import "PDController.h"
 #import "PDGeometry.h"
 #import "PDXbla.h"
 #import "PDAudio.h"
@@ -776,6 +777,23 @@ static CFTimeInterval sPresentStarted;
 			pdSliderRow(@"Vertical look speed", PDDefLookDegPerPointY, 0.05f, 0.60f),
 			pdSwitchRow(@"Invert look (vertical)", PDDefInvertY),
 			pdSliderRow(@"Gamepad look speed", PDDefPadLookSpeed, 60.0f, 540.0f),
+			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
+				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
+					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
+					preferredStyle:UIAlertControllerStyleAlert];
+				[confirm addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+				[confirm addAction:[UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+					[PDShell.shared enqueue:^{
+						NSString *result = [PDController applyGoldenpadLayout];
+						dispatch_async(dispatch_get_main_queue(), ^{
+							UIAlertController *done = [UIAlertController alertControllerWithTitle:@"Controller Layout" message:result preferredStyle:UIAlertControllerStyleAlert];
+							[done addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+							[[weakSelf topPresenter] presentViewController:done animated:YES completion:nil];
+						});
+					}];
+				}]];
+				[[weakSelf topPresenter] presentViewController:confirm animated:YES completion:nil];
+			}),
 		],
 		@[
 			pdSegRow(@"Control style", PDDefControlStyle,

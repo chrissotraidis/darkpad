@@ -61,6 +61,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Same iPhone simulator inspected in the layout editor: all default rings clear the cutout. Moved SWAP, closed and reopened the editor, and visually confirmed its exact custom placement. Restored the originally empty layout and 100% scale after the check. No existing custom layout was erased (`layout_entries=0` before this test).
 - Simulator/device builds pass (`app-safe-controls.log`, `app-device-safe-controls.log`); ROM/save hashes match before and after installation (`safe-controls-preservation.json`). Other phone sizes, iPad and physical thumb reach remain unqualified.
 
+## Goldenpad controller preset
+
+- Added Settings → Aiming → Use Goldenpad Controller Layout. Explicit confirmation shows RT fire, LT aim, LB crouch, A/Y/RB weapon, B/X interact; PD extras are left-stick-click reload, right-stick-click alternate fire, View/Back weapon wheel. Start and A/B menu controls remain. Keyboard/mouse and D-pad bindings are preserved. Conflicting akimbo-trigger mode is disabled by this preset.
+- Preflights every slot before mutation, backs up prior bindings in defaults, and persists engine bindings. Does not overwrite custom configurations automatically or on controller reconnect. First runtime attempt caught public API action-name mismatch without changing bindings; fixed names then applied successfully.
+- Verified 56 action assignments across four players, exact keyboard/mouse and D-pad preservation, and all binding sections unchanged after quit/relaunch (`goldenpad-applied.ini`, `goldenpad-bind-validation.json`). Simulator/device builds pass. This proves configuration, not physical controller behavior; gadget/CamSpy acceptance remains open.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

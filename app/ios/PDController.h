@@ -18,6 +18,9 @@ NS_ASSUME_NONNULL_BEGIN
     stick for the double-flick roll (D-037). Game thread. */
 - (void)tick;
 
+/** Explicit controller preset; engine thread. Returns a result for the user. */
++ (NSString *)applyGoldenpadLayout;
+
 /**
  * Feed one LEFT-stick x sample to the double-flick roll detector, as if a pad
  * had reported it (the :8775 bridge's `pad lx <value>`).
