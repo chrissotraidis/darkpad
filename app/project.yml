@@ -68,6 +68,7 @@ targets:
       - path: ios/PDSceneDelegate.m
       - path: ios/PDTouchOverlay.m
       - path: ios/PDController.m
+      - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m
@@ -156,6 +157,7 @@ targets:
       - path: ios/PDSceneDelegate.m
       - path: ios/PDTouchOverlay.m
       - path: ios/PDController.m
+      - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m

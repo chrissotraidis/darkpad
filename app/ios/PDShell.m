@@ -17,6 +17,7 @@ extern void *pdAngleGetHostView(void);
 #import "PDPacing.h"
 #import "PDTouchOverlay.h"
 #import "PDController.h"
+#import "PDGyro.h"
 #import "PDDefaults.h"
 #import "PDXbla.h"
 #import "PDAudio.h"
@@ -320,6 +321,7 @@ int pdExtraPumpMs = 0;
 	}
 	[s appendString:[PDXbla stateLines]];
 	[s appendString:[PDAudio stateLines]];
+	[s appendString:[PDGyro.shared stateLines]];
 
 	[s appendFormat:@"drawable=%dx%d\n", dw, dh];
 	[s appendFormat:@"points=%.0fx%.0f\n", pts.width, pts.height];
@@ -582,6 +584,7 @@ void pdIosFrameHook(void)
 #endif
 		[PDSettingsViewController updateNativePause];
 		[PDController.shared tick];
+		[PDGyro.shared tick];
 		[PDTouchOverlay publishInput];
 		// The picture's size chain (D-077): logged on change, and on an iPhone
 		// a portrait-shaped game window is put back before this frame draws.

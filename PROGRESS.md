@@ -76,15 +76,21 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 ## Normal campaign attempt
 
 - Loaded preserved Dark agent through Game Pak → Solo Missions → Defection → Agent → Accept. Touch movement, firing, automatic reload, damage and normal failure/retry screens worked. Attempt ended deceased at 2:48, one kill, 13 shots; **mission completion still fails acceptance** (`defection-normal-attempt-failed.png`, matching state).
-- Retried through the normal Retry menu. Current session is now a normal campaign attempt, paused in native Settings on the lower roof. Tool/decision latency left the first attempt exposed to guards; use native pause between observations during route validation. No health/objective cheats or save edits used.
+- Retried through the normal Retry menu. Retry was paused in native Settings on the lower roof, then ended for the gyro build update. Tool/decision latency left the first attempt exposed to guards; use native pause between observations during route validation. No health/objective cheats or save edits used.
+
+## Experimental gyro trial
+
+- Added opt-in handset gyro through the existing look-degrees interface, aim-only, with sensitivity/inversion and neutral reset on aim release. Stops sensors for menus, editing, inactive app and disabled preference; invalid/stale samples and long gaps cannot produce a catch-up turn. Both landscape orientations mapped; no engine gyro implementation added.
+- Portable integration checks pass for 30/60/90/120 Hz, duplicate samples, orientation flips, inversion, sensitivity, aim release, gaps and stale/nonfinite data (`gyro-math-test.log`). Run with `xcrun --sdk macosx clang -isysroot "$(xcrun --sdk macosx --show-sdk-path)" -std=c11 -Wall -Wextra -Werror tests/gyro_math.c -o /tmp/darkpad-gyro-test && /tmp/darkpad-gyro-test`. Explicit SDK avoids this host's mismatched default CLT SDK/linker.
+- Simulator/device builds pass. Native toggle persists across relaunch; unavailable sensor reports correctly with zero motion input. Restored off. ROM/save hashes preserved (`gyro-preservation.json`). Physical axis feel, drift, latency and lifecycle sensor shutdown remain **not run**, so this is experimental, not accepted gyro quality.
 
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
 
 - Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This earlier smoke is distinct from the later completed normal match. Dedicated simulator is currently booted.
-- Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator session is a normal Defection retry paused on the lower roof, no objective completion claimed. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
+- Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator is at agent selection after the gyro update; the prior normal retry was ended without completion. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
 - First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default control overlap with the display cutout is fixed on the tested iPhone; validate other sizes during control/layout work.
 - Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
-- Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Art profiles are implemented; qualify optional pack memory/performance on hardware. Gyro stays experimental until physical testing.
+- Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Art profiles are implemented; qualify optional pack memory/performance on hardware. Gyro trial is implemented but stays experimental until physical testing.
 - P2 networking follows P1 acceptance; do not update engine prematurely. No physical target currently connected.

@@ -15,6 +15,10 @@
 #include <string.h>
 #include <math.h>
 
+NSString *const PDDefGyroEnabled = @"pd.gyro.enabled";
+NSString *const PDDefGyroSensitivity = @"pd.gyro.sensitivity";
+NSString *const PDDefGyroInvertY = @"pd.gyro.invertY";
+
 NSString *const PDDefGraphicsProfile = @"pd.graphics.profile";
 NSString *const PDDefLookDegPerPoint  = @"pd.look.degPerPoint";
 NSString *const PDDefLookDegPerPointY = @"pd.look.degPerPointY";
@@ -109,6 +113,9 @@ void PDDefaultsRegister(void)
 		PDDefXblaGoldenEye: @YES,
 		PDDefTexturePacks: @YES,
 		PDDefGraphicsProfile: @0,
+		PDDefGyroEnabled: @NO,
+		PDDefGyroSensitivity: @1.0,
+		PDDefGyroInvertY: @NO,
 
 		// "Lower Other Audio" - bean's default and the family's (D-033): a
 		// podcast keeps going, quietly, which is what a player who started one

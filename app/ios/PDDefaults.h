@@ -18,6 +18,10 @@ NS_ASSUME_NONNULL_BEGIN
 // Art profile: 0 Original, 1 Enhanced, 2 Remaster (user-supplied assets).
 extern NSString *const PDDefGraphicsProfile;
 
+extern NSString *const PDDefGyroEnabled; // opt-in experimental aim only
+extern NSString *const PDDefGyroSensitivity; // 0.25–3.0
+extern NSString *const PDDefGyroInvertY;
+
 // Look / aiming
 extern NSString *const PDDefLookDegPerPoint;   // float, degrees of view per point of drag
 extern NSString *const PDDefLookDegPerPointY;  // float, the vertical axis on its own

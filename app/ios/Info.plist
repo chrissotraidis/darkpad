@@ -91,6 +91,8 @@
 	     that touches CoreBluetooth without this key - the 0.0.0.2/0.0.0.3 device
 	     crash. pd_ios_main.m now overrides that hint off; if anything ever
 	     reaches CoreBluetooth anyway it must prompt, never abort. -->
+	<key>NSMotionUsageDescription</key>
+	<string>Use device motion for optional gyro aiming while playing.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>

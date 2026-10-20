@@ -17,6 +17,7 @@
 #import "PDPacing.h"
 #import "PDTouchOverlay.h"
 #import "PDController.h"
+#import "PDGyro.h"
 #import "PDGeometry.h"
 #import "PDXbla.h"
 #import "PDAudio.h"
@@ -794,6 +795,13 @@ static CFTimeInterval sPresentStarted;
 				}]];
 				[[weakSelf topPresenter] presentViewController:confirm animated:YES completion:nil];
 			}),
+#if !TARGET_OS_VISION
+            pdSwitchRow(@"Gyro while aiming (experimental)", PDDefGyroEnabled),
+            pdSliderRow(@"Gyro sensitivity", PDDefGyroSensitivity, 0.25f, 3.0f),
+            pdSwitchRow(@"Invert gyro (vertical)", PDDefGyroInvertY),
+            pdInfoRow(@"Gyro status", ^NSString *{ return [PDGyro.shared status]; }),
+            pdButtonRow(@"Recenter gyro", ^{ [PDGyro.shared recenter]; }),
+#endif
 		],
 		@[
 			pdSegRow(@"Control style", PDDefControlStyle,
@@ -1214,6 +1222,9 @@ static CFTimeInterval sPresentStarted;
 	if ((NSUInteger)s >= _sections.count) {
 		return nil;
 	}
+	if ([_sections[(NSUInteger)s] isEqualToString:@"Aiming"]) {
+        return @"Experimental gyro adds fine aim only while aiming. Release aim to reposition the device without moving the view; the next aim starts from neutral. Menus and backgrounding stop motion input.";
+    }
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Controls"]) {
 		return @"Dual analogue is the port's own control style (\"Port/Ext\"): the stick walks and "
 		        "runs at the speed you push it, and dragging looks. N64 puts the stick back on the "
@@ -1367,6 +1378,7 @@ static CFTimeInterval sPresentStarted;
 	PDRow *row = objc_getAssociatedObject(sw, @selector(commit));
 	[NSUserDefaults.standardUserDefaults setBool:sw.on forKey:row.key];
 	[self commit];
+    if ([row.key isEqualToString:PDDefGyroEnabled]) [self.tableView reloadData];
 #if TARGET_OS_VISION
 	// Show FPS and the 3D section's FPS on Panel are one key on one page.
 	if ([row.key isEqualToString:PDDefShowFPS]) {
