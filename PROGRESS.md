@@ -179,6 +179,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Current paused live position is approximately (320,157,-8453), heading 269.97, health 0.394, approaching room 72 via room 71. Preserve PID 25917 and the existing container. Private readback, screenshot and route notes updated under `work/evidence/investigation/`.
 - This expands simulator campaign traversal evidence but does not establish a second completed mission or physical touch usability. No build/install or save modification during this run.
 
+## Investigation laser-corridor failure
+
+- Continued normal Agent run through Sector Three: guards 21–24 cleared, doorway traversed after correcting lateral alignment. Reached approximately (1212,156,-10232) with health 0.394 and isotope objective complete.
+- A subsequent forward movement crossed active lasers and caused fatal damage near z=-10943. Normal results explicitly show **Failed / Deceased**, 4:30, 20 kills, 45.3% accuracy. Evidence: `work/evidence/investigation/laser-failed-results.png`. This supersedes earlier live-run continuation notes: the process remains running but the mission has ended. No Investigation unlock/save completion is claimed.
+- Source inspection confirms Agent initializes the purple maintenance robot directly on its laser patrol (`func0412_purplebot_programs`, path10); terminal reprogramming is for higher difficulties. Next attempt must observe and follow its laser opening cycle with shorter movements, rather than cross active beams. No gameplay logic was changed to bypass the hazard.
+- Only the existing simulator used. CamSpy objective and traversal evidence remain valid partial coverage; another normal mission attempt is required.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
