@@ -21,7 +21,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 - **Source/build:** PASS baseline Mac, ARM64 simulator and unsigned iOS device apps. Local SDL2/curl/ANGLE recipes require no sibling checkout. `scripts/bootstrap-apple.sh` assembles the proven steps; whole-command empty-project-cache rebuild passed on this Mac (details below); second-Mac reproduction remains untested. No broad engine optimization changes.
 - **Package/install:** simulator installed; native Files picker imported the supplied ROM; missing-ROM UI works. Updated installation preserved EEPROM and ROM. Device package built but not installed/signed.
-- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. Defection / Agent completed and its time/unlock reloaded in the simulator; full campaign coverage remains incomplete.
+- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. Defection and Investigation / Agent completed and their time/unlock progression reloaded in the simulator; full campaign coverage remains incomplete.
 - **Performance:** NOT QUALIFIED — no physical-device thermal/frame-time session. Simulator counters are not phone benchmarks.
 - **Release readiness:** NOT READY. Private development only; assets/saves/captures/builds ignored. P1/P2 acceptance remains incomplete.
 
@@ -243,6 +243,14 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - The security door at approximately (2309,161,-16945) correctly reported locked. Source inspection identified the normal Data Uplink terminal, tag 0x0a at (2314,138,-16696). First connection was interrupted by enemy fire pushing Joanna out of range. After clearing the guard, selected Data Uplink through Inventory, used the terminal and remained nearby; the game displayed “Password located”. Ordinary USE then opened the previously locked door, and Joanna crossed into the descending passage.
 - Test correction: Inventory scroll position changes visible row coordinates. An attempted weapon selection initially left Data Uplink equipped; later inspected the current menu and confirmed the weapon before firing. This was test sequencing, not evidence of an input defect. Future menu actions must use the current layout.
 - Current paused position approximately (2864,99,-17094), heading 249.87, health 0.11845687. Data Uplink is still equipped; select a weapon before further combat. Dr. Caroll and mission completion remain pending. Preserve PID 25917. Same single simulator. Private screenshot `work/evidence/investigation/uplink-password-found.png` and readback retained.
+
+## Investigation / Agent completed and save reloaded
+
+- Completed the normal Investigation run, including isotope holograph, Data Uplink door, all three robot-controlled laser crossings and locating Dr. Caroll. The final cutscene visibly reported Objective 2 Completed, followed by the Extraction next-mission briefing. No health, ammunition, position, objective or save mutations; diagnostic-guided touch input and read-only LLDB inspection only.
+- Traversed the lower labs and cleared guards 30–32. The final corridor caused minor damage; reached Dr. Caroll alive with health 0.0872068703. The central lab partition required retreating to z≈-20644, crossing east to x≈6163, then heading south to its exit. Earlier failed attempts remain separate history.
+- Backed up EEPROM/multiplayer setup, fully terminated the app and launched a new process (PID 74642). Loaded existing Dark agent through normal menus: Investigation has its Agent completion star and **10m:06s** best time; **Extraction is unlocked**. Save hashes match before/after relaunch. This is persisted mission progression evidence, not physical touch usability or full-campaign acceptance.
+- Private evidence under `work/evidence/investigation/`: `drcaroll-objective-completed.png`, `extraction-next-mission.png`, `reloaded-extraction-unlock.png`, `reloaded-investigation-time.png`, and `completed-save/`. Current app is at Investigation difficulty selection after reload, no live mission. PID 25917 is no longer active. Same single dedicated simulator; no rebuild/install required.
+- Next campaign coverage starts with Extraction; physical device, controller, graphics-pack memory/performance and later networking gates remain open.
 
 ## Next work
 
