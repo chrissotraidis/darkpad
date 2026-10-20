@@ -204,6 +204,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Reached Sector Three entrance with health 0.65625, position approximately (315,157,-8444), heading 269.97. Paused in Settings; preserve PID 25917. This is stronger health margin than the previous attempt at the same point, but mission completion and the laser crossing remain unverified.
 - Current private readback and route notes updated. Next clear guards 21–24, approach the lasers, and inspect the robot/opening cycle before crossing. Only the existing simulator used.
 
+## Investigation retry: laser timing failure verified
+
+- Cleared Sector Three guards 21–24 without additional damage and reached laser approach at health 0.65625. The normal retry subsequently failed at the first barrier; results show Failed / Deceased, 3:52, 20 kills, 47.4% accuracy (`work/evidence/investigation/retry-laser-failed.png`). Earlier alive-position notes are superseded. Process remains running at results, paused by native Settings.
+- Added private read-only LLDB inspection of tagged doors and maintenance robot. First barrier z=-10975.5 was open while Joanna stood at z=-10636; robot was already at z=-11478, opening the second barrier. During the next movement it advanced to z=-11977 and the first barrier closed. Fatal contact occurred at z=-10943. This is timing failure, not proof of a port defect; no gameplay logic changed.
+- Next normal attempt must stop close to the first barrier (before z=-10900), wait for the robot to return, and cross promptly during that local opening. A distant snapshot of an open door does not guarantee safe arrival. Inspect all three barrier groups at z=-10975.5/-11598.5/-12529.5. Diagnostic `lasers.py`/`lasers.json` remain private; reads only, no state mutation.
+- Investigation completion remains open. Same single simulator; no save or installation replacement.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
