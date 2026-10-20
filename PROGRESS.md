@@ -9,7 +9,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 ## Exact sources and environment
 
 - Apple shell: rebelancap/perfect-dark-ios `b88f7cff611d54f7d233ebe3882e2295e5ecca9a`; historical docs under `docs/upstream` are not Darkpad measurements.
-- Engine: `90c8622e74b35be669d60d177effc6d7d2d7621c` (`UPSTREAM_PIN`), unmodified vendor; all 48 overlay patches apply.
+- Engine: `90c8622e74b35be669d60d177effc6d7d2d7621c` (`UPSTREAM_PIN`), unmodified vendor; all 49 overlay patches apply.
 - Goldenpad: chrissotraidis/goldenpad `52bb67328c2cc4b98b4242ba0539985bd61fc2d3`, downloaded under ignored `work/references`; direct behavior inspection in `docs/goldenpad-reference.md`.
 - SDL2 `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8); curl 8.11.0 archive SHA-256 `264537d90e58d2b09dddc50944baf3c38e7089151c8986715e2aaeaaf2b8118f`.
 - ANGLE `e25e8d8565f7b077002e07c2cbacfc2eec35aec0`; depot_tools `3a8af1e64be01a524f7d1c46daf8c2dcac63ff85`. Transitive actual revisions in `work/evidence/angle-dependency-revisions.txt`; pins in `dependencies/pins.env`.
@@ -27,7 +27,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 ## Reproducible commands and evidence
 
-- `scripts/bootstrap.sh`, `scripts/apply-overlay.sh`: exact engine and clean application of 48 patches (`work/evidence/bootstrap.log`, `overlay.log`).
+- `scripts/bootstrap.sh`, `scripts/apply-overlay.sh`: exact engine and clean application of 49 patches (`work/evidence/bootstrap.log`, `overlay.log`).
 - `scripts/build-apple-deps.sh {iphonesimulator,iphoneos,macosx}`: SDL2/curl built, every tagged archive object checked ARM64 and correct platform (SDL2 186/186/185, curl 169 per SDK). SecureTransport TLS; optional nghttp2/HTTP3 discovery disabled after finding unintended Homebrew linkage in the first Mac attempt.
 - `scripts/fetch-angle.sh`, `scripts/build-angle-ios.sh {simulator,device}`: both native framework pairs built and checked. Use DEPS-provided GN and host Ninja, avoiding depot_tools' stale Python-wrapper requirement. Logs `angle-{simulator,device}.log`.
 - `scripts/build-macos.sh`: `build/oracle-clang/pd.arm64`. Chicago 600-frame smoke and eight-simulant 2,000-frame smoke exited 0; screenshots inspected. Mac save/reload kept EEPROM byte-identical. These are partial correctness checks, not mission/match completion.
@@ -38,12 +38,21 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Quit/relaunch visibly retained **Dark** (`sim-saved-agent-reload.png`). Documents/Library backup in `work/evidence/sim-before-update/`. Pre-update EEPROM SHA-256 `97f96398b6740a47e8b4ef89a6fbb1eadf4f057d51a633b3f6ea7f7bb67ec3d9`; installation preserved its bytes.
 - Fixed watchdog false hangs before first engine frame. Updated app waited >30 seconds on onboarding with `frames=0`, `hang_dumps=0` (`sim-onboarding-watchdog.txt`), then restored ROM resumed gameplay (`sim-after-update-state.txt`). Private ROM backup was restored; none left renamed.
 
+## Normal match and dropdown checkpoint
+
+- Fixed an actual touch selection defect: tapping **8** in Number of Simulants committed **1**. Patch `0055` uses the dropdown's rendered bounds and scroll offset to focus the tapped row before selection; outside taps cannot commit the previous value. Native taps now select eight. All 49 patches apply to a fresh vendor copy; vendor remains unmodified. Simulator and device engine/app builds passed after the fix.
+- Normal simulator flow: loaded saved agent Dark, configured Skedar / Pistols / eight Normal Sims / one-minute limit, saved setup **8bots**, started a non-spectator game, moved with touch, and reached Game Over naturally. Rankings include NormalSim8 and scoring bots. Saved player **Player18**, quit/relaunched, loaded **8bots** and **Player18** through the menus. Reloaded statistics show Games Played 1, Time 0:00.57, Pain Received 0.6. This verifies a completed short match and persistence, not combat usability or a campaign mission. Evidence: `sim-normal-match-{game-over,ranking}.png`, `sim-player18-reloaded-stats.png`.
+- Earlier direct `--mpsims 8` spectator runs reached Game Over on Mac and simulator. That debug path bypasses loading the single-player agent and produced a missing-agent save error after saving the multiplayer profile; use the normal menu path for save acceptance. No cheat or endless-match flag used for these completion runs.
+- Added a native local Mac reference app wrapper (`scripts/package-macos-reference.sh`) around the unchanged upstream ARM64 binary. Native input and postmatch UI verified; ROM and saves are supplied outside the bundle. This is a private reference, not a release artifact.
+- Bootstrap now explicitly repackages ANGLE after building both device and simulator slices, preventing an old simulator-only XCFramework from being reused. Both framework manifests contain the required slices.
+- Before updating the simulator app, backed up Documents/Library; ROM and EEPROM hashes were unchanged after installation (`dropdown-update-preservation.json`). Existing agents/profiles retained. Boot services again delayed initial process launch; subsequent launches worked.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
 
-- Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This is not a completed match. Simulator shut down after the test.
-- Complete early mission and actual bot match/save progression; maintain distinction from seeded smoke. Full campaign and human control usability still outstanding.
+- Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This earlier smoke is distinct from the later completed normal match. Dedicated simulator is currently booted.
+- Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Full campaign and human control usability still outstanding.
 - First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default controls overlap the display cutout. Fix from this evidence during control/layout work.
 - Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
 - Implement Goldenpad utility menu and semantic control layout, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Add original/enhanced profiles instead of forcing 2× texture enhancement and combat roll by default; gyro stays experimental until physical testing.

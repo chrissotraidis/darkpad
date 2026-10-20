@@ -33,6 +33,23 @@ Validation preserves the original and can normalize byte-swapped copies.
 Never commit ROMs, saves, extracted art, signing material, or gameplay captures.
 Do not boot a second simulator while one is running.
 
+For a native Mac window that can be selected as an app during manual testing:
+
+```sh
+scripts/package-macos-reference.sh
+mkdir -p work/saves/mac-reference
+open -a "$PWD/build/mac-reference/Perfect Dark Reference.app" --args \
+  --basedir "$PWD/work/gamedata" --savedir "$PWD/work/saves/mac-reference" \
+  --skip-intro
+```
+
+This is an ad-hoc signed local reference, with the same pinned desktop engine.
+It has no ROM importer; stage validated data first. Keep it private: the engine
+can write F12 screenshots into the app's Resources directory while testing.
+Use the regular agent menus for progression/save tests. `--mpsims` bypasses
+agent loading; saving can write a multiplayer profile and then report a missing
+single-player agent. It cannot validate the normal save flow.
+
 Source revisions: `UPSTREAM_PIN`, `dependencies/pins.env`, and `PROGRESS.md`.
 Original Apple shell history/docs are retained under `docs/upstream`; their
 measurements are historical upstream evidence, not validation of this build.

@@ -15,6 +15,9 @@ for kind in simulator device; do
  scripts/build-angle-ios.sh "$kind"
  scripts/build-ios.sh "$kind"
 done
+# Repackage both freshly built slices even if an earlier simulator-only run
+# already created an XCFramework. gen-app-project only checks for existence.
+scripts/make-angle-xcframeworks.sh
 scripts/gen-app-project.sh
 for sdk in iphonesimulator iphoneos; do
  xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark \
