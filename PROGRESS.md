@@ -186,6 +186,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Source inspection confirms Agent initializes the purple maintenance robot directly on its laser patrol (`func0412_purplebot_programs`, path10); terminal reprogramming is for higher difficulties. Next attempt must observe and follow its laser opening cycle with shorter movements, rather than cross active beams. No gameplay logic was changed to bypass the hazard.
 - Only the existing simulator used. CamSpy objective and traversal evidence remain valid partial coverage; another normal mission attempt is required.
 
+## Investigation normal retry underway
+
+- Accepted Retry through the normal results menu in the same process. The new Agent attempt has cleared guard 0 and all four first-lab guards. Current health 0.890625; paused in Settings at approximately (-1143,157,-2293), heading 179.97. Both objectives are pending again; prior isotope completion belongs to the failed run.
+- Shortened the starting route: from lift forward 25×50 ms, turn west, forward 60×50 ms reaches the first guard corridor directly. Collected CMP150 normally; later switched to Falcon 2 after ammunition depletion. One close-range hit during reload; no cheats or state edits.
+- Keep PID 25917 for continuation. Next: reach z≈-2688, turn east toward isotope access, clear the two guards, and deploy CamSpy while Joanna remains outside the radiation area. Later, observe the maintenance robot before crossing active lasers. Current readback and notes under `work/evidence/investigation/`.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
