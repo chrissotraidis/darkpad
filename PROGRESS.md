@@ -192,6 +192,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Shortened the starting route: from lift forward 25×50 ms, turn west, forward 60×50 ms reaches the first guard corridor directly. Collected CMP150 normally; later switched to Falcon 2 after ammunition depletion. One close-range hit during reload; no cheats or state edits.
 - Keep PID 25917 for continuation. Next: reach z≈-2688, turn east toward isotope access, clear the two guards, and deploy CamSpy while Joanna remains outside the radiation area. Later, observe the maintenance robot before crossing active lasers. Current readback and notes under `work/evidence/investigation/`.
 
+## Investigation retry: isotope complete
+
+- Cleared both isotope-access guards and completed the CamSpy holograph objective again in the live normal retry. Screenshot `work/evidence/investigation/retry-isotope-completed.png` visibly confirms Objective 1 Completed. Exited camera and returned west; paused at approximately (428,157,-2739), heading 89.97, health 0.84375. Dr. Caroll remains pending.
+- First deployment did not remain active: a subsequent movement went to Joanna, caught on screenshot, and she was withdrawn. Re-selected CamSpy and verified its HUD before flight. This is a test-sequencing risk to investigate; do not assume successful activation from a menu tap alone. The second flight/shutter completed normally with no further health loss.
+- Preserve PID 25917. Same simulator, no install or state mutation. Private current readback and route notes updated. Continue west through the Caution door, then south through Sector Two; laser timing remains unverified.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
