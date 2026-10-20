@@ -160,6 +160,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - All 14 classifier fixture cases pass, including rejection of synthetic matching-header content (`stock-rom-classifier-test.log`). Installed stock input passes separately (`stock-rom-accepted.txt`). Startup with the synthetic file displays the actionable mismatch UI (`stock-rom-content-mismatch.png`); restoring the stock ROM atomically automatically resumes startup.
 - Simulator and unsigned device builds pass (`app-stock-rom-*.log`). Documents/Library backed up before installation; ROM, EEPROM, configuration and match setup SHA-256 values still match after the complete test (`stock-rom-preservation.json`). Unfinished roof test run ended for update; saved progression preserved. One simulator used.
 
+## Investigation campaign run in progress
+
+- Started normal Investigation / Agent from the existing unlock. Advanced through the starting corridor and two access doors into the first lab encounter using touch controls. Collected the first guard's CMP150 normally; after it depleted the engine switched back to the Falcon 2. Corridor guard and three lab guards cleared; one nearby lab guard remains. Last readback shows full health, paused in Settings.
+- Read-only LLDB inspection supplies position/guard and room-connectivity evidence; no health, position, ammunition, objective or save edits. Private route/current-state files under `work/evidence/investigation/`. The diagnostic stream command returns before its gesture finishes; waiting its duration corrected an early script sequencing mistake that had cancelled movement by opening Settings immediately.
+- Investigation's isotope and Dr. Caroll objectives remain incomplete. Preserve the live process (PID 25917) for continuation, rather than restarting for unrelated shell changes. Same single simulator. This run has not established another campaign completion or human touch usability.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
