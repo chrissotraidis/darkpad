@@ -237,6 +237,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - This resolves the earlier test execution failure to traverse the lasers. Current Joanna position approximately (1195,157,-12739), heading 179.97, health unchanged at 0.39399007, paused in native Settings. Guard 25 is ahead around (1464,105,-13693). Dr. Caroll and mission completion still pending. Preserve PID 25917 and installation. Same single simulator.
 - Private evidence: `work/evidence/investigation/three-lasers-crossed.png`, `live-at-pause.json`, `lasers.json`. Earlier failed attempts remain recorded separately and are not completion evidence.
 
+## Investigation: Data Uplink door unlocked and traversed
+
+- Continued beyond the lasers through the lounge and offset access doors. Cleared guards 25, 26, 28, 29 and finally pursuing guard 27. Health fell to 0.11845687 during these encounters; isotope objective remains complete. No health or gameplay-state edits.
+- The security door at approximately (2309,161,-16945) correctly reported locked. Source inspection identified the normal Data Uplink terminal, tag 0x0a at (2314,138,-16696). First connection was interrupted by enemy fire pushing Joanna out of range. After clearing the guard, selected Data Uplink through Inventory, used the terminal and remained nearby; the game displayed “Password located”. Ordinary USE then opened the previously locked door, and Joanna crossed into the descending passage.
+- Test correction: Inventory scroll position changes visible row coordinates. An attempted weapon selection initially left Data Uplink equipped; later inspected the current menu and confirmed the weapon before firing. This was test sequencing, not evidence of an input defect. Future menu actions must use the current layout.
+- Current paused position approximately (2864,99,-17094), heading 249.87, health 0.11845687. Data Uplink is still equipped; select a weapon before further combat. Dr. Caroll and mission completion remain pending. Preserve PID 25917. Same single simulator. Private screenshot `work/evidence/investigation/uplink-password-found.png` and readback retained.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
