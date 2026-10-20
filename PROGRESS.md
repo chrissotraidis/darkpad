@@ -38,3 +38,12 @@ Resolve pinned ANGLE/depot_tools and build SDL2/curl without sibling dependencie
 - Mac Chicago smoke PASS: 600 seeded fixed-step frames, exit 0, inspected 1280×720 screenshot at frame 500 (intro cutscene rendered), pd.ini and 2048-byte eeprom.bin written. This is a rendering/lifecycle smoke, not completed-mission evidence. Log: work/evidence/mac-smoke-chicago.log.
 - ANGLE sync PASS. Simulator framework build running, session 98166 (work/evidence/angle-simulator.log). Use DEPS-provided buildtools/mac/gn and the pre-resolved host Ninja; depot_tools' wrappers expected an obsolete Python bootstrap marker.
 - Eight-bot Mac smoke started (work/evidence/mac-smoke-eight-bots.log). Still zero booted simulators.
+- Eight-bot Mac smoke PASS: 2,000 frames, eight simulants, CPU vertex path, exit 0 and screenshot at frame 1,800. Not a completed match/progression acceptance test.
+- Foundation checkpoint committed as 3eab186 on codex/perfect-dark-foundation (including preserved document relocation).
+- ANGLE first compile reached 250 targets then Dawn generator failed under the user's default Python 3.8 (functools.cache absent). Recipe now selects installed Python 3.11 via a project-local tool shim, with a minimum-version check. Resumed simulator ANGLE build: session 17538; work/evidence/angle-simulator.log.
+
+## Next continuation
+1. Check ANGLE session 17538/log, finish simulator frameworks then engine and app; device slice follows sequentially.
+2. Mac smoke passes are only partial P0 evidence. Verify save reload, early mission completion and actual bot match; use CPU-vertices for renderer comparisons.
+3. Boot at most one discovered simulator, verify missing-ROM UI, import and gameplay, then shut it down before another target.
+4. Only after stable baseline apply Goldenpad menu/controls, gyro trial and enhanced-art work. No physical devices currently connected.

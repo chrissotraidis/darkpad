@@ -13,7 +13,11 @@ ANGLE="$BASE/angle"
 [[ -f "$ANGLE/build/config/BUILDCONFIG.gn" ]] || "$ROOT/scripts/fetch-angle.sh"
 [[ "$(git -C "$ANGLE" rev-parse HEAD)" == "$ANGLE_COMMIT" ]] || exit 1
 NINJA="$(command -v ninja)"
-export PATH="$BASE/depot_tools:$PATH"
+PYTHON="${PD_PYTHON:-$(command -v python3.11 || command -v python3)}"
+"$PYTHON" -c 'import sys; assert sys.version_info >= (3, 9), "ANGLE requires Python 3.9+"'
+mkdir -p "$BASE/tools"
+ln -sfn "$PYTHON" "$BASE/tools/python3"
+export PATH="$BASE/tools:$BASE/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
 cd "$ANGLE"
 OUT="out/ios-arm64-$KIND"
