@@ -90,6 +90,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Added development-only `pad binds` snapshot of actual engine bindings. Staged reversible custom R3 roll binds for four players, then checked all 512 live slots before/after repeated simulated disconnect/reconnect. Exact match, including all custom R3 slots (`pad-preserve-live-{before,after}.json`). Restored original pd.ini byte-for-byte after testing.
 - Simulator/device builds pass (`app-pad-preserve.log`, `app-device-pad-preserve.log`); update preserves ROM/save hashes. This is notification-path evidence, not a physical Bluetooth hot-plug test.
 
+## Empty-cache bootstrap acceptance
+
+- `scripts/bootstrap-apple.sh` completed uninterrupted, exit 0, from clean managed worktree `/Users/chrissotraidis/.codex/worktrees/clean-bootstrap/darkpad` at `dc53fa0`, with no pre-existing work/build/vendor directories. Engine, SDL/curl (three SDKs), ANGLE (both iOS slices), Mac reference and both app bundles rebuilt. Both final Xcode builds succeeded. Log: `work/evidence/clean-bootstrap-dc53fa0.log`.
+- No working-checkout dependency libraries or game assets copied into the clean tree. This proves an empty **project** cache on this Mac with installed prerequisites; system developer tools/vpython caches remain host dependencies. No claim of a second Mac test.
+- Installed the clean-produced simulator app after Documents/Library backup; all four ROM/save hashes match (`clean-build-update.json`). Only the existing dedicated simulator remained booted. Mission/save-reload acceptance proceeds on this clean build.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

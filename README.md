@@ -21,7 +21,8 @@ This fetches the pinned engine and dependencies and builds simulator/device
 bundles plus a native Mac reference. Initial ANGLE acquisition is large;
 allow tens of GiB and substantial build time. Sources and intermediate builds
 are cached under ignored `work/` and `build/`. No sibling checkout is required.
-The complete command is under validation; consult progress for proven steps.
+The complete command passed from an empty project dependency cache on the
+recorded development Mac; see [PROGRESS.md](PROGRESS.md) for evidence and limits.
 
 ```sh
 scripts/validate-rom.py '/path/to/your/Perfect Dark.z64' \
