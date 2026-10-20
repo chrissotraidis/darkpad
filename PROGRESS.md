@@ -73,12 +73,17 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator checks passed for all three profiles, live return to Original, and Enhanced persistence across quit/relaunch. No optional art pack was supplied, so real replacement assets and their memory cost remain unqualified. Fresh roll gestures now default off; explicit existing preferences survive.
 - Final simulator and unsigned device builds pass (`app-art-profiles-final.log`, `app-device-art-profiles-final.log`). ROM/save hashes survived updates; Documents/Library backed up. Legacy development `xbla release on/off` now selects Remaster/Original.
 
+## Normal campaign attempt
+
+- Loaded preserved Dark agent through Game Pak → Solo Missions → Defection → Agent → Accept. Touch movement, firing, automatic reload, damage and normal failure/retry screens worked. Attempt ended deceased at 2:48, one kill, 13 shots; **mission completion still fails acceptance** (`defection-normal-attempt-failed.png`, matching state).
+- Retried through the normal Retry menu. Current session is now a normal campaign attempt, paused in native Settings on the lower roof. Tool/decision latency left the first attempt exposed to guards; use native pause between observations during route validation. No health/objective cheats or save edits used.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
 
 - Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This earlier smoke is distinct from the later completed normal match. Dedicated simulator is currently booted.
-- Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator session is a debug-entered Defection route used for native UI checks, no objective completion claimed. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
+- Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator session is a normal Defection retry paused on the lower roof, no objective completion claimed. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
 - First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default control overlap with the display cutout is fixed on the tested iPhone; validate other sizes during control/layout work.
 - Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
 - Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Art profiles are implemented; qualify optional pack memory/performance on hardware. Gyro stays experimental until physical testing.
