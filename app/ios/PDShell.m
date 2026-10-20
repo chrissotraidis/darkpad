@@ -21,6 +21,7 @@ extern void *pdAngleGetHostView(void);
 #import "PDXbla.h"
 #import "PDAudio.h"
 #import "PDSettingsViewController.h"
+extern int lvIsPaused(void);
 #import "PDWatchdog.h"
 #import "PDGeometry.h"
 
@@ -335,6 +336,7 @@ int pdExtraPumpMs = 0;
 	// Which chip set is up, and therefore whether a tap is a menu pointer or a
 	// gameplay button (overlay 0019). A scripted menu walk asserts on this
 	// before it asserts on anything it tapped.
+	[s appendFormat:@"engine_paused=%d\n", self.engineRunning ? lvIsPaused() : 0];
 	[s appendFormat:@"menu_open=%d\n", self.engineRunning ? (menuIosDialogIsOpen() ? 1 : 0) : 0];
 	if (self.engineRunning) {
 		float px = 0, py = 0, pz = 0;
@@ -578,6 +580,7 @@ void pdIosFrameHook(void)
 		// engine's loop never returns, so "later" has no other meaning.
 		pdVision3dFramePoll();
 #endif
+		[PDSettingsViewController updateNativePause];
 		[PDController.shared tick];
 		[PDTouchOverlay publishInput];
 		// The picture's size chain (D-077): logged on change, and on an iPhone

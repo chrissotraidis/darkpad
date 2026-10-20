@@ -503,7 +503,7 @@ static const PDButtonSpec kMenuButtons[] = {
 	// The corner-geometry log's change detector (D-076).
 	NSString *_lastGeo;
 	uint32_t _geoTicks;
-	CFTimeInterval _gameplaySince;
+
 	CGFloat _scale;
 
 	// Settings, read once and kept, not read per touch event (D-034).
@@ -702,18 +702,19 @@ static __weak PDTouchOverlay *sCurrent;
 }
 
 /**
- * bean's gear (touch_overlay_uikit.mm:1598-1619): 34x34, white at 0.55 on black
- * at 0.30, a sibling of the overlay.
+ * A 44-point utility target, independent of gameplay controls.
  */
 - (void)installGearInWindow:(UIWindow *)window
 {
 	UIButton *gear = [UIButton buttonWithType:UIButtonTypeSystem];
-	[gear setImage:[UIImage systemImageNamed:@"gearshape.fill"] forState:UIControlStateNormal];
+	[gear setImage:[UIImage systemImageNamed:@"ellipsis"] forState:UIControlStateNormal];
 	gear.tintColor = [UIColor colorWithWhite:1.0 alpha:0.55];
 	gear.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.30];
-	gear.layer.cornerRadius = 17.0;
-	gear.translatesAutoresizingMaskIntoConstraints = NO;
-	[gear addTarget:self action:@selector(openSettings) forControlEvents:UIControlEventTouchUpInside];
+	gear.layer.cornerRadius = 22.0;
+	gear.accessibilityLabel = @"Utilities";
+	gear.accessibilityHint = @"Settings, touch layout and diagnostics";
+	gear.translatesAutoresizingMaskIntoConstraints = YES;
+	[gear addTarget:self action:@selector(openUtilities) forControlEvents:UIControlEventTouchUpInside];
 	[window addSubview:gear];
 	_gear = gear;
 	[self pinGearInWindow:window];
@@ -721,60 +722,28 @@ static __weak PDTouchOverlay *sCurrent;
 	NSLog(@"perfectdark: [touch] gear installed frame=%@", NSStringFromCGRect(gear.frame));
 }
 
-/**
- * Where the gear sits (D-076).
- *
- * iPhone: PAUSE's default spot MIRRORED - the same unit y of the full window
- * and 1 - its unit x - so the two are level and equally far in from their
- * corners on every iPhone shape. It is derived from the START row of kButtons,
- * the same numbers PAUSE's own default is drawn from, so it cannot drift from
- * it. It used to hang off the window's safe area (+12/+12, bean), which put
- * it level with nothing in particular - and since the UIScene adoption (D-038)
- * SDL's window is born sceneless and grafted onto the scene, and a grafted
- * window reports the PORTRAIT panel's insets while it is laid out landscape
- * (top 47 / left 0 on a 17e in landscape): the gear dropped by the portrait
- * top inset and slid to the edge. A player who moved PAUSE keeps their spot;
- * the gear follows the default, so it stays where the player learned it.
- *
- * visionOS: unchanged, the safe area's top-left at +12/+12 - a window in the
- * shared space has no insets and nothing grafted, and its corner is not
- * shaped by a phone's bezel.
- */
+/** Keep the utility target inside the current landscape safe area. */
 - (void)pinGearInWindow:(UIWindow *)window
 {
 	UIButton *gear = _gear;
-	if (!gear || gear.superview != window) {
-		return;
+	if (!gear || gear.superview != window) return;
+	UIEdgeInsets inset = window.safeAreaInsets;
+	// SDL's grafted landscape window can retain portrait safe-area insets.
+	// Reserve the reported cutout inset horizontally until UIKit catches up.
+	if (window.bounds.size.width > window.bounds.size.height && inset.top > 24
+		&& inset.left == 0 && inset.right == 0) {
+		inset.left = inset.right = MAX(inset.top, inset.bottom);
+		inset.top = 0;
 	}
-	NSMutableArray<NSLayoutConstraint *> *c = [NSMutableArray arrayWithObjects:
-		[gear.widthAnchor constraintEqualToConstant:34],
-		[gear.heightAnchor constraintEqualToConstant:34], nil];
-#if TARGET_OS_VISION
-	UILayoutGuide *safe = window.safeAreaLayoutGuide;
-	[c addObject:[gear.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12]];
-	[c addObject:[gear.topAnchor constraintEqualToAnchor:safe.topAnchor constant:12]];
-#else
-	const PDButtonSpec *pause = [self specForLabel:@"START"];
-	NSAssert(pause, @"no START row in kButtons");
-	const CGFloat ux = pause ? 1.0 - pause->unitX : 0.06;
-	const CGFloat uy = pause ? pause->unitY : 0.0992;
-	// Multiples of the window's own trailing/bottom edges, i.e. of its width and
-	// height (its leading/top are 0) - the same `u * bounds` the chips use.
-	[c addObject:[NSLayoutConstraint constraintWithItem:gear attribute:NSLayoutAttributeCenterX
-		relatedBy:NSLayoutRelationEqual toItem:window attribute:NSLayoutAttributeTrailing
-		multiplier:ux constant:0]];
-	[c addObject:[NSLayoutConstraint constraintWithItem:gear attribute:NSLayoutAttributeCenterY
-		relatedBy:NSLayoutRelationEqual toItem:window attribute:NSLayoutAttributeBottom
-		multiplier:uy constant:0]];
-#endif
-	[NSLayoutConstraint activateConstraints:c];
+	gear.frame = CGRectMake(inset.left + 12, inset.top + 12, 44, 44);
 }
 
-- (void)openSettings
+- (void)openUtilities
 {
 	_gearTaps++;
-	NSLog(@"perfectdark: [settings] gear tapped at %.3f", CACurrentMediaTime());
-	[PDSettingsViewController present];
+	[self releaseEverything];
+	inputIosPointerClear();
+	[PDSettingsViewController presentUtilities];
 }
 
 // ---------------------------------------------------------------------------
@@ -2008,52 +1977,16 @@ static const CGFloat kWheelRadius = 32.0;
 	return out;
 }
 
-/**
- * The gear is shown in menus, on the title screen, in the pause screen and the
- * briefing, and HIDDEN while the player is actually playing (bean,
- * touch_overlay_uikit.mm:1142-1167).
- *
- * The predicate is the engine's, asked once a frame on the game thread: there
- * is a player standing somewhere (playerIosGetPos, overlay 0021, which answers
- * 0 in a menu or a load), no dialog is open (menuIosDialogIsOpen, overlay 0019,
- * which is what PD's pause menu and every options page is) and the player is
- * not paused (playerIosIsPaused, overlay 0021 - the two transitional frames
- * either side of the dialog, where a pad player has pressed Start and is
- * looking for the gear). Every failure mode here reports "not gameplay" and
- * SHOWS the gear: it is the only route to Settings, and bean lost his for good
- * by getting this the other way round.
- *
- * Hysteresis one way only: showing is immediate, hiding waits for 400 ms of
- * continuous gameplay so a quick pause and unpause cannot flicker it.
- *
- * D-037: this runs on EVERY frame, including the frames where the touch layer
- * is hidden because a pad is connected. It used to be a line in -publish, and
- * +publishInput returns before -publish whenever the layer is hidden - so the
- * gear froze at whatever it was the instant the controller connected, which on
- * a pad player mid-mission is "hidden", for ever. That is the user's "when I
- * pause the game on gamepad, the iOS settings button does not show": the
- * predicate was right and was simply never asked again.
- */
+/** Keep utilities reachable independently of controller/touch visibility. */
 - (void)updateGearVisibility
 {
 	if (!_gear) {
 		return;
 	}
-	float px = 0, py = 0, pz = 0;
-	const BOOL playing = !_menuOpen && !playerIosIsPaused()
-		&& playerIosGetPos(&px, &py, &pz) != 0;
-	if (!playing) {
-		_gameplaySince = 0.0;
-	} else if (_gameplaySince == 0.0) {
-		_gameplaySince = CACurrentMediaTime();
-	}
-	const BOOL settled = playing && (CACurrentMediaTime() - _gameplaySince) >= 0.4;
-	const BOOL hide = _editing || settled;
-	if (_gear.hidden != hide) {
-		_gear.hidden = hide;
-		NSLog(@"perfectdark: [touch] gear %@ (%@)", hide ? @"hidden" : @"shown",
-			playing ? @"gameplay" : @"menu/title");
-	}
+	// Utilities remain reachable during play and when a controller hides the
+	// touch layer. The original START chip still opens the game's own menu.
+	_gear.hidden = _editing;
+	[self pinGearInWindow:_gear.window];
 	// The corner geometry, logged when it changes (checked twice a second).
 	if (++_geoTicks % 30 == 0) {
 		NSString *geo = [self cornerGeometryReport];
@@ -3166,7 +3099,7 @@ static CGVector pdStickCurve(CGVector raw)
 	}
 
 	if ([what isEqualToString:@"gear"]) {
-		[self openSettings];
+		[self openUtilities];
 		return what;
 	}
 

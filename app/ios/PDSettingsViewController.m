@@ -197,9 +197,48 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 
 @end
 
+// Small native utility hub; no game assets or unsafe stage-reset action.
+@interface PDUtilitiesViewController : UITableViewController
+@end
+@implementation PDUtilitiesViewController
+- (void)viewDidLoad
+{
+	[super viewDidLoad];
+	self.title = @"Utilities";
+	self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+		initWithTitle:@"Resume" style:UIBarButtonItemStyleDone target:self action:@selector(resume)];
+}
+- (void)resume { [PDSettingsViewController dismiss]; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return 3; }
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path
+{
+	UITableViewCell *cell = [table dequeueReusableCellWithIdentifier:@"utility"];
+	if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"utility"];
+	cell.textLabel.text = @[@"Settings", @"Edit Touch Controls", @"Diagnostics"][path.row];
+	cell.imageView.image = [UIImage systemImageNamed:@[@"slider.horizontal.3", @"hand.draw", @"waveform.path.ecg"][path.row]];
+	cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+	return cell;
+}
+- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path
+{
+	[table deselectRowAtIndexPath:path animated:YES];
+	if (path.row == 1) {
+		[PDSettingsViewController dismiss];
+		[PDTouchOverlay.current beginLayoutEditing];
+	} else {
+		[PDSettingsViewController present];
+		if (path.row == 2) [PDSettingsViewController scrollToSectionContaining:@"Diagnostics"];
+	}
+}
+@end
+
 // ---------------------------------------------------------------------------
 
 static UIWindow *sWindow;
+static PDSettingsViewController *sSettingsController;
+static BOOL sUtilityOwnsPause;
+extern int lvIsPaused(void);
+extern void lvSetPaused(int paused);
 /** When the gear was tapped, so viewDidAppear can say how long the page took. */
 static CFTimeInterval sPresentStarted;
 
@@ -222,6 +261,29 @@ static CFTimeInterval sPresentStarted;
 
 + (BOOL)isPresented { return sWindow != nil && !sWindow.hidden; }
 
++ (void)updateNativePause
+{
+	const BOOL wanted = self.isPresented || PDTouchOverlay.current.layoutEditing;
+	if (wanted && !sUtilityOwnsPause && !lvIsPaused()) {
+		sUtilityOwnsPause = YES;
+		lvSetPaused(1);
+	} else if (!wanted && sUtilityOwnsPause) {
+		lvSetPaused(0);
+		sUtilityOwnsPause = NO;
+	}
+}
+
++ (void)presentUtilities
+{
+	if (!NSThread.isMainThread) {
+		dispatch_async(dispatch_get_main_queue(), ^{ [self presentUtilities]; });
+		return;
+	}
+	[self present];
+	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	[nav setViewControllers:@[[[PDUtilitiesViewController alloc] initWithStyle:UITableViewStyleInsetGrouped]] animated:NO];
+}
+
 + (void)present
 {
 	if (!NSThread.isMainThread) {
@@ -239,6 +301,8 @@ static CFTimeInterval sPresentStarted;
 	} else {
 		[self build];
 	}
+	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	[nav setViewControllers:@[sSettingsController] animated:NO];
 	sWindow.hidden = NO;
 	[sWindow makeKeyAndVisible];
 	// The GoldenEye rows read a cached scan; refresh it OFF the main thread and
@@ -296,6 +360,7 @@ static CFTimeInterval sPresentStarted;
 #else
 	PDSettingsViewController *vc = [[PDSettingsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
 #endif
+	sSettingsController = vc;
 	UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
 
 	// Its own window: SDL owns the root view controller of the game's window,
@@ -438,6 +503,7 @@ static CFTimeInterval sPresentStarted;
 	sWindow.rootViewController = nil;
 	sWindow.windowScene = nil;
 	sWindow = nil;
+	sSettingsController = nil;
 	NSLog(@"perfectdark: [settings] window destroyed (heal experiment)");
 }
 
@@ -519,12 +585,7 @@ static CFTimeInterval sPresentStarted;
 
 + (nullable PDSettingsViewController *)presentedControllerEvenIfHidden
 {
-	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
-	if (![nav isKindOfClass:UINavigationController.class]) {
-		return nil;
-	}
-	UIViewController *vc = nav.viewControllers.firstObject;
-	return [vc isKindOfClass:PDSettingsViewController.class] ? (PDSettingsViewController *)vc : nil;
+	return sSettingsController;
 }
 
 /**

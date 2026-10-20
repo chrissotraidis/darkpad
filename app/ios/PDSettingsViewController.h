@@ -13,6 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 /** Show it (main thread). Idempotent. */
 + (void)present;
+/** Goldenpad-inspired utilities, using the same focus-safe native window. */
++ (void)presentUtilities;
+/** Engine-frame hook: preserve prior pause state across native UI and editing. */
++ (void)updateNativePause;
 /** Hide it. */
 + (void)dismiss;
 /** Whether it is up — the bridge reports this in `state`. */

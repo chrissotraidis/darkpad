@@ -6,7 +6,7 @@ This is a behavior reference, not an engine/protocol integration. No root
 license was present in that checkout; implement the interaction ideas in the
 existing MIT-licensed Apple shell rather than copying Swift source.
 
-## Behavior to carry across after baseline gameplay validation
+## Reference behavior
 
 - Left stick moves, right-side drag/right stick looks. Semantic actions stay
   separate from game-specific button words.
@@ -33,5 +33,19 @@ existing MIT-licensed Apple shell rather than copying Swift source.
 - `app/ios/PDController.m`: existing SDL bindings, right-stick look and hot-plug.
 - `app/ios/PDSettingsViewController.m`: native settings and diagnostics.
 
-Implementation/acceptance pending P0 baseline. Test CamSpy, weapon wheel,
-secondary fire, cancellation, backgrounding and held input during menu opening.
+## Implemented utility pass
+
+The shell now has a persistent 44-point circular ellipsis with an accessible
+Utilities label. It opens a native hub for Settings, Edit Touch Controls and
+Diagnostics; the original START action remains separate. Opening it clears held
+touch state. The existing settings window preserves SDL focus on dismissal.
+Native UI and layout editing pause simulation and release only a pause they own.
+The button handles SDL's stale portrait safe-area insets in landscape.
+
+Simulator evidence: native menu navigation, direct editing, Diagnostics,
+zero held inputs, stable paused player position, and pause/resume transitions
+0 → 1 → 0. ROM/save hashes survived installation. Simulator and unsigned device
+builds pass. The native hub does not yet offer return-to-main-menu; a safe engine
+exit/save path needs validation first. Controller mappings and safe-area gameplay
+button layout are still pending. Test CamSpy, weapon wheel, secondary fire,
+backgrounding and physical controller interaction before acceptance.
