@@ -55,13 +55,19 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator and unsigned device builds pass (`app-utilities-final.log`, `app-device-utilities-final.log`). Native destinations inspected. Documents/Library backed up before updates; ROM and all four detected save/data files retained exact hashes.
 - P0 mission completion remains incomplete. Proceeded with the directly requested shell utility improvement while preserving the pinned engine/reference baseline; no broader acceptance claim. Current live session was entered through the debug stage command solely to test native pause, so it is not campaign completion evidence.
 
+## Default touch-layout safe areas
+
+- Built-in gameplay controls now translate inward as a group to avoid the display cutout and bottom edge, preserving spacing between the action buttons. START/BACK are inset separately; the temporary left FIRE mirrors the adjusted FIRE position. Explicit custom positions remain unchanged.
+- Same iPhone simulator inspected in the layout editor: all default rings clear the cutout. Moved SWAP, closed and reopened the editor, and visually confirmed its exact custom placement. Restored the originally empty layout and 100% scale after the check. No existing custom layout was erased (`layout_entries=0` before this test).
+- Simulator/device builds pass (`app-safe-controls.log`, `app-device-safe-controls.log`); ROM/save hashes match before and after installation (`safe-controls-preservation.json`). Other phone sizes, iPad and physical thumb reach remain unqualified.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
 
 - Eight-bot simulator smoke PASS: 2,000 seeded frames, exit 0; log confirms 9 active character props (player + 8 bots). Frame 1,800 screenshot inspected and retained as `work/evidence/sim-eight-bots.png`. This earlier smoke is distinct from the later completed normal match. Dedicated simulator is currently booted.
 - Complete an early mission; normal bot match/save progression now verified, distinct from seeded smoke. Current simulator session is a debug-entered Defection route used for native UI checks, no objective completion claimed. Timed bridge streams are asynchronous: wait for their duration before observing or issuing the next gesture. Original agent and multiplayer saves remain intact. Full campaign and human control usability still outstanding.
-- First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default controls overlap the display cutout. Fix from this evidence during control/layout work.
+- First-run-only status bar overlapped gameplay after onboarding; absent on subsequent relaunch. Default control overlap with the display cutout is fixed on the tested iPhone; validate other sizes during control/layout work.
 - Onboarding currently exposes lots of optional GE/XBLA material and accepts modified-header-matching ROMs. Reconcile compatibility/import behavior with PRD while preserving intentional supported functionality.
 - Finish Goldenpad semantic control layout and utility exit/save handling, retain PD reload/secondary fire/gadgets/CamSpy, test hot-plug/layout/lifecycle. Add original/enhanced profiles instead of forcing 2× texture enhancement and combat roll by default; gyro stays experimental until physical testing.
 - P2 networking follows P1 acceptance; do not update engine prematurely. No physical target currently connected.

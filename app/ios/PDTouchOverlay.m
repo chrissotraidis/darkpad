@@ -722,19 +722,25 @@ static __weak PDTouchOverlay *sCurrent;
 	NSLog(@"perfectdark: [touch] gear installed frame=%@", NSStringFromCGRect(gear.frame));
 }
 
+// SDL may retain portrait insets while its grafted window is landscape.
+static UIEdgeInsets pdControlInsets(UIWindow *window)
+{
+	UIEdgeInsets inset = window.safeAreaInsets;
+	if (window.bounds.size.width > window.bounds.size.height && inset.top > 24
+		&& inset.left == 0 && inset.right == 0) {
+		inset.left = inset.right = MAX(inset.top, inset.bottom);
+		inset.top = 0;
+		inset.bottom = MIN(inset.bottom, 21);
+	}
+	return inset;
+}
+
 /** Keep the utility target inside the current landscape safe area. */
 - (void)pinGearInWindow:(UIWindow *)window
 {
 	UIButton *gear = _gear;
 	if (!gear || gear.superview != window) return;
-	UIEdgeInsets inset = window.safeAreaInsets;
-	// SDL's grafted landscape window can retain portrait safe-area insets.
-	// Reserve the reported cutout inset horizontally until UIKit catches up.
-	if (window.bounds.size.width > window.bounds.size.height && inset.top > 24
-		&& inset.left == 0 && inset.right == 0) {
-		inset.left = inset.right = MAX(inset.top, inset.bottom);
-		inset.top = 0;
-	}
+	UIEdgeInsets inset = pdControlInsets(window);
 	gear.frame = CGRectMake(inset.left + 12, inset.top + 12, 44, 44);
 }
 
@@ -866,31 +872,38 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	return [label isEqualToString:@(kLeftFire.label)] ? &kLeftFire : NULL;
 }
 
-/** Where a chip's centre goes, in points - wherever the player put it (D-089). */
+/** Adapt built-in controls as a group; explicit player placements stay exact. */
 - (CGPoint)centreForLabel:(NSString *)label radius:(CGFloat)radius
 {
-	CGPoint def;
-	if ([label isEqualToString:@(kLeftFire.label)]) {
-		// Derived, not tabled: FIRE mirrored, so a custom FIRE placement carries
-		// across for free (bean). An explicit FIRE_L entry still wins.
-		CGPoint fire = pdUnitForLabel(@"FIRE", CGPointMake(kButtons[0].unitX, kButtons[0].unitY));
-		def = CGPointMake(1.0 - fire.x, fire.y);
-	} else {
-		const PDButtonSpec *spec = [self specForLabel:label];
-		def = spec ? CGPointMake(spec->unitX, spec->unitY) : CGPointMake(0.5, 0.5);
+	CGSize size = self.bounds.size;
+	CGPoint custom = pdUnitForLabel(label, CGPointMake(NAN, NAN));
+	if (isfinite(custom.x) && isfinite(custom.y)) {
+		return CGPointMake(custom.x * size.width, custom.y * size.height);
 	}
-	// Unit x bounds and nothing else, exactly as bean does it
-	// (centreForButton). NO safe-area clamp on the way out: his table is
-	// already inside the usable area of a notched phone - it was exported from
-	// one - and clamping pulled CROUCH and SWAP a chip's width in from where he
-	// put them, which is not parity (measured on lane 3, hit tests reported
-	// "look" where those two chips should have been). The editor's drop has no
-	// clamp either since D-089: the player may park a chip anywhere, under the
-	// notch or half off the panel, and Reset brings it back.
-	(void)radius;
-	CGPoint u = pdUnitForLabel(label, def);
-	CGSize sz = self.bounds.size;
-	return CGPointMake(u.x * sz.width, u.y * sz.height);
+	if ([label isEqualToString:@(kLeftFire.label)]) {
+		CGPoint fire = [self centreForLabel:@"FIRE" radius:kButtons[0].radius * _scale];
+		return CGPointMake(size.width - fire.x, fire.y);
+	}
+	const PDButtonSpec *spec = [self specForLabel:label];
+	if (!spec) return CGPointMake(size.width / 2, size.height / 2);
+	CGPoint point = CGPointMake(spec->unitX * size.width, spec->unitY * size.height);
+	UIEdgeInsets inset = pdControlInsets(self.window);
+	if ([label isEqualToString:@"START"] || [label isEqualToString:@"BACK"]) {
+		point.x = MIN(point.x, size.width - inset.right - radius - 12);
+		point.y = MAX(point.y, inset.top + radius + 12);
+		return point;
+	}
+	// Translate the whole cluster instead of independently clamping each chip,
+	// which would collapse the spacing between AIM/RELOAD and FIRE/SWAP.
+	CGFloat right = 0, bottom = 0;
+	for (int i = 0; i < PD_NUM_BUTTONS; i++) {
+		if (strcmp(kButtons[i].label, "START") == 0) continue;
+		right = MAX(right, kButtons[i].unitX * size.width + kButtons[i].radius * _scale);
+		bottom = MAX(bottom, kButtons[i].unitY * size.height + kButtons[i].radius * _scale);
+	}
+	point.x += MIN(0, size.width - inset.right - 12 - right);
+	point.y += MIN(0, size.height - inset.bottom - 12 - bottom);
+	return point;
 }
 
 /** bean: the mirrored FIRE exists only while AIM is held. */

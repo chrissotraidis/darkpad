@@ -46,6 +46,6 @@ Simulator evidence: native menu navigation, direct editing, Diagnostics,
 zero held inputs, stable paused player position, and pause/resume transitions
 0 → 1 → 0. ROM/save hashes survived installation. Simulator and unsigned device
 builds pass. The native hub does not yet offer return-to-main-menu; a safe engine
-exit/save path needs validation first. Controller mappings and safe-area gameplay
-button layout are still pending. Test CamSpy, weapon wheel, secondary fire,
+exit/save path needs validation first. Built-in gameplay buttons now translate as a group inside the safe area; custom
+placements stay exact. Controller mappings are still pending. Test CamSpy, weapon wheel, secondary fire,
 backgrounding and physical controller interaction before acceptance.
