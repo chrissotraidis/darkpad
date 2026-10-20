@@ -19,9 +19,9 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 ## Five statuses
 
-- **Source/build:** PASS baseline Mac, ARM64 simulator and unsigned iOS device apps. Local SDL2/curl/ANGLE recipes require no sibling checkout. `scripts/bootstrap-apple.sh` assembles the proven steps; whole-command empty-cache rerun still not performed. No broad engine optimization changes.
+- **Source/build:** PASS baseline Mac, ARM64 simulator and unsigned iOS device apps. Local SDL2/curl/ANGLE recipes require no sibling checkout. `scripts/bootstrap-apple.sh` assembles the proven steps; whole-command empty-project-cache rebuild passed on this Mac (details below); second-Mac reproduction remains untested. No broad engine optimization changes.
 - **Package/install:** simulator installed; native Files picker imported the supplied ROM; missing-ROM UI works. Updated installation preserved EEPROM and ROM. Device package built but not installed/signed.
-- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. No completed mission or complete campaign coverage yet.
+- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. Defection / Agent completed and its time/unlock reloaded in the simulator; full campaign coverage remains incomplete.
 - **Performance:** NOT QUALIFIED — no physical-device thermal/frame-time session. Simulator counters are not phone benchmarks.
 - **Release readiness:** NOT READY. Private development only; assets/saves/captures/builds ignored. P1/P2 acceptance remains incomplete.
 
@@ -165,6 +165,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Started normal Investigation / Agent from the existing unlock. Advanced through the starting corridor and two access doors into the first lab encounter using touch controls. Collected the first guard's CMP150 normally; after it depleted the engine switched back to the Falcon 2. Corridor guard and three lab guards cleared; one nearby lab guard remains. Last readback shows full health, paused in Settings.
 - Read-only LLDB inspection supplies position/guard and room-connectivity evidence; no health, position, ammunition, objective or save edits. Private route/current-state files under `work/evidence/investigation/`. The diagnostic stream command returns before its gesture finishes; waiting its duration corrected an early script sequencing mistake that had cancelled movement by opening Settings immediately.
 - Investigation's isotope and Dr. Caroll objectives remain incomplete. Preserve the live process (PID 25917) for continuation, rather than restarting for unrelated shell changes. Same single simulator. This run has not established another campaign completion or human touch usability.
+
+## Investigation isotope objective verified
+
+- Continued the live normal Agent run: cleared the remaining lab guard and both isotope access guards, collected ammunition, and traversed the offset lab doorway and two Caution doors using normal touch actions.
+- Deployed CamSpy through Inventory, flew into the chamber, ascended with AIM-drag, framed the isotope and pressed FIRE. The game visibly reports **Objective 1: Completed** (`work/evidence/investigation/isotope-completed.png`). This is objective-level gadget coverage, not just a shutter animation.
+- Exited with WHEEL and withdrew Joanna from the radiation corridor. Last readback: health 0.6875, position approximately (1556,157,-2638), heading 269.97; paused in Settings. Dr. Caroll and mission completion remain pending. Preserve PID 25917. Read-only diagnostics guided the inputs; no game-state mutations.
+- Exactly one booted simulator confirmed. Private route notes and current readback are updated for continuation.
 
 ## Next work
 
