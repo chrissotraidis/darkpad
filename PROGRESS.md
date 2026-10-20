@@ -148,6 +148,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - CROUCH cycles camera height 159 →114 →69 →159 at unchanged x/z. SWAP cycles Falcon 2 (weapon 3) → unarmed (1) → Falcon 2 (3). Input immediately after initiating Settings dismissal can remain suppressed during its transition; repeated checks waited 0.7 seconds for dismissal before sending touches.
 - These are synthetic touch correctness checks, not human usability or physical controller acceptance. No code change/build required. Current mission remains safely paused on the roof in Settings. Only the existing simulator used.
 
+## Art-profile live switching and missing-asset fallback
+
+- During normal Defection, switched Display → Art profile using the actual segmented-control handler. Enhanced applied EnhanceTextures=1, replacement-pack loading on, Xbox art off. Remaster applied EnhanceTextures=0 and pack loading off; with xbla_available=0, Settings explicitly reports “No remaster assets — using N64 art” and the game continues rendering the original scene. Original restores both optional paths off.
+- Screenshots inspected for scene/HUD continuity and retained under `work/evidence/art-profile-runtime/`. Drawable remains 2622×1206 in every profile: art selection does not silently change resolution. Three further complete cycles asserted the engine flags and resolution after each apply; all nine switches passed (`repeated-switches.json`). Simulator footprint ranged 108.4–109.1 MB during this short run, insufficient to establish a memory limit or exclude long-term growth.
+- This verifies live switching and missing-asset fallback on a roof scene only. No replacement pack or remaster assets were present; loaded-pack rendering, level transitions, scopes/transparency and physical memory/performance remain unqualified. Original restored, mission paused in Settings. One simulator only; no code changes or rebuild required.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
