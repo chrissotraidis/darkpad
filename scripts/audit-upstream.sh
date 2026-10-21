@@ -39,3 +39,17 @@ done
 printf 'Audit: %s\nRevision: %s\nPatches: %d; failed: %d\n' "$AUDIT" "$REV" "$TOTAL" "$FAILED"
 printf 'Diagnostic only: inspect failed hunks and offsets before porting.\n'
 [ "$FAILED" -eq 0 ]
+# A successful archived overlay needs an identity independent of its parent Git
+# repository. Hash the reconstructed sources before CMake generates any files.
+python3 - "$AUDIT/src" <<'PYID'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+h = hashlib.sha256()
+for path in sorted(p for p in root.rglob('*') if p.is_file()):
+    name = path.relative_to(root).as_posix().encode()
+    data = path.read_bytes()
+    h.update(len(name).to_bytes(8, 'big')); h.update(name)
+    h.update(len(data).to_bytes(8, 'big')); h.update(data)
+(root / '.darkpad-source-id').write_text(h.hexdigest() + '\n')
+print('Source identity:', h.hexdigest())
+PYID

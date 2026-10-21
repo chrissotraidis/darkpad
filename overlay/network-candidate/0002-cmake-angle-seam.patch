@@ -1,0 +1,117 @@
+Subject: candidate source identity and ANGLE build seam
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -110,21 +110,21 @@
+   message(FATAL_ERROR "Unknown ROM ID: ${ROMID}")
+ endif()
+ 
+-# git commit hash
+-execute_process(
+-  COMMAND git rev-parse --short HEAD
+-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+-  OUTPUT_VARIABLE VERSION_HASH
+-  OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
+-
+-# git branch name
+-execute_process(
+-  COMMAND git rev-parse --abbrev-ref HEAD
+-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+-  OUTPUT_VARIABLE VERSION_BRANCH
+-  OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
++# Archived Darkpad candidates use the exact reconstructed source identity.
++# Never inherit the surrounding wrapper repository's changing commit.
++set(PD_SOURCE_ID_FILE "${CMAKE_SOURCE_DIR}/.darkpad-source-id")
++if(NOT EXISTS "${PD_SOURCE_ID_FILE}")
++  message(FATAL_ERROR "Candidate source identity missing: reconstruct with scripts/audit-upstream.sh")
++endif()
++set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PD_SOURCE_ID_FILE}")
++file(READ "${PD_SOURCE_ID_FILE}" PD_SOURCE_ID)
++string(STRIP "${PD_SOURCE_ID}" PD_SOURCE_ID)
++string(LENGTH "${PD_SOURCE_ID}" PD_SOURCE_ID_LENGTH)
++if(NOT PD_SOURCE_ID_LENGTH EQUAL 64 OR NOT PD_SOURCE_ID MATCHES "^[0-9a-f]+$")
++  message(FATAL_ERROR "Invalid candidate source identity")
++endif()
++string(SUBSTRING "${PD_SOURCE_ID}" 0 16 VERSION_HASH)
++set(VERSION_BRANCH "darkpad-candidate")
+ 
+ # Which release Check for Updates follows. A build made from a v* tag looks at
+ # the stable release; anything else - the CI's branch builds, and a copy
+
+Subject: build: PD_GL_ANGLE, a build-time seam for an ANGLE (EGL/Metal) GL ES context
+
+The port asks SDL for its GL context. On Apple that context is desktop GL 4.1
+(macOS, deprecated) or EAGL (iOS, deprecated; absent on visionOS), so the
+substrate this port ships on is ANGLE: a real OpenGL ES 3.0 context served by
+ANGLE's Metal backend, which SDL2 cannot hand us through SDL_GL_*.
+
+This patch adds the switch only. With PD_GL_ANGLE=OFF (the default) nothing
+changes: `if(NOT GL_LIBRARY)` becomes `if(NOT DEFINED GL_LIBRARY)` so that the
+ANGLE branch can select "no system GL" with an empty string, and that is the
+whole difference. The oracle keeps building and replaying byte for byte.
+
+With it ON, three paths must be given and are asserted, not guessed:
+  -DPD_ANGLE_DIR          dir holding libEGL.dylib and libGLESv2.dylib
+  -DPD_ANGLE_INCLUDE_DIR  ANGLE's include/ (EGL/egl.h, EGL/eglext.h)
+  -DPD_ANGLE_GLUE         app/gfx/gfx_angle_egl.mm, the context glue
+
+The glue is additive and lives in app/, outside the vendored tree, per the
+charter's ground rule 1; it is appended to SRC_PORT_CXX and compiled as ObjC++
+(enable_language(OBJCXX)) because CAMetalLayer is an Objective-C object.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c7cdf21ff..a95196865 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -328,7 +328,35 @@ endif()
+ list(APPEND LIBS "${ZLIB_LIBRARY}")
+ 
+ # GL
+-if(NOT GL_LIBRARY)
++#
++# PD_GL_ANGLE: take the GL context from ANGLE (EGL, Metal backend) instead of
++# from SDL. This is the substrate iOS and visionOS have to use - neither has
++# desktop GL and visionOS has no EAGL either - and it is proven on macOS first
++# (docs/angle-spike.md). With the option OFF nothing here is compiled and the
++# port keeps SDL's own GL path exactly as upstream wrote it.
++#
++#   -DPD_GL_ANGLE=ON -DPD_ANGLE_DIR=<dir with libEGL.dylib/libGLESv2.dylib>
++#   -DPD_ANGLE_INCLUDE_DIR=<ANGLE include/>  -DPD_ANGLE_GLUE=<gfx_angle_egl.mm>
++option(PD_GL_ANGLE "Create the GL ES context through ANGLE/EGL instead of SDL" OFF)
++if(PD_GL_ANGLE)
++  if(NOT PD_ANGLE_DIR OR NOT PD_ANGLE_INCLUDE_DIR OR NOT PD_ANGLE_GLUE)
++    message(FATAL_ERROR "PD_GL_ANGLE needs PD_ANGLE_DIR, PD_ANGLE_INCLUDE_DIR and PD_ANGLE_GLUE")
++  endif()
++  if(NOT EXISTS "${PD_ANGLE_DIR}/libEGL.dylib" OR NOT EXISTS "${PD_ANGLE_GLUE}")
++    message(FATAL_ERROR "PD_GL_ANGLE: no libEGL.dylib in ${PD_ANGLE_DIR}, or no glue at ${PD_ANGLE_GLUE}")
++  endif()
++  enable_language(OBJCXX)
++  set(GL_LIBRARY "")
++  include_directories(SYSTEM "${PD_ANGLE_INCLUDE_DIR}")
++  add_definitions(-DPD_GL_ANGLE)
++  list(APPEND LIBS
++    "${PD_ANGLE_DIR}/libEGL.dylib"
++    "${PD_ANGLE_DIR}/libGLESv2.dylib"
++    "-framework QuartzCore" "-framework Metal" "-framework Foundation"
++    "-Wl,-rpath,${PD_ANGLE_DIR}")
++endif()
++
++if(NOT DEFINED GL_LIBRARY)
+   if(WIN32)
+     set(GL_LIBRARY opengl32)
+   elseif(NINTENDO_SWITCH)
+@@ -617,6 +645,12 @@ set(SRC_LIB
+ )
+ list(PREPEND SRC_LIB "${CMAKE_SOURCE_DIR}")
+ 
++if(PD_GL_ANGLE)
++  # The ANGLE/EGL context glue is additive and lives outside the vendored tree.
++  list(APPEND SRC_PORT_CXX "${PD_ANGLE_GLUE}")
++  set_source_files_properties("${PD_ANGLE_GLUE}" PROPERTIES COMPILE_OPTIONS "-O2")
++endif()
++
+ set(SRC
+   ${SRC_GAME}
+   ${SRC_PORT}
