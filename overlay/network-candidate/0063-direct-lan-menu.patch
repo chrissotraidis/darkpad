@@ -51,7 +51,7 @@ Subject: Add an account-free direct IPv4 LAN join menu
  	s_Role = NETROLE_NONE;
  	s_LobbyRoomOn = 0;
  	s_LobbyRoomId[0] = '\0';
-@@ -5347,6 +5358,27 @@
+@@ -5347,6 +5358,29 @@
  	g_NetLocalSlot = 0;
  
  	sysLogPrintf(LOG_NOTE, "net: lobby: the room's session is closed");
@@ -74,6 +74,8 @@ Subject: Add an account-free direct IPv4 LAN join menu
 +{
 +	// Loading a stage also closes menus: that is not cancellation.
 +	if (!s_DirectMenuSession || s_MatchActive) return;
++	// The direct dialog already displays connection failures inline.
++	g_NetNoticePending = 0;
 +	if (s_ClientState != NETCS_GONE) netClientLeave();
 +	netSessionStopMenuSession();
  }
