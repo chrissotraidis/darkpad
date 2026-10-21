@@ -1,0 +1,18 @@
+Subject: Check texture upscale budget before signed dimension arithmetic
+
+--- a/port/fast3d/gfx_texscale.cpp
++++ b/port/fast3d/gfx_texscale.cpp
+@@ -186,6 +186,13 @@
+                             enum TexScaleEdge edge_s, enum TexScaleEdge edge_t, bool glyph,
+                             uint32_t tile_w, uint32_t tile_h) {
+     if (scale < 2 || scale > TEXSCALE_MAX_SCALE || width == 0 || height == 0) {
++        return NULL;
++    }
++
++    // Bound the canvas before narrowing dimensions or multiplying signed ints.
++    // The uint32 dimensions fit in a uint64 product; divide the budget first
++    // so even extreme dimensions cannot overflow while checking the limit.
++    if ((uint64_t)width * height > TEXSCALE_MAX_TEXELS / (scale * scale)) {
+         return NULL;
+     }
+ 
