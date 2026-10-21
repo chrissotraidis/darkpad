@@ -1,0 +1,13 @@
+Subject: candidate: preserve deeper direct-folder scan and upstream unpacked depth6
+
+--- a/port/src/xblaimport.c
++++ b/port/src/xblaimport.c
+@@ -53,7 +53,7 @@
+ // How far into that folder to look. An archive in the wild wraps the package
+ // in a folder of its own ("Perfect Dark/<content id>"), and a player who
+ // unpacked one by hand has that folder sitting in xbla/.
+-#define XBLAIMPORT_SCAN_DEPTH 2
++#define XBLAIMPORT_SCAN_DEPTH 4
+ 
+ // How far into what an archive came apart into: cache/xbla/ holds nothing but
+ // the archive's own tree, so it can be looked through further. An archive made

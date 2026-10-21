@@ -668,3 +668,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 -0061's only conflict was the added net/net.h include. Updated candidate patch context to retain it; platform inset hook and remaining six HUD hunks unchanged.
 - Reconstructed all55 patches with explicit candidate replacements:44PASS/11FAIL, work/upstream-audit.u29F0I.0051 and0061 logs clean; inspected resulting list guard/clamp and both-hand HUD calls. No candidate compilation or runtime acceptance inferred. Diff check PASS.
 - One booted iPad confirmed; running solo build/pin/vendor unchanged. Candidate audio, asset import, profiling/stereo conflicts plus network look transport remain. Goal active.
+
+## Candidate asset import patches reconciled
+
+- Previous turn resolved menu/HUD context conflicts. Inspected pristine candidate: XBLA now scans extracted archives at depth6 independently of direct-folder depth2. Rebased0001 to retain direct depth4 without replacing upstream's depth6 logic.
+- Rebased0046 context around upstream's `.extracted15` cache generation, Community Edition header wording, and original-helicopter inclusion. Preserves the new asset in gebeanWantEntry and retains all package streaming/free-space behavior. Its large importer insertion now applies, allowing0049 bounds checks to apply unchanged.
+- Candidate audit work/upstream-audit.23D3W8:47PASS/8FAIL. Inspected64-bit block sum, block/file bounds, duplicate-path check, total-byte and2^24-block caps, and table-end bound in reconstructed importer. This proves patch integration/source presence only; no malformed-package runtime or real optional-asset validation claimed.
+- Remaining patch conflicts:0023/0028/0048 audio,0027 profiling,0032–0035 rendering. Network touch-look transport and candidate compile/runtime remain pending. Working solo source/pin and simulator untouched; goal active.

@@ -19,3 +19,5 @@ First replacement audit: 0015, 0019 and0020 now apply; remaining13 failures incl
 0061 adjusts only the initial include context to retain the candidate's net/net.h include alongside the platform HUD inset hook. All six remaining HUD hunks apply unchanged.
 
 Latest replacement audit:44PASS/11FAIL (`work/upstream-audit.u29F0I`). Input/menu/HUD patch application is now clean; compilation, runtime behavior and network look transport remain unverified/incomplete.
+
+0001 keeps direct-folder scan depth4 while preserving upstream's separate unpacked-archive depth6. 0046 rebases package import around upstream's `.extracted15` cache marker and original-helicopter asset inclusion; the dependent0049 package table bounds checks apply unchanged. Latest audit47PASS/8FAIL (`work/upstream-audit.23D3W8`): remaining conflicts are0023/0028/0048 audio,0027 profiling, and0032–0035 rendering. Asset runtime tests remain pending.
