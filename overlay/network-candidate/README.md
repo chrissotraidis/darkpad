@@ -4,6 +4,8 @@ These patches replace same-named solo overlay patches **only** when explicitly p
 
 Target: `3ee8ed0cd549b64350848655c43ae1568e449c6d`.
 
+**Current state:** touch/gyro command transport and prediction are implemented in the candidate, with deterministic sanitizer tests and a successful simulator app build. Live gameplay/network validation remains pending. Earlier entries below record intermediate incomplete states. The candidate uses experimental protocol `0x4431`; both peers must use this overlay, and upstream protocol32 peers are intentionally incompatible.
+
 ```sh
 scripts/audit-upstream.sh 3ee8ed0cd549b64350848655c43ae1568e449c6d overlay/network-candidate
 ```
@@ -39,3 +41,7 @@ Application-link follow-up: simulator app BUILD SUCCEEDED with the candidate lib
 Touch transport preparation:0015 now exposes the latched touch/gyro degree pair and accumulates it separately from integer mouse counts in netInputAccumulateMouse. Shared motion clearing runs at stage start and tick end. Separate repeatable tick and pending-presentation getters preserve fractional motion and suppress tick reads during presentation-only passes. These new getters are intentionally not yet connected to gameplay/command consumers: command flags, mixed signed sensitivity and presentation prediction still need a consistent integration. Network aiming remains incomplete.
 
 Fresh55/55 audit: `work/upstream-audit.psiBWn`. `python3 tests/candidate_network_motion.py <audit>/src` runs actual extracted input/accumulation functions under ASan/UBSan; passes100 sub-count moves, repeated reads, render-only frames, catch-up clearing, stage reset, multiple shell events and mouse independence. Modified input.c/net.c syntax-compile for simulator and desktop; logs in work/network-look-merge. Latest full app/desktop builds predate this accumulator addition.
+
+Command integration:0015 now extends netcmd by two separate scaled touch components (44-byte packed record), explicitly changes the protocol ID, carries these through validation, folding/catch-up, dry-tick clearing, remote signed/absolute reads, capture and prediction replay. Local frame getters consume accumulated degrees on simulation ticks; presentation prediction reads unspent degrees even without SDL mouse lock. Menu capture clears both mouse and touch. Mouse sensitivity signs apply only to mouse components.
+
+Fresh audit `work/upstream-audit.Y21Gln`:55/55. `tests/candidate_network_commands.py` compiles actual netcmd/netdelta/netbuf and extracted folding/replay/remote getter functions under ASan/UBSan: roundtrip, changed tiny touch fields through delta, guard bytes, truncation, folding, mixed signs and presentation/locked gating pass. Motion accumulation tests still pass. Simulator full engine807 steps and app build PASS, platform7 arm64 verified; artifacts `work/network-touch-build/libpd.a` and `work/dd-network-touch/Build/Products/Debug-iphonesimulator/perfectdark.app`, logs work/network-touch{,-app}-build.log. All five changed C sources syntax-check on desktop. Earlier Mac executable still has the old protocol: rebuild it before paired testing. No candidate install/live match has occurred.
