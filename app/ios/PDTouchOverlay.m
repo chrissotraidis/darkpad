@@ -558,6 +558,7 @@ static const PDButtonSpec kMenuButtons[] = {
 	UIView *_editBar;
 	UISlider *_editSlider;
 	UILabel *_editPct;
+	UILabel *_editControlName;
 	__weak PDTouchButtonView *_dragChip;
 	CGVector _dragGrab;                 // finger-to-centre offset at touch-down
 	CGPoint _dragUnit;                  // where the drag has got to, unit coords
@@ -1129,6 +1130,7 @@ static const CGFloat kWheelRadius = 32.0;
 	_editBar = nil;
 	_editSlider = nil;
 	_editPct = nil;
+	_editControlName = nil;
 	_editSelected = nil;
 	[_hideBadge removeFromSuperview];
 	_hideBadge = nil;
@@ -1151,7 +1153,7 @@ static const CGFloat kWheelRadius = 32.0;
 	[self updateScalePct];
 }
 
-/** Reset / a live size slider / Done, and no instruction text. */
+/** Identify the selected action, following Goldenpad's live editor. */
 - (void)buildEditChrome
 {
 	if (_editBar) {
@@ -1204,6 +1206,17 @@ static const CGFloat kWheelRadius = 32.0;
 	[bar addSubview:pct];
 	_editPct = pct;
 	[self updateScalePct];
+	UILabel *name = [UILabel new];
+	name.text = @"Drag a control to reposition";
+	name.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+	name.textColor = UIColor.whiteColor;
+	name.backgroundColor = [UIColor colorWithWhite:0 alpha:0.65];
+	name.layer.cornerRadius = 6;
+	name.clipsToBounds = YES;
+	name.textAlignment = NSTextAlignmentCenter;
+	name.translatesAutoresizingMaskIntoConstraints = NO;
+	[bar addSubview:name];
+	_editControlName = name;
 
 	UILayoutGuide *safe = self.safeAreaLayoutGuide;
 	[NSLayoutConstraint activateConstraints:@[
@@ -1211,6 +1224,10 @@ static const CGFloat kWheelRadius = 32.0;
 		[bar.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-14],
 		[bar.heightAnchor constraintEqualToConstant:42],
 		[bar.trailingAnchor constraintEqualToAnchor:done.trailingAnchor],
+		[name.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
+		[name.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
+		[name.bottomAnchor constraintEqualToAnchor:bar.topAnchor constant:-28],
+		[name.heightAnchor constraintEqualToConstant:24],
 		[reset.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
 		[reset.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
 		[reset.widthAnchor constraintEqualToConstant:42],
@@ -1429,6 +1446,9 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)placeHideBadge
 {
 	PDTouchButtonView *chip = _editing ? [self editChipForLabel:_editSelected] : nil;
+	_editControlName.text = chip
+		? [NSString stringWithFormat:@"%@ · Drag to move", [chip.label isEqualToString:@"FIRE_L"] ? @"LEFT FIRE" : chip.label]
+		: @"Drag a control to reposition";
 	if (!chip || !pdLabelHideable(chip.label)) {
 		_hideBadge.hidden = YES;
 		return;

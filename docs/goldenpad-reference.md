@@ -118,8 +118,7 @@ The initial Utilities hub reproduced the actions but used a full-screen table,
 which missed Goldenpad’s visual design. It is now a 280-point material popover
 with 14-point corners, 48-point minimum icon rows, a fine border/shadow, and
 outside-tap dismissal. The ellipsis uses the reference’s bold white symbol and
-black circular treatment. It stays on the left to preserve Darkpad’s separate
-START control. Settings remains the native settings form; the compact menu
+black circular treatment. It stays at the upper right, with game START below it and game BACK on the left. The panel shares the ellipsis anchor. Settings remains the native settings form; the compact menu
 keeps truthful Darkpad actions (End Mission or Match and Diagnostics). Native
 simulator navigation, pause ownership and dismissal were verified.
 
@@ -132,3 +131,18 @@ On iPad, Settings uses a centered form up to 680×760 points over a dimmed
 game. The utility popover keeps full-window placement and dismissal. The
 layout and transitions were visually checked on the dedicated 11-inch iPad
 simulator, with the phone simulator shut down first.
+
+## Touch layout fidelity still open
+
+The current gameplay positions remain inherited from the Apple baseline; they
+are not Goldenpad's default touch arrangement. Goldenpad's
+`Sources/RecompPrototypeTouchLayout.swift` has separate phone/tablet defaults:
+fire/aim/action form a right-side column, crouch and weapon sit below, and
+START is below the utility menu. Darkpad additionally needs reload, alternate
+fire and a gadget wheel. A future layout pass must adapt those extras, measure
+spacing inside safe areas, and preserve explicitly saved positions. Do not
+claim full touch-layout fidelity from the controller preset or utility styling.
+
+The live editor now identifies the selected action by name, following the
+reference editor's selection label. Its size slider still scales all controls;
+per-control size/opacity remains a difference from Goldenpad.
