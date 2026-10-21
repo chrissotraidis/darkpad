@@ -541,3 +541,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Touch Use at the starting doorway opened it; subsequent keyboard movement crossed from room49 into room47, confirmed by read-only LLDB: position (-1717.49585,-8441,281.801178), heading357.088745. Debugger detached; no gameplay-state writes. Earlier unsuccessful Use attempts were facing walls, not evidence of a routing defect.
 - Held touch Fire reduced magazine8→4; touch Reload restored8 with reserve41→37. No guard kill or mission objective completion claimed. Three-dot utility menu opens correctly and currently pauses the session. Next route portal is room47→46 near x=-1878,z667. Heading0 moves +Z, heading90 moves -X; at heading0 A moves +X and D moves -X. Keyboard turn rate approximately210degrees/sec.
 - Broader mission/tablet/dual-wield acceptance remains pending. Existing compact control and safe-area fixes remain committed; goal active.
+
+## Extraction interior route with compact controls
+
+- Previous goal turn was progress: verified starting door interaction. This turn retained exactly one booted phone and the same build/PID46190; no install or source changes.
+- First guard visibly fell; crossed room47→46→45, picked up CMP150. Touch Use opened the room45→44 door, fought the guard, then crossed into room44 (read-only checkpoint x=-1058,z810). Subsequent movement toward room35 triggered the spoken/text instruction "They've locked down the ground floor - get to the elevator!". No objective completion or save/reload claim.
+- Current native utility menu pause: room44, x=-870.622131,y=-8441,z=858.859009, heading182.088745, pitch-3.5, health0.104316197; Falcon2 scope3/12, Night Vision on. Enemy fire/knockback moved player back from the corridor entrance. LLDB observations only, detached cleanly. Tablet remains shut down.
+- Next corridor portal is room44→35 at x[-1012,-825],z638. Center nearx=-918 before proceeding toward negativeZ. CMP150 available from pickup; current health is low. Touch Fire/Reload/Use and three-dot pause remain functional. Broader mission, tablet HUD and dual-wield coverage remain incomplete; goal active.
