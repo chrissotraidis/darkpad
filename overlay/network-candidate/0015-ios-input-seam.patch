@@ -1,0 +1,180 @@
+Subject: candidate-only iOS input seam; network touch look remains pending
+
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -239,6 +239,17 @@
+ 
+ // returns changes in mouse position since last frame, scaled by sensitivity
+ // returns 0, 0 when the mouse is not locked into the window
++#ifdef PLATFORM_IOS
++// The iOS shell's two ways in (app/ios/): absolute view-angle DEGREES for the
++// touch/gyro look, added to whatever the mouse contributed and never scaled by
++// the mouse sensitivity, and one button mask + stick the touch layer and the
++// :8775 bridge share. See the definitions in port/src/input.c.
++void inputIosLookAddDegrees(f32 degx, f32 degy);
++void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
++void inputIosPadSetButton(u32 button, s32 down);
++u32 inputIosPadGetButtons(void);
++#endif
++
+ void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
+ 
+ // returns changes in mouse position since last frame, scaled by absolute sensitivity
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -466,6 +466,9 @@
+ static inline void inputInitAllControllers(void)
+ {
+ 	SDL_GameControllerUpdate();
++#ifdef PLATFORM_IOS
++	inputIosLatchFrame();
++#endif
+ 
+ 	numJoysticks = SDL_NumJoysticks();
+ 
+@@ -1222,6 +1225,94 @@
+ 	return sens;
+ }
+ 
++#ifdef PLATFORM_IOS
++/**
++ * The iOS shell's two ways into this file, and the only ones.
++ *
++ * A phone has no mouse and, most of the time, no pad, so the shell's touch
++ * layer has to become both. It does NOT do that by synthesising SDL events:
++ * the look seam is a deliberate one (docs/frame-map.md), because the mouse
++ * chain here scales by Game.PlayerN.MouseSpeedX/Y, and a touch drag whose
++ * degrees changed when the player edited a mouse setting they cannot reach
++ * would be a bug nobody could find.
++ *
++ * So the shell writes DEGREES. bondwalk.c:1456 turns freelookdx into
++ * `freelookdx * 3.5` degrees of yaw per frame whatever the frame rate, so
++ * degrees / 3.5 is what belongs in the delta, added after - and independently
++ * of - the mouse's own contribution. Neither mouseSensX/Y nor mouseLocked is
++ * consulted: a finger on the screen is always locked to the view.
++ *
++ * The pad injection is the same idea for buttons: the shell's touch buttons,
++ * an on-screen chip and the :8775 bridge's `pad` command all set bits in one
++ * mask that is OR-ed into whatever a real controller reported, so a physical
++ * pad and the overlay can be held at once (which is what a bridge-driven test
++ * on a device with no pad needs).
++ *
++ * Both are latched once per frame by inputIosLatchFrame(), called from
++ * inputUpdate(), so a value is read exactly once by exactly one frame however
++ * many times the consumer asks for it - the same contract mouseDX/DY have.
++ */
++static f32 iosLookPendingX = 0.f, iosLookPendingY = 0.f;
++static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
++static u32 iosPadButtons = 0;
++static s32 iosPadStickX = 0, iosPadStickY = 0;
++
++void inputIosLookAddDegrees(f32 degx, f32 degy)
++{
++	iosLookPendingX += degx;
++	iosLookPendingY += degy;
++}
++
++void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
++{
++	iosPadButtons = buttons;
++	iosPadStickX = (stickx < -128) ? -128 : ((stickx > 127) ? 127 : stickx);
++	iosPadStickY = (sticky < -128) ? -128 : ((sticky > 127) ? 127 : sticky);
++}
++
++void inputIosPadSetButton(u32 button, s32 down)
++{
++	if (down) {
++		iosPadButtons |= button;
++	} else {
++		iosPadButtons &= ~button;
++	}
++}
++
++u32 inputIosPadGetButtons(void)
++{
++	return iosPadButtons;
++}
++
++/**
++ * The shell's buttons and stick, over whatever the pad (if any) reported.
++ *
++ * OR for the buttons and "only if the pad is not already pushing" for the
++ * stick, so that holding a real stick always wins over a stale touch value and
++ * the two are never averaged into a direction neither of them asked for.
++ */
++static void inputIosMergePad(OSContPad *npad)
++{
++	npad->button |= iosPadButtons;
++
++	if (!npad->stick_x && iosPadStickX) {
++		npad->stick_x = iosPadStickX;
++	}
++
++	if (!npad->stick_y && iosPadStickY) {
++		npad->stick_y = iosPadStickY;
++	}
++}
++
++static void inputIosLatchFrame(void)
++{
++	iosLookFrameX = iosLookPendingX;
++	iosLookFrameY = iosLookPendingY;
++	iosLookPendingX = 0.f;
++	iosLookPendingY = 0.f;
++}
++#endif
++
+ s32 inputReadController(s32 idx, OSContPad *npad)
+ {
+ 	if (idx < 0 || idx >= INPUT_MAX_CONTROLLERS  || !npad) {
+@@ -1272,6 +1363,9 @@
+ 	}
+ 
+ 	if (!pads[idx]) {
++#ifdef PLATFORM_IOS
++		if (idx == 0) inputIosMergePad(npad);
++#endif
+ 		return 0;
+ 	}
+ 
+@@ -1313,6 +1407,10 @@
+ 		}
+ 	}
+ 
++#ifdef PLATFORM_IOS
++	if (idx == 0) inputIosMergePad(npad);
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -1795,6 +1893,14 @@
+ 		mdx = rawdx * (0.022f / 3.5f) * mouseSensX;
+ 		mdy = rawdy * (0.022f / 3.5f) * mouseSensY;
+ 	}
++#ifdef PLATFORM_IOS
++	// Network look must enter the command stream, never every simulated slot.
++	// Candidate integration: only the solo path is supported by this seam.
++	if (g_NetMode == NETMODE_NONE) {
++		mdx += iosLookFrameX * (1.f / 3.5f);
++		mdy += iosLookFrameY * (1.f / 3.5f);
++	}
++#endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+ }
+@@ -1808,6 +1914,14 @@
+ 		mdx = rawdx * (0.022f / 3.5f) * fabsf(mouseSensX);
+ 		mdy = rawdy * (0.022f / 3.5f) * fabsf(mouseSensY);
+ 	}
++#ifdef PLATFORM_IOS
++	// Network look must enter the command stream, never every simulated slot.
++	// Candidate integration: only the solo path is supported by this seam.
++	if (g_NetMode == NETMODE_NONE) {
++		mdx += iosLookFrameX * (1.f / 3.5f);
++		mdy += iosLookFrameY * (1.f / 3.5f);
++	}
++#endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+ }

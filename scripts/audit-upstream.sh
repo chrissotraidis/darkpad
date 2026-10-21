@@ -4,7 +4,12 @@
 # partially apply: this diagnostic tree is NOT a build or acceptance result.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF="${1:?usage: scripts/audit-upstream.sh <local commit or ref>}"
+REF="${1:?usage: scripts/audit-upstream.sh <local commit or ref> [replacement patch directory]}"
+REPLACEMENTS="${2:-}"
+if [ -n "$REPLACEMENTS" ]; then
+  [ -d "$REPLACEMENTS" ] || { echo "Missing replacement patch directory" >&2; exit 2; }
+  REPLACEMENTS="$(cd "$REPLACEMENTS" && pwd)"
+fi
 VENDOR="$ROOT/vendor/dabs-mod"
 REV="$(git -C "$VENDOR" rev-parse --verify "$REF^{commit}")"
 mkdir -p "$ROOT/work"
@@ -19,6 +24,10 @@ FAILED=0
 TOTAL=0
 for PATCH_FILE in "$ROOT"/overlay/patches/*.patch; do
   NAME="$(basename "$PATCH_FILE")"
+  if [ -n "$REPLACEMENTS" ] && [ -f "$REPLACEMENTS/$NAME" ]; then
+    PATCH_FILE="$REPLACEMENTS/$NAME"
+    printf 'replacement\t%s\n' "$PATCH_FILE" >> "$AUDIT/results.tsv"
+  fi
   TOTAL=$((TOTAL + 1))
   if patch -d "$AUDIT/src" -p1 --fuzz=0 --forward --batch --no-backup-if-mismatch < "$PATCH_FILE" > "$AUDIT/logs/$NAME.log" 2>&1; then
     printf '%s\tPASS\n' "$NAME" >> "$AUDIT/results.tsv"
