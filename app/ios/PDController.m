@@ -15,8 +15,8 @@
 //      look on a modern pad therefore has to come from the same degrees seam
 //      the touch layer uses, dt-normalised so the feel does not change with the
 //      frame rate, anchored at 120 Hz.
-//   3. **Hide the touch overlay while a pad is connected**, and bring it back
-//      when the pad goes away.
+//   3. **Hide gameplay touch controls in Auto while a pad is connected.**
+//      Menu navigation and the layout editor remain touchable.
 //   4. Optional double-flick roll, using the touch layer's existing gesture
 //      playback. Connection changes never rewrite the player's bindings.
 #import <GameController/GameController.h>

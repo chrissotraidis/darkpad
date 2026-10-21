@@ -1418,7 +1418,7 @@ static CFTimeInterval sPresentStarted;
         return @"Experimental gyro adds fine aim only while aiming. Release aim to reposition the device without moving the view; the next aim starts from neutral. Menus and backgrounding stop motion input.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Touch Controls"]) {
-        return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides touch controls when a controller connects. In game menus, tap to select and drag to scroll.";
+        return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides gameplay controls when a controller connects, while keeping menus touchable. In game menus, tap to select and drag to scroll.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Controller"]) {
         return @"The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";

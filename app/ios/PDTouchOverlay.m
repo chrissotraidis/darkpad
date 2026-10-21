@@ -1692,7 +1692,9 @@ static const CGFloat kWheelRadius = 32.0;
 	NSInteger mode = PDDefInt(PDDefTouchMode);
 	// Auto hides gameplay controls for a pad, but menus remain touchable.
 	// Otherwise taps bypass the normalized pointer and reach SDL mouse input.
-	BOOL hide = (mode == 2) || (mode == 0 && self.padConnected && !_menuOpen);
+	// Connection notifications can arrive during editing. Keep Done reachable;
+	// endLayoutEditing reapplies the selected visibility mode.
+	BOOL hide = !_editing && ((mode == 2) || (mode == 0 && self.padConnected && !_menuOpen));
 	const BOOL wasHidden = self.hidden;
 	self.hidden = hide;
 	if (!hide) {
