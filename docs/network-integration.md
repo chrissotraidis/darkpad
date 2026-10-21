@@ -39,4 +39,27 @@ The candidate's netplay documentation describes protocol32 authoritative-host ne
 
 All55 overlay patches now apply using the replacements in `overlay/network-candidate` (audit `work/upstream-audit.q2CGqw`). An isolated arm64 iOS simulator engine static-library build passes with profiler enabled; source and build logs are recorded in the replacement README. The first compile exposed an incorrectly placed touch latch; it now runs in inputUpdate each frame instead of during controller initialization. The normal solo build remains pinned and untouched.
 
-Next: complete app linking and desktop compilation, implement network touch/gyro look through the candidate command path, and then run the solo regressions and local-only LAN/co-op sessions. Patch application and a static-library build do not establish runtime compatibility.
+Simulator app linking and desktop compilation now pass (details below). Next: implement network touch/gyro look through the candidate command path, then run the solo regressions and local-only LAN/co-op sessions. Patch application and a static-library build do not establish runtime compatibility.
+
+## Candidate application and desktop builds
+
+Both builds use the complete reconstructed source in `work/upstream-audit.q2CGqw`, without replacing the solo build outputs.
+
+Simulator app link:
+
+```sh
+xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark \
+  -configuration Debug -sdk iphonesimulator \
+  -derivedDataPath work/dd-network-candidate CODE_SIGNING_ALLOWED=NO \
+  'LIBRARY_SEARCH_PATHS=$(SRCROOT)/../work/network-candidate-build-fixed $(SRCROOT)/../work/deps-$(PLATFORM_NAME)/lib $(SRCROOT)/../work/curl-$(PLATFORM_NAME)/lib' build
+```
+
+Result: BUILD SUCCEEDED; `scripts/check-apple-platform.py iphonesimulator` passes on the resulting app executable. Its symbol table includes netInputAccumulateMouse and inputIosLatchFrame, confirming the candidate engine was linked. Log: `work/network-candidate-app-build.log`. This unsigned simulator bundle is not installed or runtime-tested yet.
+
+Desktop: the existing `scripts/build-macos.sh` CMake recipe with source set to the same reconstructed candidate tree and output set to `work/network-candidate-macos` passes all805 Ninja steps. Exact local invocation saved as `work/build-network-candidate-macos.sh`; log `work/network-candidate-macos.log`. The resulting pd.arm64 passes the macOS platform/architecture check. Both executables' dynamic dependencies were inspected: system libraries/frameworks and the app's ANGLE framework references, with no Homebrew dylib dependency observed. macOS linking warns about duplicate libc++ and reduced common-section alignment; runtime remains unverified.
+
+## Touch/gyro network integration obligations
+
+Source inspection confirms schedEndFrame calls inputUpdate then netInputAccumulateMouse. net.c accumulates raw mouse counts until netTickEnd, zeros reads on presentation-only passes, and exposes unspent counts to prediction. Apple touch/gyro uses floating-point degrees independent of mouse sensitivity: do not round it into raw mouse counts or inject the current display frame into every pass.
+
+The client command already carries scaled mdx/mdy and NETCMD_MOUSELOCKED; remote simulation and prediction replay consume those fields. A correct integration must accumulate degree deltas across frames, clear them alongside the tick/session reset, expose the accumulated value only to local simulation ticks, and include unspent degrees in presentation prediction. Preserve signed-versus-absolute sensitivity behavior when mixing a real mouse with touch: remote absolute deltas currently multiply the entire command by the mouse sensitivity sign. Verify flags, reset/pause behavior and mixed-input semantics as well as serialization. These are requirements for the next implementation, not implemented features.
