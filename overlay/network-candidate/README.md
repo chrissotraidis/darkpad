@@ -4,7 +4,7 @@ These patches replace same-named solo overlay patches **only** when explicitly p
 
 Target: `3ee8ed0cd549b64350848655c43ae1568e449c6d`.
 
-**Current state:** touch/gyro command transport and prediction are implemented in the candidate, with deterministic sanitizer tests and a successful simulator app build. Live gameplay/network validation remains pending. Earlier entries below record intermediate incomplete states. The candidate uses experimental protocol `0x4431`; both peers must use this overlay, and upstream protocol32 peers are intentionally incompatible.
+**Current state:** simulator-to-Mac timed matches, touch aiming, respawn and background/resume have runtime evidence. The latest57-patch build (`8d0f203b8c87579a`) adds Direct LAN menu joining and a duplicate-notice fix; it builds on both platforms and is installed in the isolated simulator candidate, but its paired runtime check remains pending. Menu-driven hosting/join/return and co-op are not accepted. The candidate uses experimental protocol `0x4431`; both peers must use matching source identity, and upstream protocol32 peers are intentionally incompatible. See `docs/network-integration.md` and PROGRESS.md for current evidence. Entries below are historical intermediate states, not current acceptance claims.
 
 ```sh
 scripts/audit-upstream.sh 3ee8ed0cd549b64350848655c43ae1568e449c6d overlay/network-candidate

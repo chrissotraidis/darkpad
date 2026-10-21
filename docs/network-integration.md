@@ -1,6 +1,6 @@
 # Networking integration experiment
 
-The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. No network session has been validated.
+The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
 
 ## Reproduce the compatibility audit
 
@@ -105,7 +105,7 @@ Next isolate simulator pointer/touch delivery versus engine command consumption,
 
 ## Current runtime checks (21 October 2026)
 
-Matching simulator/Mac candidate identity is `f778b98fa3d272ca` (56 applied patches). The candidate-only test-host setup initializes valid bot profiles and names before transmitting rules. Named four-bot timed matches now reach results. Shared shell fixes retain final movement on camera, AIM and menu touches; the normal solo build also passes menu scrolling with preserved saves and HD artwork. See PROGRESS.md for build and preservation manifests.
+The completed-match checks in this section used matching simulator/Mac candidate identity `f778b98fa3d272ca` (56 applied patches). The candidate-only test-host setup initializes valid bot profiles and names before transmitting rules. Named four-bot timed matches now reach results. Shared shell fixes retain final movement on camera, AIM and menu touches; the normal solo build also passes menu scrolling with preserved saves and HD artwork. See PROGRESS.md for build and preservation manifests.
 
 Background/foreground was exercised for approximately29 seconds against a live Mac host; the client resumed and reached Game Over. This is simulator evidence, not physical LAN or performance qualification.
 
@@ -118,3 +118,13 @@ FIRE release reproduction recipe, using one simulator and a matching dedicated M
 Observed: zero-bot case produced exactly6 shots from3 presses (`work/network-timed-match.bfl9ro1n`); death/respawn case produced exactly2 shots (`work/network-timed-match.vbjna5e0`). Earlier `k2_1eqqf` reported32 shots after brief presses and remains unexplained. Do not claim it fixed; capture per-shot pad/mouse/command state if it recurs.
 
 Normal lobby join/return, two co-op missions and progression, both host roles, and controlled latency/loss remain incomplete. Keep this engine isolated from the working solo pin.
+
+## Direct LAN menu checkpoint
+
+Candidate0063 adds Direct LAN to the Perfect Menu, with IPv4 address and port editors, validation, connection status, retry and cancellation. It uses the existing transport without an account or public lobby. Address and port changes, a no-host timeout and retry were verified in the simulator. A duplicate queued notice after cancellation was found and corrected in source; that correction still needs a UI regression check.
+
+Latest reconstructed source: `work/upstream-audit.tWjrhY/src`, all57 patches applied. Both new platform builds identify as `8d0f203b8c87579a`. Simulator engine, Mac executable, simulator app link/platform checks and motion/command sanitizer tests pass. The rebuilt candidate is installed; installation preserved all non-SplashBoard Documents/Library files against `work/network-notice-backup.scmu0h_a`.
+
+Private artifacts are `work/network-direct-notice-build/libpd.a`, `work/network-direct-notice-macos/pd.arm64`, and `work/dd-network-touch/Build/Products/Debug-iphonesimulator/perfectdark.app`. Local engine recipes are `work/build-network-direct-notice{,-macos}.sh`; logs use the same prefix. These new binaries have not yet passed paired runtime testing. Never pair the newly installed client with an older host identity.
+
+Next: verify timeout/Back no longer produces a duplicate notice, then launch the matching local host and join using the menu without `--connect`. `work/network-look-merge/direct-menu-match.py` is the bounded local host recipe for that test; it does not provide a product hosting UI. Normal hosting, return from a match, native keyboard completion, hostname/IPv6 entry, co-op progression and controlled latency/loss still need work. UI testing was interrupted by a locked Mac; no additional host was started.
