@@ -905,7 +905,7 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	}
 	if ([label isEqualToString:@"SWAP"] || [label isEqualToString:@"ALT"]) {
 		CGFloat spacing = MAX(56, radius * 2 + 12);
-		return CGPointMake(inset.left + 24 + ( [label isEqualToString:@"ALT"] ? spacing : 0), MAX(48, inset.top + radius + 12));
+		return CGPointMake(inset.left + MAX(24, radius + 12) + ([label isEqualToString:@"ALT"] ? spacing : 0), MAX(48, inset.top + radius + 12));
 	}
 	if ([label isEqualToString:@"START"]) {
 		CGRect menu = [self convertRect:PDUtilityMenuFrame(self.window) fromView:self.window];

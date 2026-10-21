@@ -175,7 +175,8 @@ retain a minimum 44-point hit diameter.
 The simulator build passes. Native simulator taps verified Fire (8→7 rounds),
 Reload (7/92→8/91), Start/Back and the upper-right utility menu. Investigation's
 saved 10:06 completion remains visible after installation/relaunch. Evidence:
-`work/evidence/control-layout-redesign/`. This revised layout has phone visual
-coverage; tablet visual recheck remains pending. The user explicitly requested
+`work/evidence/control-layout-redesign/`. The revised layout has phone gameplay and tablet editor/menu visual
+coverage. Tablet inspection caught and corrected insufficient leading-edge
+padding for Next; the default anchor now includes the scaled button radius. The user explicitly requested
 simulator-only testing on 2026-10-20; physical-device tests are outside the current
 execution scope, with no hardware-usability claims.
