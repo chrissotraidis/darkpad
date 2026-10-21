@@ -977,7 +977,13 @@ static CFTimeInterval sPresentStarted;
 				@[ @"Original", @"Enhanced", @"Remaster" ], @[ @0, @1, @2 ]),
 			pdInfoRow(@"Art status", ^NSString *{
 				switch (PDDefInt(PDDefGraphicsProfile)) {
-					case 1: return @"2× texture filtering; installed packs optional";
+					case 1: {
+						const int selected = texpackGetSelectedPack();
+						if (texpackLoadEnabled() && selected >= 0) {
+							return [NSString stringWithFormat:@"HD pack: %@", @(texpackGetPackName(selected))];
+						}
+						return @"2× filtering only; no texture pack selected";
+					}
 					case 2: return xblaImportIsAvailable() ? @"Xbox 360 art available" : @"No remaster assets — using N64 art";
 					default: return @"N64 art; replacement packs off";
 				}
