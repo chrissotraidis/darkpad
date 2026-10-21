@@ -11,6 +11,13 @@
 
 #include <SDL.h>
 
+// Updated on the game/main thread; the engine reads on that same thread.
+static float sHudSideInset[2];
+float pdPlatformHudSideInset(int right)
+{
+	return sHudSideInset[right ? 1 : 0];
+}
+
 #if TARGET_OS_VISION
 
 int pdGeoRepairEnabled = 0;
@@ -376,6 +383,17 @@ void pdGeoFrame(void)
 		return;
 	}
 	pdGeoInstallOnce();
+	UIView *hudHost = (__bridge UIView *)pdAngleGetHostView();
+	UIWindow *hudWindow = hudHost.window;
+	UIEdgeInsets hudInsets = hudWindow.safeAreaInsets;
+	CGFloat hudHeight = hudHost.bounds.size.height;
+	if (hudWindow.bounds.size.width > hudWindow.bounds.size.height && hudInsets.top > 24
+		&& hudInsets.left == 0 && hudInsets.right == 0) {
+		// SDL can retain portrait insets after its window rotates.
+		hudInsets.left = hudInsets.right = MAX(hudInsets.top, hudInsets.bottom);
+	}
+	sHudSideInset[0] = hudHeight > 0 ? MIN(.25, hudInsets.left / hudHeight) : 0;
+	sHudSideInset[1] = hudHeight > 0 ? MIN(.25, hudInsets.right / hudHeight) : 0;
 	// The renderer is about to ask the EGL surface for its size. On an iPhone
 	// a w<h answer is never right: this app declares landscape only, so it is
 	// a window that UIKit (or SDL) has laid out portrait behind the game's back.

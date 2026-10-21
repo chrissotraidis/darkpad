@@ -924,7 +924,9 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	if ([label isEqualToString:@"CROUCH"]) { column = 1; row = 1; }
 	if (column >= 0) {
 		CGFloat spacing = 76 * _scale;
-		CGFloat outerX = size.width - inset.right - MAX(48 * _scale, radius + 16);
+		// Leave a separate strip for the safe-area-adjusted ammo gauge and
+		// numbers on phones. Keep the thumb cluster's internal spacing intact.
+		CGFloat outerX = size.width - inset.right - MAX((tablet ? 48 : 88) * _scale, radius + 16);
 		CGFloat fireY = size.height * (tablet ? .72 : .60);
 		fireY = MIN(fireY, size.height - inset.bottom - 20 - 32 * _scale - spacing);
 		fireY = MAX(fireY, inset.top + 32 * _scale + spacing + 20);
