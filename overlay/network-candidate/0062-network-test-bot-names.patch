@@ -1,0 +1,12 @@
+--- a/port/src/net/netsession.c
++++ b/port/src/net/netsession.c
+@@ -4224,6 +4224,9 @@
+ 	}
+ 
+ 	if (sims > 0) {
++		// Slot activation alone leaves the default names empty. Generate
++		// them before RULES is sent, as the normal setup menu does.
++		mpGenerateBotNames();
+ 		g_Vars.lvmpbotlevel = 1;
+ 	}
+ 

@@ -22,8 +22,8 @@ rm "$AUDIT/source.tar"
 printf 'revision\t%s\npatch\tresult\n' "$REV" > "$AUDIT/results.tsv"
 FAILED=0
 TOTAL=0
-for PATCH_FILE in "$ROOT"/overlay/patches/*.patch; do
-  NAME="$(basename "$PATCH_FILE")"
+while IFS= read -r NAME; do
+  PATCH_FILE="$ROOT/overlay/patches/$NAME"
   if [ -n "$REPLACEMENTS" ] && [ -f "$REPLACEMENTS/$NAME" ]; then
     PATCH_FILE="$REPLACEMENTS/$NAME"
     printf 'replacement\t%s\n' "$PATCH_FILE" >> "$AUDIT/results.tsv"
@@ -35,7 +35,18 @@ for PATCH_FILE in "$ROOT"/overlay/patches/*.patch; do
     printf '%s\tFAIL\n' "$NAME" >> "$AUDIT/results.tsv"
     FAILED=$((FAILED + 1))
   fi
-done
+done < <(
+  # Candidate-only patches join the same ordered series; matching names
+  # still replace solo patches exactly once.
+  {
+    for PATCH_FILE in "$ROOT"/overlay/patches/*.patch; do basename "$PATCH_FILE"; done
+    if [ -n "$REPLACEMENTS" ]; then
+      for PATCH_FILE in "$REPLACEMENTS"/*.patch; do
+        [ -f "$PATCH_FILE" ] && basename "$PATCH_FILE"
+      done
+    fi
+  } | LC_ALL=C sort -u
+)
 printf 'Audit: %s\nRevision: %s\nPatches: %d; failed: %d\n' "$AUDIT" "$REV" "$TOTAL" "$FAILED"
 printf 'Diagnostic only: inspect failed hunks and offsets before porting.\n'
 [ "$FAILED" -eq 0 ]
