@@ -2635,6 +2635,9 @@ static CGVector pdStickCurve(CGVector raw)
 			continue;
 		}
 		if (_menuOpen && t == _pointerTouch) {
+			// The lift can carry movement absent from touchesMoved. Account for
+			// that residual before deciding whether this was a tap or a scroll.
+			if (!cancelled) [self movePointerTo:[t locationInView:self]];
 			[self liftPointerAt:[t locationInView:self]];
 			continue;
 		}
