@@ -373,6 +373,8 @@ static CFTimeInterval sPresentStarted;
 // Forward declarations: +present and +prewarm both reach these before the file
 // gets round to defining them.
 @interface PDSettingsViewController ()
+@property (nonatomic, copy) NSString *texturePackStatus;
+- (void)refreshTexturePackStatus;
 + (void)build;
 - (void)buildRows;
 - (void)segChanged:(UISegmentedControl *)seg;
@@ -677,6 +679,32 @@ static CFTimeInterval sPresentStarted;
 	self.tableView.sectionHeaderTopPadding = 0.0;
 	_rows3d = [[PDVision3DRows alloc] initWithTableView:self.tableView];
 #endif
+}
+
+- (void)viewWillAppear:(BOOL)animated
+{
+	[super viewWillAppear:animated];
+	[self refreshTexturePackStatus];
+}
+
+- (void)refreshTexturePackStatus
+{
+	__weak typeof(self) weakSelf = self;
+	// Pack getters can scan directories. Read them on the engine queue, not
+	// while UIKit is constructing cells, and copy names before crossing threads.
+	[PDShell.shared enqueue:^{
+		int count = texpackGetNumPacks();
+		int selected = texpackGetSelectedPack();
+		NSString *status;
+		if (!count) status = @"No texture packs installed";
+		else if (selected < 0) status = [NSString stringWithFormat:@"%d available — none selected", count];
+		else status = [NSString stringWithFormat:@"%@%@", @(texpackGetPackName(selected)),
+			texpackLoadEnabled() ? @"" : @" — disabled by art profile"];
+		dispatch_async(dispatch_get_main_queue(), ^{
+			weakSelf.texturePackStatus = status;
+			[weakSelf.tableView reloadData];
+		});
+	}];
 }
 
 /**
@@ -1113,9 +1141,11 @@ static CFTimeInterval sPresentStarted;
 			}),
 		],
 		@[
+			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
 			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
 			pdButtonRow(@"Reload packs (F9)", ^{
-				[PDShell.shared enqueue:^{ texpackReload(); }];
+				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
+				[weakSelf refreshTexturePackStatus];
 			}),
 		],
 		@[
@@ -1400,6 +1430,9 @@ static CFTimeInterval sPresentStarted;
 		        "goldfinger64.zip, its patch, or the patched ROM (the patch needs the GoldenEye ROM). "
 		        "Changes here take effect the next time you open the app.";
 	}
+	if ([_sections[(NSUInteger)s] isEqualToString:@"Texture Packs"]) {
+		return @"In Files, open On My iPhone/iPad → Perfect Dark → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Choose between installed packs in the game’s Extended Options → Texture Packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
+	}
 	return nil;
 }
 - (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s
@@ -1558,7 +1591,10 @@ static CFTimeInterval sPresentStarted;
 			row.values[(NSUInteger)idx].stringValue.UTF8String);
 		[NSUserDefaults.standardUserDefaults setInteger:row.values[(NSUInteger)idx].integerValue forKey:row.key];
 		[self commit];
-		if ([row.key isEqualToString:PDDefGraphicsProfile]) [self.tableView reloadData];
+		if ([row.key isEqualToString:PDDefGraphicsProfile]) {
+			[self.tableView reloadData];
+			[self refreshTexturePackStatus];
+		}
 	}
 }
 
