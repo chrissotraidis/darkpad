@@ -208,34 +208,24 @@ typedef struct {
 #define PD_CK_ALTMODE    PDPadL       // CK_LTRIG — "Fire Mode", the secondary function
 #define PD_CK_RADIAL     PDPadDown    // CK_DPAD_D — "Radial Menu", the weapon wheel
 
+// Goldenpad's phone aim/fire/action column and lower crouch/weapon row.
+// PD-only actions sit to its left. Small spacing adjustments accommodate
+// the extra actions and landscape cutouts; explicit saved positions win.
 static const PDButtonSpec kButtons[] = {
-	// FIRE raised 0.7548 -> 0.7240 (D-085 addendum, the user, 2026-10-02: "raise the
-	// fire button a tiny bit to eliminate overlap") - the smallest lift that
-	// leaves ~4 pt between its ring and ALT's on the 17e (4.2) and the Air (4.9).
-	{ "FIRE",   PDPadG,           "scope",                       0.8609, 0.7240, 46 },
-	// AIM small on purpose (bean): it is a mode toggle, not a held-in-panic
-	// button, and only FIRE earns the big target.
-	{ "AIM",    PDPadR,           "target",                      0.9315, 0.5484, 28 },
-	// USE, ALT and CROUCH share one unitY (D-085 addendum: "horizontally
-	// parallel"). 0.9227 was ALT's, the middle of the three old values.
-	{ "USE",    PDPadB,           "hand.raised.fill",            0.8030, 0.9227, 28 },
-	{ "CROUCH", PD_CK_CROUCH,     "arrow.down",                  0.9443, 0.9227, 28 },
-	{ "RELOAD", PD_CK_X_RELOAD,   "arrow.triangle.2.circlepath", 0.8521, 0.5119, 28 },
-	// bean's SWAP is the 360 pad's Y, weapon swap. PD's Y is Next Weapon, which
-	// is the same thumb doing the same job.
-	{ "SWAP",   PD_CK_Y_NEXTWEAP, "arrow.left.arrow.right",      0.9554, 0.7214, 28 },
-	// The pause/START button, below the upper-right utility menu. The three-bar
-	// glyph, not a pause bar: the same button is START in the front-end menus.
-	{ "START",  PDPadStart,       "line.3.horizontal",           0.9400, 0.0992, 20 },
-	// D-085, the user's placements. ALT: on the USE-CROUCH line, half way between
-	// them. Hidden on a GoldenEye level while the gun in hand has no second
-	// function (every GoldenEye gun) - see -applyChipRules.
-	{ "ALT",    PD_CK_ALTMODE,    "switch.2",                    0.8737, 0.9227, 28 },
-	// WHEEL: centred between RELOAD and AIM, above them (one chip gap above
-	// RELOAD's ring). Hold-and-drag like AIM (D-046): press opens the active
-	// menu, the drag picks the slice, the lift chooses it. Glyph = vkQuake's
-	// wheel (ios_touch.m), the user's ask.
-	{ "WHEEL",  PD_CK_RADIAL,     "circle.hexagongrid.fill",     0.8918, 0.3720, 28 },
+	{ "FIRE",   PDPadG,           "scope",                       0.938389, 0.573504, 38 },
+	{ "AIM",    PDPadR,           "target",                      0.942733, 0.380000, 28 },
+	{ "USE",    PDPadB,           "hand.raised.fill",            0.932070, 0.760000, 28 },
+	{ "CROUCH", PD_CK_CROUCH,     "arrow.down",                  0.870000, 0.898291, 26 },
+	{ "RELOAD", PD_CK_X_RELOAD,   "arrow.triangle.2.circlepath", 0.840000, 0.380000, 26 },
+	{ "SWAP",   PD_CK_Y_NEXTWEAP, "arrow.left.arrow.right",      0.790000, 0.940171, 26 },
+	{ "START",  PDPadStart,       "line.3.horizontal",           0.946288, 0.240171, 20 },
+	{ "ALT",    PD_CK_ALTMODE,    "switch.2",                    0.710000, 0.800000, 26 },
+	{ "WHEEL",  PD_CK_RADIAL,     "circle.hexagongrid.fill",     0.760000, 0.573504, 26 },
+};
+// Same action order, using Goldenpad's distinct tablet arrangement.
+static const CGPoint kTabletButtonUnits[] = {
+	{0.91, 0.71}, {0.91, 0.58}, {0.91, 0.84}, {0.81, 0.89},
+	{0.81, 0.58}, {0.71, 0.89}, {0.972, 0.14}, {0.61, 0.89}, {0.71, 0.71},
 };
 #define PD_NUM_BUTTONS ((int)(sizeof(kButtons) / sizeof(kButtons[0])))
 
@@ -246,7 +236,7 @@ static const PDButtonSpec kButtons[] = {
 // the other side of the screen - so a custom FIRE placement carries across for
 // free; unitX/unitY here are unused.
 static const PDButtonSpec kLeftFire =
-	{ "FIRE_L", PDPadG, "scope", 0.0, 0.0, 46 };
+	{ "FIRE_L", PDPadG, "scope", 0.0, 0.0, 38 };
 
 // In a menu the gameplay chips are in the way - the dialog is centred and they
 // sit on top of it - so they are hidden and this one takes their place. PD's
@@ -896,7 +886,12 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	}
 	const PDButtonSpec *spec = [self specForLabel:label];
 	if (!spec) return CGPointMake(size.width / 2, size.height / 2);
-	CGPoint point = CGPointMake(spec->unitX * size.width, spec->unitY * size.height);
+	BOOL tablet = self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+	CGPoint unit = CGPointMake(spec->unitX, spec->unitY);
+	for (int i = 0; tablet && i < PD_NUM_BUTTONS; i++) {
+		if (spec == &kButtons[i]) unit = kTabletButtonUnits[i];
+	}
+	CGPoint point = CGPointMake(unit.x * size.width, unit.y * size.height);
 	UIEdgeInsets inset = pdControlInsets(self.window);
 	if ([label isEqualToString:@"BACK"]) {
 		// Game navigation belongs on the leading side; never replace ellipsis.
@@ -904,18 +899,22 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	}
 	if ([label isEqualToString:@"START"]) {
 		CGRect menu = [self convertRect:PDUtilityMenuFrame(self.window) fromView:self.window];
-		return CGPointMake(CGRectGetMidX(menu), CGRectGetMaxY(menu) + 12 + radius);
+		// Offset phone START from the aim column so both remain independent
+		// on shorter landscape displays. The ellipsis keeps its own anchor.
+		return CGPointMake(CGRectGetMidX(menu) - (tablet ? 0 : (size.width < 740 ? 140 : 72)), CGRectGetMaxY(menu) + 12 + radius);
 	}
-	// Translate the whole cluster instead of independently clamping each chip,
-	// which would collapse the spacing between AIM/RELOAD and FIRE/SWAP.
-	CGFloat right = 0, bottom = 0;
+	// Translate horizontally as a group to preserve the reference's columns.
+	// Clamp only lower controls vertically: translating the whole cluster up
+	// would collide with START on phones with a home-indicator inset.
+	CGFloat right = 0;
 	for (int i = 0; i < PD_NUM_BUTTONS; i++) {
 		if (strcmp(kButtons[i].label, "START") == 0) continue;
-		right = MAX(right, kButtons[i].unitX * size.width + kButtons[i].radius * _scale);
-		bottom = MAX(bottom, kButtons[i].unitY * size.height + kButtons[i].radius * _scale);
+		CGFloat x = tablet ? kTabletButtonUnits[i].x : kButtons[i].unitX;
+		right = MAX(right, x * size.width + kButtons[i].radius * _scale);
 	}
 	point.x += MIN(0, size.width - inset.right - 12 - right);
-	point.y += MIN(0, size.height - inset.bottom - 12 - bottom);
+	point.y = MIN(point.y, size.height - inset.bottom - 12 - radius);
+
 	return point;
 }
 
@@ -1553,6 +1552,11 @@ static const CGFloat kWheelRadius = 32.0;
 	_scale = PDDefFloat(PDDefButtonScale);
 	if (_scale < 0.5 || _scale > 2.5) {
 		_scale = 1.0;
+	}
+	// Fit the reference-sized rings on compact landscape phones as a group.
+	CGFloat shortSide = MIN(self.bounds.size.width, self.bounds.size.height);
+	if (self.traitCollection.userInterfaceIdiom != UIUserInterfaceIdiomPad && shortSide > 0) {
+		_scale *= MIN(1.0, shortSide / 375.0);
 	}
 	CGFloat alpha = PDDefFloat(PDDefButtonOpacity);
 	if (alpha < 0.03 || alpha > 1.0) {

@@ -132,17 +132,23 @@ game. The utility popover keeps full-window placement and dismissal. The
 layout and transitions were visually checked on the dedicated 11-inch iPad
 simulator, with the phone simulator shut down first.
 
-## Touch layout fidelity still open
+## Device-specific touch defaults
 
-The current gameplay positions remain inherited from the Apple baseline; they
-are not Goldenpad's default touch arrangement. Goldenpad's
-`Sources/RecompPrototypeTouchLayout.swift` has separate phone/tablet defaults:
-fire/aim/action form a right-side column, crouch and weapon sit below, and
-START is below the utility menu. Darkpad additionally needs reload, alternate
-fire and a gadget wheel. A future layout pass must adapt those extras, measure
-spacing inside safe areas, and preserve explicitly saved positions. Do not
-claim full touch-layout fidelity from the controller preset or utility styling.
+Gameplay defaults now adapt Goldenpad's separate phone/tablet arrangements
+from `Sources/RecompPrototypeTouchLayout.swift`: aim/fire/action form a
+right-side column, with crouch and weapon below. Tablet core positions use
+its reference coordinates. Phone fire retains its reference position; aim,
+use and the lower row allow clearance for Perfect Dark's additional actions
+and landscape safe areas. Reload, alternate fire and the gadget wheel sit
+left of the main column. Game START sits below and left of ellipsis on phones
+to avoid the aim/reload controls; tablet START stays directly below ellipsis.
 
-The live editor now identifies the selected action by name, following the
-reference editor's selection label. Its size slider still scales all controls;
-per-control size/opacity remains a difference from Goldenpad.
+Horizontal safe-area correction translates the default cluster together;
+lower controls clamp above the home indicator. Short phones proportionally
+scale the rings. Explicit custom positions and hidden states still take
+precedence. Default ring sizes were adjusted for the new arrangement.
+
+The live editor identifies the selected action by name. Its size slider still
+scales all controls; per-control size/opacity remains a difference from
+Goldenpad. Physical thumb reach and complete gameplay usability still require
+hardware acceptance; simulator layout checks do not prove those qualities.
