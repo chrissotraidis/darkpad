@@ -180,3 +180,12 @@ coverage. Tablet inspection caught and corrected insufficient leading-edge
 padding for Next; the default anchor now includes the scaled button radius. The user explicitly requested
 simulator-only testing on 2026-10-20; physical-device tests are outside the current
 execution scope, with no hardware-usability claims.
+
+### Compact action spacing
+
+The six default gameplay actions now use point-based spacing around Fire instead
+of independent screen percentages. Aim/Fire/Use form the outer column;
+Reload/Weapon/Duck form the inner column. This keeps tablet controls close together
+and reserves the central look area. Saved custom coordinates continue to take
+precedence. Phone landscape and tablet training were visually checked in the
+simulator; this does not establish physical thumb ergonomics.

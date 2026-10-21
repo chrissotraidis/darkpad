@@ -912,7 +912,25 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 		// Keep START directly below the utility button, as in Goldenpad.
 		return CGPointMake(CGRectGetMidX(menu), CGRectGetMaxY(menu) + 12 + radius);
 	}
-	// Translate horizontally as a group to preserve the reference's columns.
+	// Keep the action cluster within a thumb's reach. Screen percentages made
+	// the gaps grow with tablet width/height, despite fixed-size buttons.
+	// Preserve Goldenpad's aim/fire/use column with PD actions just inside it.
+	NSInteger column = -1, row = 0;
+	if ([label isEqualToString:@"AIM"]) { column = 0; row = -1; }
+	if ([label isEqualToString:@"FIRE"]) { column = 0; row = 0; }
+	if ([label isEqualToString:@"USE"]) { column = 0; row = 1; }
+	if ([label isEqualToString:@"RELOAD"]) { column = 1; row = -1; }
+	if ([label isEqualToString:@"WHEEL"]) { column = 1; row = 0; }
+	if ([label isEqualToString:@"CROUCH"]) { column = 1; row = 1; }
+	if (column >= 0) {
+		CGFloat spacing = 76 * _scale;
+		CGFloat outerX = size.width - inset.right - MAX(48 * _scale, radius + 16);
+		CGFloat fireY = size.height * (tablet ? .72 : .60);
+		fireY = MIN(fireY, size.height - inset.bottom - 20 - 32 * _scale - spacing);
+		fireY = MAX(fireY, inset.top + 32 * _scale + spacing + 20);
+		return CGPointMake(outerX - column * spacing, fireY + row * spacing);
+	}
+	// Translate remaining controls inside the safe area.
 	// Clamp only lower controls vertically: translating the whole cluster up
 	// would collide with START on phones with a home-indicator inset.
 	CGFloat right = 0;
