@@ -385,6 +385,7 @@ static CFTimeInterval sPresentStarted;
 // gets round to defining them.
 @interface PDSettingsViewController ()
 @property (nonatomic, copy) NSString *texturePackStatus;
+@property (nonatomic, copy) NSString *enhancedArtStatus;
 - (void)refreshTexturePackStatus;
 + (void)build;
 - (void)buildRows;
@@ -706,6 +707,9 @@ static CFTimeInterval sPresentStarted;
 	[PDShell.shared enqueue:^{
 		int count = texpackGetNumPacks();
 		int selected = texpackGetSelectedPack();
+		NSString *enhancedStatus = (texpackLoadEnabled() && selected >= 0)
+			? [NSString stringWithFormat:@"HD pack: %@", @(texpackGetPackName(selected))]
+			: @"2× filtering only; no texture pack selected";
 		NSString *status;
 		if (!count) status = @"No texture packs installed";
 		else if (selected < 0) status = [NSString stringWithFormat:@"%d available — none selected", count];
@@ -713,6 +717,7 @@ static CFTimeInterval sPresentStarted;
 			texpackLoadEnabled() ? @"" : @" — disabled by art profile"];
 		dispatch_async(dispatch_get_main_queue(), ^{
 			weakSelf.texturePackStatus = status;
+			weakSelf.enhancedArtStatus = enhancedStatus;
 			[weakSelf.tableView reloadData];
 		});
 	}];
@@ -1017,13 +1022,7 @@ static CFTimeInterval sPresentStarted;
 				@[ @"Original", @"Enhanced", @"Remaster" ], @[ @0, @1, @2 ]),
 			pdInfoRow(@"Art status", ^NSString *{
 				switch (PDDefInt(PDDefGraphicsProfile)) {
-					case 1: {
-						const int selected = texpackGetSelectedPack();
-						if (texpackLoadEnabled() && selected >= 0) {
-							return [NSString stringWithFormat:@"HD pack: %@", @(texpackGetPackName(selected))];
-						}
-						return @"2× filtering only; no texture pack selected";
-					}
+					case 1: return weakSelf.enhancedArtStatus ?: @"Applying art profile…";
 					case 2: return xblaImportIsAvailable() ? @"Xbox 360 art available" : @"No remaster assets — using N64 art";
 					default: return @"N64 art; replacement packs off";
 				}
@@ -1653,6 +1652,7 @@ static CFTimeInterval sPresentStarted;
 		[NSUserDefaults.standardUserDefaults setInteger:row.values[(NSUInteger)idx].integerValue forKey:row.key];
 		[self commit];
 		if ([row.key isEqualToString:PDDefGraphicsProfile]) {
+			self.enhancedArtStatus = nil;
 			[self.tableView reloadData];
 		}
 	}
