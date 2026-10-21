@@ -563,3 +563,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Current default cluster remains separated from right ammo gauge/numbers in opposite landscape. Touch Fire/Reload sequence consumed one reserve round (8/71→8/70 after reload). Native three-dot menu→Edit Touch Controls→Done succeeds, with all controls and editor actions visible. No custom positions changed. Snapshot: work/evidence/tablet-hud-0061/opposite-landscape.png (paused menu).
 - Unsigned iphoneos Debug app compile/link PASS for e1965f5 with xcodebuild; log device-final.log. Simulator build and this device build now contain the same tablet spacing change. No physical-device testing or performance claim.
 - Sole iPad PID50387 remains paused in Defection opening, opposite landscape. Phone remains shut down. Broader campaign/dual-wield/profile coverage and networking remain incomplete; goal active.
+
+## Tablet live art-profile rendering
+
+- Previous turn was progress: opposite-landscape verification and device compile. Current worktree clean at start. Same sole iPad simulator/PID50387; no build/install this turn.
+- In native Settings switched Original→Enhanced during Defection opening. Art status reports 2× texture filtering; rendered building/sign textures visibly smooth while geometry, controls and ammo HUD remain present and separated. Saved enhanced.png under work/evidence/tablet-hud-0061.
+- Switched to Remaster: status explicitly says no remaster assets, using N64 art. Resumed gameplay renders the N64 fallback without blank textures in this view. This is fallback coverage only, not imported XBLA/HD asset acceptance, full visual-profile acceptance, or performance measurement.
+- Returned to Enhanced and left native Settings open (paused). Next continue gameplay with Enhanced, including interior/dark/effect and transition coverage. Campaign completion, dual-wield and broader acceptance remain incomplete; goal active.
