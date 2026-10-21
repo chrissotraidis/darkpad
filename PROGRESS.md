@@ -570,3 +570,9 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - In native Settings switched Original→Enhanced during Defection opening. Art status reports 2× texture filtering; rendered building/sign textures visibly smooth while geometry, controls and ammo HUD remain present and separated. Saved enhanced.png under work/evidence/tablet-hud-0061.
 - Switched to Remaster: status explicitly says no remaster assets, using N64 art. Resumed gameplay renders the N64 fallback without blank textures in this view. This is fallback coverage only, not imported XBLA/HD asset acceptance, full visual-profile acceptance, or performance measurement.
 - Returned to Enhanced and left native Settings open (paused). Next continue gameplay with Enhanced, including interior/dark/effect and transition coverage. Campaign completion, dual-wield and broader acceptance remain incomplete; goal active.
+
+## Control editor pause verified under enemy fire
+
+- Previous turn repeated layout checks without new implementation; revalidated the live iPad/PID50387 and investigated apparent scene movement when entering editing. Exactly one simulator booted; worktree initially clean.
+- Read-only LLDB before editing: lvupdate240=0, health0.0807909145, position(331.961578,-441.000427,119.999992). Opened three-dot menu → Edit Touch Controls through Simulator UI. Engine pause flag var80084014=1, lvupdate240=0; health and position identical. Held keyboard W1200ms while editor open; pause, health and position remained identical. All debugger sessions detached, no state writes or function calls.
+- Source confirms updateNativePause includes layoutEditing; no pause fix warranted. Apparent movement between earlier screenshots was not evidence of editor simulation advancing. Current app left in paused editor; next leave editor and continue Enhanced interior/campaign coverage. No new mission completion or broader performance claim.
