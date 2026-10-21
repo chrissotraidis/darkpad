@@ -1570,12 +1570,18 @@ static CFTimeInterval sPresentStarted;
 		cell.detailTextLabel.text = row.info ? row.info() : @"";
 		break;
 	case PDRowButton:
+		// Expose the whole tappable row, rather than relying on UIKit to
+		// infer an action from its labels (which can disappear after scrolling).
+		cell.isAccessibilityElement = YES;
+		cell.accessibilityLabel = row.title;
+		cell.accessibilityTraits = UIAccessibilityTraitButton;
 		cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 		if (row.info) {
 			// A choice row, not an action: it reads as a setting showing its
 			// current value, so it keeps the label colour every other row has
 			// and takes the chevron that says "this opens something".
 			cell.detailTextLabel.text = row.info();
+			cell.accessibilityValue = cell.detailTextLabel.text;
 			cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 		} else {
 			cell.textLabel.textColor = cell.tintColor;

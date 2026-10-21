@@ -641,3 +641,9 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Settings after relaunch correctly names Forever Plus HD v0.10. Original shows replacement packs off; switching back to Enhanced refreshes to the pack name. Current UI left on Enhanced Settings.
 - Save and texture hashes match the pre-update backup. Differences are runtime logs, pd.ini from profile changes, and two OS snapshot files; details work/evidence/hd-status-queue/changes.json. No new mission completion or performance claim.
 - Reconciled the top-level progress summary with current HD implementation, separate phone/tablet saves and user's simulator-only constraint. Historical evidence below remains scoped to the builds tested. Goal active.
+
+## Settings actions exposed as accessible buttons
+
+- Previous turn runtime-verified queued HD status. Investigated Settings actions missing from simulator accessibility output after scrolling: PDRowButton relied entirely on label inference. Explicitly expose each action cell as an accessibility element with its title and button trait; choice rows also expose their current value.
+- Simulator build PASS and installed after Documents/Library backup in work/evidence/settings-accessibility. Sole iPad PID58735. Runtime tree now exposes Customize Touch Layout, Goldenpad Controller Layout, Recenter gyro, asset import rows, Choose texture pack and Reload packs as buttons. Activated Choose texture pack by its accessibility element; correct pack alert opens. Cancel dismissed without changing selection. This validates semantics/activation via simulator accessibility, not a full VoiceOver usability audit.
+- No gameplay/pack changes. Settings remains open, one simulator only. Goal active; remaining campaign/effects/lifecycle and network work unchanged.
