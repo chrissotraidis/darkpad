@@ -13,3 +13,9 @@ scripts/audit-upstream.sh 3ee8ed0cd549b64350848655c43ae1568e449c6d overlay/netwo
 **Incomplete:** network touch/gyro look is not transported by this patch. Implement it through command accumulation, serialization and prediction before calling network controls functional. Do not enable the candidate in the normal build yet. Candidate compilation/runtime regression tests remain pending.
 
 First replacement audit: 0015, 0019 and0020 now apply; remaining13 failures include0051 menu scrolling. Partial application is diagnostic, not acceptance.
+
+0051 rebases touch list clamping around the candidate's `!leave` guard: keyboard Up/Down can leave a flagged list at its ends, while touch wheel movement remains clamped. Entry hit-testing and side navigation remain intact.
+
+0061 adjusts only the initial include context to retain the candidate's net/net.h include alongside the platform HUD inset hook. All six remaining HUD hunks apply unchanged.
+
+Latest replacement audit:44PASS/11FAIL (`work/upstream-audit.u29F0I`). Input/menu/HUD patch application is now clean; compilation, runtime behavior and network look transport remain unverified/incomplete.

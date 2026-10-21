@@ -661,3 +661,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Added explicitly experimental replacement0015 under overlay/network-candidate; normal overlay unchanged. Preserves dedicated-server early return and upstream raw mouse logic, merges touch pad only into controller0, preserves solo degree look and gates direct look out of network mode. Network touch/gyro aiming remains INCOMPLETE until command accumulation/serialization/prediction integration; no functionality claim.
 - Audit tool accepts an optional replacement directory and logs replacements. Actual candidate audit work/upstream-audit.AA1tvS:42PASS/13FAIL, down from39/16. 0015 plus dependent0019 pointer and0020 analog patches now PASS;0051 menu-scroll conflict remains. No candidate compile/runtime test yet. Shell syntax and diff checks PASS.
 - Solo pin, vendor and running simulator unchanged. Next reconcile0051 and implement candidate network look transport before controls acceptance; broader solo acceptance remains open. Goal active.
+
+## Candidate menu scrolling and HUD conflicts resolved
+
+- Previous turn rebased candidate input seam. Inspected0051's sole rejected hunk: upstream added MENUITEMFLAG_LIST_LEAVEATENDS and a !leave guard. Candidate replacement preserves this keyboard focus behavior while inserting the original iOS touch-drag clamp inside that guard. Remaining pointer hit-testing/side-navigation hunks unchanged.
+-0061's only conflict was the added net/net.h include. Updated candidate patch context to retain it; platform inset hook and remaining six HUD hunks unchanged.
+- Reconstructed all55 patches with explicit candidate replacements:44PASS/11FAIL, work/upstream-audit.u29F0I.0051 and0061 logs clean; inspected resulting list guard/clamp and both-hand HUD calls. No candidate compilation or runtime acceptance inferred. Diff check PASS.
+- One booted iPad confirmed; running solo build/pin/vendor unchanged. Candidate audio, asset import, profiling/stereo conflicts plus network look transport remain. Goal active.
