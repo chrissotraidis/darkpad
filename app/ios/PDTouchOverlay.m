@@ -224,7 +224,7 @@ static const PDButtonSpec kButtons[] = {
 	// bean's SWAP is the 360 pad's Y, weapon swap. PD's Y is Next Weapon, which
 	// is the same thumb doing the same job.
 	{ "SWAP",   PD_CK_Y_NEXTWEAP, "arrow.left.arrow.right",      0.9554, 0.7214, 28 },
-	// The pause/START button, parked top-right away from the fight. The three-bar
+	// The pause/START button, below the upper-right utility menu. The three-bar
 	// glyph, not a pause bar: the same button is START in the front-end menus.
 	{ "START",  PDPadStart,       "line.3.horizontal",           0.9400, 0.0992, 20 },
 	// D-085, the user's placements. ALT: on the USE-CROUCH line, half way between
@@ -738,13 +738,19 @@ static UIEdgeInsets pdControlInsets(UIWindow *window)
 	return inset;
 }
 
-/** Keep the utility target inside the current landscape safe area. */
+CGRect PDUtilityMenuFrame(UIWindow *window)
+{
+	UIEdgeInsets inset = pdControlInsets(window);
+	return CGRectMake(window.bounds.size.width - inset.right - 56,
+		MAX(26, inset.top + 12), 44, 44);
+}
+
+/** Goldenpad keeps the ellipsis above START on the right. */
 - (void)pinGearInWindow:(UIWindow *)window
 {
 	UIButton *gear = _gear;
 	if (!gear || gear.superview != window) return;
-	UIEdgeInsets inset = pdControlInsets(window);
-	gear.frame = CGRectMake(inset.left + 12, inset.top + 12, 44, 44);
+	gear.frame = PDUtilityMenuFrame(window);
 }
 
 - (void)openUtilities
@@ -891,10 +897,13 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	if (!spec) return CGPointMake(size.width / 2, size.height / 2);
 	CGPoint point = CGPointMake(spec->unitX * size.width, spec->unitY * size.height);
 	UIEdgeInsets inset = pdControlInsets(self.window);
-	if ([label isEqualToString:@"START"] || [label isEqualToString:@"BACK"]) {
-		point.x = MIN(point.x, size.width - inset.right - radius - 12);
-		point.y = MAX(point.y, inset.top + radius + 12);
-		return point;
+	if ([label isEqualToString:@"BACK"]) {
+		// Game navigation belongs on the leading side; never replace ellipsis.
+		return CGPointMake(inset.left + radius + 12, MAX(48, inset.top + radius + 12));
+	}
+	if ([label isEqualToString:@"START"]) {
+		CGRect menu = [self convertRect:PDUtilityMenuFrame(self.window) fromView:self.window];
+		return CGPointMake(CGRectGetMidX(menu), CGRectGetMaxY(menu) + 12 + radius);
 	}
 	// Translate the whole cluster instead of independently clamping each chip,
 	// which would collapse the spacing between AIM/RELOAD and FIRE/SWAP.

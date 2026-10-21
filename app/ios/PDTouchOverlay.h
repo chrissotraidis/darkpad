@@ -11,6 +11,9 @@ NS_ASSUME_NONNULL_BEGIN
  */
 BOOL PDTouchOverlayAnyPadConnected(void);
 
+/** Shared upper-right anchor for the utility button and its popover. */
+CGRect PDUtilityMenuFrame(UIWindow *window);
+
 /**
  * Force the answer above, for the :8775 bridge's `pad fake on|off|auto`.
  *

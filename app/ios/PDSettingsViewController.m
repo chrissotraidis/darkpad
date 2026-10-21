@@ -277,9 +277,11 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
     CGFloat width = MIN(280, self.view.bounds.size.width - inset.left - inset.right - 24);
     CGFloat height = [_rows systemLayoutSizeFittingSize:CGSizeMake(width - 12, UILayoutFittingCompressedSize.height)
         withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
-    CGFloat top = MAX(68, inset.top + 68);
+    CGRect anchor = [self.view convertRect:PDUtilityMenuFrame(self.view.window) fromView:self.view.window];
+    CGFloat top = CGRectGetMaxY(anchor) + 12;
     CGFloat available = MAX(48, self.view.bounds.size.height - inset.bottom - top - 12);
-    _panel.frame = CGRectMake(inset.left + 12, top, width, MIN(height + 12, available));
+    CGFloat left = MAX(inset.left + 12, CGRectGetMaxX(anchor) - width);
+    _panel.frame = CGRectMake(left, top, width, MIN(height + 12, available));
     _scroll.frame = CGRectInset(_panel.bounds, 6, 6);
     _rows.frame = CGRectMake(0, 0, width - 12, height);
     _scroll.contentSize = _rows.bounds.size;
