@@ -279,6 +279,12 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator/device builds PASS (`app-ipad-settings-build.log`, `app-ipad-settings-device-build.log`). iPad native checks passed for centered form, Done dismissal, reopening the correctly anchored popover and returning to Settings. Evidence under `work/evidence/ipad-menu/`. Backed up iPad Documents/Library before installation; EEPROM and ROM hashes match afterward. No existing phone saves copied into this new test container.
 - Current iPad process 85731, Settings open. Phone is shutdown and still has the previous installed build; verify the host-container change on phone after shutting down iPad. This is simulator layout evidence, not physical M2 iPad qualification.
 
+## Phone regression after tablet Settings host change
+
+- Shut down the iPad before booting the dedicated iPhone; only one simulator ran at a time. Installed the latest host-container build after backing up Documents/Library under `work/evidence/before-menu-host-phone/`. ROM, EEPROM and multiplayer setup hashes matched immediately after installation.
+- Native phone Settings remains full-width in landscape. Done dismisses it and releases native pause/focus with no held inputs. Loaded the existing Dark agent through ordinary game menus: Investigation retains its Agent star and **10m:06s** best time, and Extraction remains unlocked. Evidence: `work/evidence/phone-menu-host/`. No save or gameplay-state edits.
+- Current iPhone process 86659, at Investigation difficulty selection, no active mission. iPad is shut down. The Goldenpad presentation correction and phone/tablet regression checks are complete; full campaign, physical-device qualification and remaining P1/P2 gates remain open.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
