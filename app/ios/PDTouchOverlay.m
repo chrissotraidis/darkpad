@@ -547,6 +547,8 @@ static const PDButtonSpec kMenuButtons[] = {
 	BOOL _editing;
 	UIView *_editBar;
 	UISlider *_editSlider;
+	UISlider *_editOpacitySlider;
+	UILabel *_editOpacityPct;
 	UILabel *_editPct;
 	UILabel *_editControlName;
 	__weak PDTouchButtonView *_dragChip;
@@ -784,6 +786,27 @@ static CGPoint pdUnitForLabel(NSString *label, CGPoint def)
 	return CGPointMake(x.doubleValue, y.doubleValue);
 }
 
+/** Optional per-control style, independent of position and visibility. */
+static CGFloat pdControlValue(NSString *label, NSString *key, CGFloat fallback, CGFloat low, CGFloat high)
+{
+	id entry = [NSUserDefaults.standardUserDefaults dictionaryForKey:PDDefButtonLayout][label];
+	id value = [entry isKindOfClass:NSDictionary.class] ? entry[key] : nil;
+	if (![value isKindOfClass:NSNumber.class] || !isfinite([value doubleValue])) return fallback;
+	return MIN(high, MAX(low, [value doubleValue]));
+}
+
+- (void)storeStyle:(CGFloat)value key:(NSString *)key
+{
+	if (!_editSelected) return;
+	NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+	NSMutableDictionary *all = [([d dictionaryForKey:PDDefButtonLayout] ?: @{}) mutableCopy];
+	NSMutableDictionary *entry = [all[_editSelected] isKindOfClass:NSDictionary.class]
+		? [all[_editSelected] mutableCopy] : [NSMutableDictionary dictionary];
+	entry[key] = @(value);
+	all[_editSelected] = entry;
+	[d setObject:all forKey:PDDefButtonLayout];
+}
+
 - (void)storeUnit:(CGPoint)u forLabel:(NSString *)label
 {
 	NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
@@ -881,7 +904,7 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 		return CGPointMake(custom.x * size.width, custom.y * size.height);
 	}
 	if ([label isEqualToString:@(kLeftFire.label)]) {
-		CGPoint fire = [self centreForLabel:@"FIRE" radius:kButtons[0].radius * _scale];
+		CGPoint fire = [self centreForLabel:@"FIRE" radius:kButtons[0].radius * _scale * pdControlValue(@"FIRE", @"scale", 1, .55, 1.6)];
 		return CGPointMake(size.width - fire.x, fire.y);
 	}
 	const PDButtonSpec *spec = [self specForLabel:label];
@@ -910,7 +933,7 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 	for (int i = 0; i < PD_NUM_BUTTONS; i++) {
 		if (strcmp(kButtons[i].label, "START") == 0) continue;
 		CGFloat x = tablet ? kTabletButtonUnits[i].x : kButtons[i].unitX;
-		right = MAX(right, x * size.width + kButtons[i].radius * _scale);
+		right = MAX(right, x * size.width + kButtons[i].radius * _scale * pdControlValue(@(kButtons[i].label), @"scale", 1, .55, 1.6));
 	}
 	point.x += MIN(0, size.width - inset.right - 12 - right);
 	point.y = MIN(point.y, size.height - inset.bottom - 12 - radius);
@@ -1128,6 +1151,8 @@ static const CGFloat kWheelRadius = 32.0;
 	[_editBar removeFromSuperview];
 	_editBar = nil;
 	_editSlider = nil;
+	_editOpacitySlider = nil;
+	_editOpacityPct = nil;
 	_editPct = nil;
 	_editControlName = nil;
 	_editSelected = nil;
@@ -1184,7 +1209,7 @@ static const CGFloat kWheelRadius = 32.0;
 	UIButton *done = pill(@"checkmark",
 		[UIColor colorWithRed:0.18 green:0.78 blue:0.34 alpha:0.95], @selector(endLayoutEditing));
 	reset.accessibilityLabel = @"Reset touch layout";
-	reset.accessibilityHint = @"Restore default control positions, visibility and size";
+	reset.accessibilityHint = @"Restore default control positions, visibility, size and opacity";
 	done.accessibilityLabel = @"Done editing touch controls";
 
 	UISlider *sl = [UISlider new];
@@ -1204,6 +1229,20 @@ static const CGFloat kWheelRadius = 32.0;
 	pct.translatesAutoresizingMaskIntoConstraints = NO;
 	[bar addSubview:pct];
 	_editPct = pct;
+	UISlider *opacity = [UISlider new];
+	opacity.minimumValue = 0.20f;
+	opacity.maximumValue = 1.0f;
+	opacity.minimumTrackTintColor = UIColor.whiteColor;
+	opacity.translatesAutoresizingMaskIntoConstraints = NO;
+	[opacity addTarget:self action:@selector(editOpacityChanged:) forControlEvents:UIControlEventValueChanged];
+	[bar addSubview:opacity];
+	_editOpacitySlider = opacity;
+	UILabel *opacityPct = [UILabel new];
+	opacityPct.font = pct.font;
+	opacityPct.textColor = pct.textColor;
+	opacityPct.translatesAutoresizingMaskIntoConstraints = NO;
+	[bar addSubview:opacityPct];
+	_editOpacityPct = opacityPct;
 	[self updateScalePct];
 	UILabel *name = [UILabel new];
 	name.text = @"Drag a control to reposition";
@@ -1221,23 +1260,28 @@ static const CGFloat kWheelRadius = 32.0;
 	[NSLayoutConstraint activateConstraints:@[
 		[bar.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:14],
 		[bar.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-14],
-		[bar.heightAnchor constraintEqualToConstant:42],
-		[bar.trailingAnchor constraintEqualToAnchor:done.trailingAnchor],
+		[bar.heightAnchor constraintEqualToConstant:144],
+		[bar.widthAnchor constraintEqualToConstant:336],
 		[name.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
 		[name.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
-		[name.bottomAnchor constraintEqualToAnchor:bar.topAnchor constant:-28],
+		[name.topAnchor constraintEqualToAnchor:bar.topAnchor],
 		[name.heightAnchor constraintEqualToConstant:24],
+		[pct.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
+		[pct.topAnchor constraintEqualToAnchor:name.bottomAnchor constant:6],
+		[sl.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor constant:58],
+		[sl.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor constant:-58],
+		[sl.topAnchor constraintEqualToAnchor:pct.bottomAnchor constant:2],
+		[opacityPct.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
+		[opacityPct.topAnchor constraintEqualToAnchor:sl.bottomAnchor constant:8],
+		[opacity.leadingAnchor constraintEqualToAnchor:sl.leadingAnchor],
+		[opacity.trailingAnchor constraintEqualToAnchor:sl.trailingAnchor],
+		[opacity.topAnchor constraintEqualToAnchor:opacityPct.bottomAnchor constant:2],
 		[reset.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
-		[reset.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+		[reset.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
 		[reset.widthAnchor constraintEqualToConstant:42],
 		[reset.heightAnchor constraintEqualToConstant:42],
-		[sl.leadingAnchor constraintEqualToAnchor:reset.trailingAnchor constant:16],
-		[sl.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
-		[sl.widthAnchor constraintEqualToConstant:220],
-		[pct.centerXAnchor constraintEqualToAnchor:sl.centerXAnchor],
-		[pct.bottomAnchor constraintEqualToAnchor:sl.topAnchor constant:-2],
-		[done.leadingAnchor constraintEqualToAnchor:sl.trailingAnchor constant:16],
-		[done.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+		[done.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
+		[done.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor],
 		[done.widthAnchor constraintEqualToConstant:42],
 		[done.heightAnchor constraintEqualToConstant:42],
 	]];
@@ -1245,16 +1289,33 @@ static const CGFloat kWheelRadius = 32.0;
 
 - (void)updateScalePct
 {
-	_editPct.text = [NSString stringWithFormat:@"%.0f%%", PDDefFloat(PDDefButtonScale) * 100.0];
+	BOOL selected = _editSelected.length > 0;
+	_editSlider.minimumValue = selected ? 0.55f : 0.6f;
+	_editSlider.maximumValue = selected ? 1.60f : 1.8f;
+	_editSlider.value = selected ? pdControlValue(_editSelected, @"scale", 1, .55, 1.6) : PDDefFloat(PDDefButtonScale);
+	_editPct.text = [NSString stringWithFormat:@"%@ size · %.0f%%", selected ? @"Control" : @"Overall", _editSlider.value * 100];
+	_editSlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ size", _editSelected] : @"Overall touch control size";
 	_editSlider.accessibilityValue = _editPct.text;
+	_editOpacitySlider.enabled = selected;
+	_editOpacitySlider.value = selected ? pdControlValue(_editSelected, @"opacity", PDDefFloat(PDDefButtonOpacity), .2, 1) : PDDefFloat(PDDefButtonOpacity);
+	_editOpacityPct.text = selected ? [NSString stringWithFormat:@"Opacity · %.0f%%", _editOpacitySlider.value * 100] : @"Select a control for opacity";
+	_editOpacitySlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ opacity", _editSelected] : @"Control opacity";
+	_editOpacitySlider.accessibilityValue = _editOpacityPct.text;
 }
 
-/** The slider scales every chip live, as bean's does. */
 - (void)editScaleChanged:(UISlider *)sl
 {
-	[NSUserDefaults.standardUserDefaults setFloat:sl.value forKey:PDDefButtonScale];
-	[self updateScalePct];
+	if (_editSelected) [self storeStyle:sl.value key:@"scale"];
+	else [NSUserDefaults.standardUserDefaults setFloat:sl.value forKey:PDDefButtonScale];
 	[self applySettings];
+	[self updateScalePct];
+}
+
+- (void)editOpacityChanged:(UISlider *)sl
+{
+	[self storeStyle:sl.value key:@"opacity"];
+	[self applySettings];
+	[self updateScalePct];
 }
 
 /** In the editor every gameplay chip is on screen, menu or no menu. */
@@ -1263,11 +1324,11 @@ static const CGFloat kWheelRadius = 32.0;
 	for (PDTouchButtonView *b in _buttons) {
 		b.hidden = NO;
 		b.editing = YES;
-		b.alpha = [self userHid:b] ? kHiddenGhostAlpha : 1.0;
+		b.alpha = [self userHid:b] ? kHiddenGhostAlpha : pdControlValue(b.label, @"opacity", 1, .3, 1);
 	}
 	_leftFire.hidden = NO;
 	_leftFire.editing = YES;
-	_leftFire.alpha = [self userHid:_leftFire] ? kHiddenGhostAlpha : 1.0;
+	_leftFire.alpha = [self userHid:_leftFire] ? kHiddenGhostAlpha : pdControlValue(@"FIRE_L", @"opacity", 1, .3, 1);
 	for (PDTouchButtonView *b in _menuButtons) {
 		b.hidden = YES;
 	}
@@ -1514,6 +1575,7 @@ static const CGFloat kWheelRadius = 32.0;
 		return chip ? @"busy" : @"none";
 	}
 	_editSelected = chip.label;
+	[self updateScalePct];
 	_dragChip = chip;
 	_dragGrab = CGVectorMake(chip.center.x - p.x, chip.center.y - p.y);
 	_dragUnit = CGPointMake(chip.center.x / MAX(1.0, self.bounds.size.width),
@@ -1576,7 +1638,8 @@ static const CGFloat kWheelRadius = 32.0;
 
 	for (int i = 0; i < PD_NUM_BUTTONS; i++) {
 		PDTouchButtonView *b = [[PDTouchButtonView alloc] initWithSpec:&kButtons[i]
-		                                                         scale:_scale alpha:alpha dim:1.0];
+		                                                         scale:_scale * pdControlValue(@(kButtons[i].label), @"scale", 1, .55, 1.6)
+		                                                         alpha:pdControlValue(@(kButtons[i].label), @"opacity", alpha, .2, 1) dim:1.0];
 		[self addSubview:b];
 		[_buttons addObject:b];
 		if ([b.label isEqualToString:@"ALT"]) { _altChip = b; }
@@ -1584,7 +1647,8 @@ static const CGFloat kWheelRadius = 32.0;
 	}
 	// Fainter: placeable and pressable, but temporary (bean).
 	_leftFire = [[PDTouchButtonView alloc] initWithSpec:&kLeftFire
-	                                              scale:_scale alpha:alpha dim:0.55];
+	                                              scale:_scale * pdControlValue(@"FIRE_L", @"scale", 1, .55, 1.6)
+	                                              alpha:pdControlValue(@"FIRE_L", @"opacity", alpha, .2, 1) dim:0.55];
 	_leftFire.hidden = YES;
 	[self addSubview:_leftFire];
 	for (int i = 0; i < PD_NUM_MENU_BUTTONS; i++) {
@@ -3342,6 +3406,7 @@ static CGVector pdStickCurve(CGVector raw)
 		                        chip.center.y / MAX(1.0, self.bounds.size.height));
 		_dragStartUnit = _dragUnit;
 		_editSelected = chip.label;
+		[self updateScalePct];
 		chip.held = YES;
 		for (int i = 1; i <= 8; i++) {
 			[self dragChipTo:CGPointMake(p.x + d.dx * i / 8, p.y + d.dy * i / 8)];

@@ -148,7 +148,13 @@ lower controls clamp above the home indicator. Short phones proportionally
 scale the rings. Explicit custom positions and hidden states still take
 precedence. Default ring sizes were adjusted for the new arrangement.
 
-The live editor identifies the selected action by name. Its size slider still
-scales all controls; per-control size/opacity remains a difference from
-Goldenpad. Physical thumb reach and complete gameplay usability still require
-hardware acceptance; simulator layout checks do not prove those qualities.
+The live editor identifies the selected action by name. With no selection its
+size slider controls overall scale; selecting a control exposes its own size
+(55–160%) and opacity (20–100%), following Goldenpad’s ranges. Optional style
+fields preserve stored positions and visibility. Existing controls retain the
+global opacity until explicitly customized. FIRE size/opacity persisted through
+a full restart. Continuous native Simulator slider drags are still under
+investigation: accessibility-set values followed by touch apply correctly, but
+the attempted drags did not change the value. This interaction gate remains open.
+Physical thumb reach and complete gameplay usability still require hardware
+acceptance; simulator layout checks do not prove those qualities.
