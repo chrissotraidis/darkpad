@@ -718,6 +718,46 @@ static CFTimeInterval sPresentStarted;
 	}];
 }
 
+// Snapshot engine-owned names before presenting UIKit's chooser.
+- (void)chooseTexturePack
+{
+	__weak typeof(self) weakSelf = self;
+	[PDShell.shared enqueue:^{
+		texpackRefreshPacks();
+		NSMutableArray<NSString *> *names = [NSMutableArray array];
+		for (int i = 0; i < texpackGetNumPacks(); i++) {
+			[names addObject:@(texpackGetPackName(i))];
+		}
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if (!weakSelf.view.window) return;
+			UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"Choose Texture Pack"
+				message:names.count ? @"Choose the artwork used by the Enhanced profile."
+					: @"Add a pack folder or archive in Files → Perfect Dark → texture-packs. Restart the app to prepare new archives."
+				preferredStyle:UIAlertControllerStyleAlert];
+			for (NSString *name in names) {
+				[picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+					[PDShell.shared enqueue:^{
+						BOOL selected = texpackSelectPackByName(name.UTF8String);
+						if (selected) configSave("$S/pd.ini");
+						dispatch_async(dispatch_get_main_queue(), ^{
+							[weakSelf refreshTexturePackStatus];
+							if (!selected && weakSelf.view.window) {
+								UIAlertController *error = [UIAlertController alertControllerWithTitle:@"Pack Unavailable"
+									message:@"This pack is no longer installed. Choose another pack or add it again in Files."
+									preferredStyle:UIAlertControllerStyleAlert];
+								[error addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+								[[weakSelf topPresenter] presentViewController:error animated:YES completion:nil];
+							}
+						});
+					}];
+				}]];
+			}
+			[picker addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+			[[weakSelf topPresenter] presentViewController:picker animated:YES completion:nil];
+		});
+	}];
+}
+
 /**
  * What a picker, importer or alert this page opens is presented FROM: the top of
  * this page's own presentation chain. Not sWindow's — on visionOS the same page
@@ -1160,6 +1200,7 @@ static CFTimeInterval sPresentStarted;
 		@[
 			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
 			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
+			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
 			pdButtonRow(@"Reload packs (F9)", ^{
 				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
 				[weakSelf refreshTexturePackStatus];
@@ -1451,7 +1492,7 @@ static CFTimeInterval sPresentStarted;
 		        "Changes here take effect the next time you open the app.";
 	}
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Texture Packs"]) {
-		return @"In Files, open On My iPhone/iPad → Perfect Dark → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Choose between installed packs in the game’s Extended Options → Texture Packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
+		return @"In Files, open On My iPhone/iPad → Perfect Dark → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
 	}
 	return nil;
 }
