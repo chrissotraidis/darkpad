@@ -1,0 +1,22 @@
+Subject: Include inner chevron edges in iOS page-navigation targets
+
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -5903,10 +5903,15 @@
+ 		// rules: its targets are drawn outside the item's own row.
+ 		if (inputIosPointerIsActive() && g_MenuUsingMouse && inputs.mouseheld
+ 				&& inputs.select && !inputs.leftright && !inputs.leftrightheld && !dialog->dimmed) {
+-			if (inputs.mousex < dialog->x) {
++			// The drawn chevrons overlap the dialog edge. Include their inner
++			// half in the touch target, only near the centre and with siblings.
++			struct menulayer *touchlayer = &menu->layers[menu->depth - 1];
++			s32 edgeInset = touchlayer->numsiblings >= 2
++				&& ABS(inputs.mousey - (dialog->y + dialog->height / 2)) <= 12 ? 4 : 0;
++			if (inputs.mousex < dialog->x + edgeInset) {
+ 				inputs.leftright = -1;
+ 				inputs.select = 0;
+-			} else if (inputs.mousex > dialog->x + dialog->width) {
++			} else if (inputs.mousex > dialog->x + dialog->width - edgeInset) {
+ 				inputs.leftright = 1;
+ 				inputs.select = 0;
+ 			} else if (!menuIosPointOnFocusedItem(dialog, inputs.mousex, inputs.mousey)) {
