@@ -1,6 +1,6 @@
 # Darkpad progress
 
-## Current milestone: P0 — running baseline, acceptance incomplete
+## Current milestone: P1 — solo polish and simulator acceptance incomplete
 
 Implement `docs/goal.md` and `docs/prd.md`, then Goldenpad-inspired controls/three-dot utilities, gyro trial, enhanced art and staged LAN/co-op. At most one booted simulator. No public release authorized. Previous goal turns made implementation and runtime-validation progress.
 
@@ -9,7 +9,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 ## Exact sources and environment
 
 - Apple shell: rebelancap/perfect-dark-ios `b88f7cff611d54f7d233ebe3882e2295e5ecca9a`; historical docs under `docs/upstream` are not Darkpad measurements.
-- Engine: `90c8622e74b35be669d60d177effc6d7d2d7621c` (`UPSTREAM_PIN`), unmodified vendor; all 49 overlay patches apply.
+- Engine: `90c8622e74b35be669d60d177effc6d7d2d7621c` (`UPSTREAM_PIN`), unmodified vendor; 55 overlay patches applied in the latest recorded reconstruction (see HUD safe-area evidence below).
 - Goldenpad: chrissotraidis/goldenpad `52bb67328c2cc4b98b4242ba0539985bd61fc2d3`, downloaded under ignored `work/references`; direct behavior inspection in `docs/goldenpad-reference.md`.
 - SDL2 `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8); curl 8.11.0 archive SHA-256 `264537d90e58d2b09dddc50944baf3c38e7089151c8986715e2aaeaaf2b8118f`.
 - ANGLE `e25e8d8565f7b077002e07c2cbacfc2eec35aec0`; depot_tools `3a8af1e64be01a524f7d1c46daf8c2dcac63ff85`. Transitive actual revisions in `work/evidence/angle-dependency-revisions.txt`; pins in `dependencies/pins.env`.
@@ -21,9 +21,17 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 - **Source/build:** PASS baseline Mac, ARM64 simulator and unsigned iOS device apps. Local SDL2/curl/ANGLE recipes require no sibling checkout. `scripts/bootstrap-apple.sh` assembles the proven steps; whole-command empty-project-cache rebuild passed on this Mac (details below); second-Mac reproduction remains untested. No broad engine optimization changes.
 - **Package/install:** simulator installed; native Files picker imported the supplied ROM; missing-ROM UI works. Updated installation preserved EEPROM and ROM. Device package built but not installed/signed.
-- **Physical gameplay:** NOT RUN — `devicectl list devices` found no connected devices. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. Defection and Investigation / Agent completed and their time/unlock progression reloaded in the simulator; full campaign coverage remains incomplete.
+- **Physical gameplay:** NOT RUN — user explicitly requested simulator-only testing; physical-device acceptance is excluded from the current test plan. Simulator reached actual dataDyne Defection via saved agent/mission menus; firing and sustained movement work. Defection and Investigation / Agent completed and their time/unlock progression reloaded in the simulator; full campaign coverage remains incomplete.
 - **Performance:** NOT QUALIFIED — no physical-device thermal/frame-time session. Simulator counters are not phone benchmarks.
 - **Release readiness:** NOT READY. Private development only; assets/saves/captures/builds ignored. P1/P2 acceptance remains incomplete.
+
+## Current product state and remaining work
+
+- Goldenpad reference checkout and native ellipsis menu are implemented. Compact touch clusters, layout editor and controller preset have simulator evidence; physical touch/controller/gyro behavior is unqualified.
+- Enhanced includes 2× filtering and the locally installed PD Forever Plus HD v0.10 replacement pack. Rooftop Original/Enhanced round trip and firing/reloading verified. Native pack chooser saves selection. Pack is private test content, not bundled release content; optional Xbox remaster assets remain unavailable.
+- Defection and Investigation Agent completion/save reload were verified on the phone simulator. The separate tablet save has no recorded Defection completion. Do not treat the two saves as one progression record.
+- Remaining solo work: broader declared campaign coverage, gadget/alternate-control and dual-wield checks, HD interior/transparency/transition coverage, and lifecycle checks with the current build. Simulator measurements cannot establish physical sustained-performance targets.
+- P2 engine/network integration and actual Mac-to-simulator multiplayer/co-op sessions remain unimplemented/unverified. Keep the working solo baseline while preparing that separate experiment. Public release remains unauthorized.
 
 ## Reproducible commands and evidence
 
@@ -626,3 +634,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Previous turn implemented and runtime-verified the native chooser. Source review found the Art status cell still queried engine-owned texture selection directly from UIKit, unlike the existing queued Texture Packs status path.
 - Moved Enhanced status construction into refreshTexturePackStatus on the engine queue and copied the resulting string to the main thread. Profile changes invalidate the cached text until the existing coalesced engine apply refreshes it; the row reports Applying art profile meanwhile. Pack selection/reload uses that same refresh path.
 - Simulator build PASS, diff-check PASS. This change is built but not installed/runtime-verified yet; sole iPad PID57314 remains on the preceding chooser build, Settings open. No simulator/device/session changes. Broader goal remains active.
+
+## Queued HD status runtime acceptance
+
+- Previous turn removed UIKit reads of engine texture state. Installed64ed24e after3833-file Documents/Library backup; sole iPad PID58189, no second simulator.
+- Settings after relaunch correctly names Forever Plus HD v0.10. Original shows replacement packs off; switching back to Enhanced refreshes to the pack name. Current UI left on Enhanced Settings.
+- Save and texture hashes match the pre-update backup. Differences are runtime logs, pd.ini from profile changes, and two OS snapshot files; details work/evidence/hd-status-queue/changes.json. No new mission completion or performance claim.
+- Reconciled the top-level progress summary with current HD implementation, separate phone/tablet saves and user's simulator-only constraint. Historical evidence below remains scoped to the builds tested. Goal active.
