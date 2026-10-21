@@ -1,0 +1,106 @@
+Subject: audiomgr: make the "plenty queued" throttle a port-settable threshold
+
+amgrFrame() renders 368 samples per 60 Hz tick — unless the audio queue
+already holds more than 1100 samples, in which case it renders 184 and sets a
+two-tick hysteresis counter. That governor is an N64 AI-queue heuristic and it
+predates anything that controls the queue level deliberately.
+
+This port does control it. D-039's rate matcher holds the queue at one and a
+half DEVICE buffers, and on iOS the device buffer is floored at 1024 samples
+(overlay 0023, M-029), so the setpoint is **1536 — permanently above 1100**.
+The engine therefore throttles for ever: 184, 368, 368, 184, … averaging about
+306 samples a tick where 367 are consumed, a 17 % production deficit that no
+PI loop can close, which is why `audio_rate_milli` sat pinned at its +10 %
+clamp (Q-017, D-042). The clamp was covering a governor fighting the
+controller, not a clock.
+
+It is not a 120 Hz problem, which is where it was first seen: schedAudioFrame()
+runs amgrFrame() once per 60 Hz tick (`g_Vars.diffframe60`) at any render rate,
+so the deficit is the same at 60. 120 only made it audible.
+
+So the threshold becomes a variable rather than a literal, and on iOS it is
+raised above the setpoint: the engine always renders its full 368 per tick and
+the rate matcher is the only thing deciding how fast those samples reach the
+device — one controller, not two. Every other platform keeps 1100 and nothing
+changes. Production is 22,080 samples/s against 22,851 consumed (M-036), i.e.
+BELOW consumption, so the queue cannot run away with the governor raised, and
+`queueLimit` (16384 on iOS) is still the hard ceiling.
+
+diff --git a/port/src/audio.c b/port/src/audio.c
+index 63ed859b0..0b456cf27 100644
+--- a/port/src/audio.c
++++ b/port/src/audio.c
+@@ -6,8 +6,9 @@
+ #include "audio.h"
+ #include "mixer.h"
+ #include "record.h"
+ #include "system.h"
+ #include "video.h"
++#include "lib/audiomgr.h"   /* g_AmgrThrottleSamples (overlay 0028) */
+ 
+ static SDL_AudioDeviceID dev;
+ static const s16 *nextBuf;
+@@ -637,5 +638,9 @@ PD_CONSTRUCTOR static void audioConfigInit(void)
+ 	configRegisterInt("Audio.PrimeSamples", &primeSamples, 0, 32 * 1024);
+ 	configRegisterInt("Audio.RateMatch", &rateMatch, 0, 1);
+ 	configRegisterInt("Audio.RateMatchMaxPct", &rateMatchMaxPct, 0, PD_AUDIO_RATE_MAX_PCT);
++	// The ENGINE's own governor (overlay 0028, D-042), exposed so the pair can
++	// be A/B'd live on the phone: set it to 1100 and amgrFrame() goes back to
++	// throttling itself to 184 samples on alternate ticks.
++	configRegisterInt("Audio.EngineThrottleSamples", &g_AmgrThrottleSamples, 0, 1 * 1024 * 1024);
+ #endif
+ }
+diff --git a/src/include/lib/audiomgr.h b/src/include/lib/audiomgr.h
+index ec1d6ba0a..2b99dacc8 100644
+--- a/src/include/lib/audiomgr.h
++++ b/src/include/lib/audiomgr.h
+@@ -18,6 +18,11 @@ void amgrStopThread(void);
+ 
+ #ifndef PLATFORM_N64
+ void amgrFrame(void);
++
++#ifndef PLATFORM_N64
++/** Upstream's 1100, raised on iOS by overlay 0028 - see audiomgr.c. */
++extern s32 g_AmgrThrottleSamples;
++#endif
+ #endif
+ 
+ #endif
+diff --git a/src/lib/audiomgr.c b/src/lib/audiomgr.c
+index 7791798de..b381599fd 100644
+--- a/src/lib/audiomgr.c
++++ b/src/lib/audiomgr.c
+@@ -321,6 +321,24 @@ void amgrHandleDoneMsg(AudioInfo *info)
+ }
+ 
+ #ifndef PLATFORM_N64
++/**
++ * The queue level, in samples, past which a frame renders 184 instead of 368.
++ *
++ * Upstream's literal 1100, and on iOS it is raised above the level this port
++ * deliberately holds the queue at (D-042). A governor whose trip point sits
++ * BELOW the setpoint of the thing controlling the queue throttles production
++ * for ever, and nothing downstream can correct it: the rate matcher (D-039)
++ * holds one and a half device buffers, the device buffer is floored at 1024
++ * samples on iOS, so 1536 > 1100 and every other tick rendered 184 instead of
++ * 368 - a 17 % production deficit that pinned the matcher at its +10 % clamp.
++ * One controller for the queue, not two.
++ */
++#ifdef PLATFORM_IOS
++s32 g_AmgrThrottleSamples = 8192;
++#else
++s32 g_AmgrThrottleSamples = 1100;
++#endif
++
+ void amgrFrame(void)
+ {
+ 	static AudioInfo *previnfo = NULL;
+@@ -340,7 +358,7 @@ void amgrFrame(void)
+ 		osAiSetNextBuffer(previnfo->data, previnfo->frameSamples * 4);
+ 	}
+ 
+-	if (somevalue > 1100 && var8005cf94 == 0) {
++	if (somevalue > g_AmgrThrottleSamples && var8005cf94 == 0) {
+ 		// already a lot queued, render 1 naudio frame (184 samples) this frame
+ 		info->frameSamples = 184;
+ 		var8005cf94 = 2;
