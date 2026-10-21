@@ -22,16 +22,6 @@ Subject: candidate-only iOS input seam; network touch look remains pending
  // returns changes in mouse position since last frame, scaled by absolute sensitivity
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -466,6 +466,9 @@
- static inline void inputInitAllControllers(void)
- {
- 	SDL_GameControllerUpdate();
-+#ifdef PLATFORM_IOS
-+	inputIosLatchFrame();
-+#endif
- 
- 	numJoysticks = SDL_NumJoysticks();
- 
 @@ -1222,6 +1225,94 @@
  	return sens;
  }
@@ -148,6 +138,18 @@ Subject: candidate-only iOS input seam; network touch look remains pending
  	return 0;
  }
  
+@@ -1371,8 +1467,11 @@
+ void inputUpdate(void)
+ {
+ 	if (g_NetDedicated) return;
+ 
+ 	SDL_GameControllerUpdate();
++#ifdef PLATFORM_IOS
++	inputIosLatchFrame();
++#endif
+ 
+ 	if (mouseEnabled) {
+ 		inputUpdateMouse();
 @@ -1795,6 +1893,14 @@
  		mdx = rawdx * (0.022f / 3.5f) * mouseSensX;
  		mdy = rawdy * (0.022f / 3.5f) * mouseSensY;

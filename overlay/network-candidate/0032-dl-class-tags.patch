@@ -1,0 +1,193 @@
+Subject: the display list says what it is drawing (the stereo class tags)
+
+D-055, and the engine half of patch 0030's fold.
+
+The visionOS stereo fold needs to know WHAT a projection is for, because the
+three shapes PD hands the renderer need three different eye offsets. D-049
+recovered that from the SHAPE of the matrix. On the simulator with N64 art that
+read world 187440 / sky 1540 / gun 104 and looked right; on the user's headset
+with the XBLA release on it read
+
+    stereo_cls_world=2266415  stereo_cls_sky=2290014  stereo_cls_gun=247990
+
+- a sky count equal to the world count. The shape of P is not a property of the
+subject: PD's lists multiply into the projection (G_MTX_MUL with
+G_MTX_PROJECTION) and 4J's mesh lists do it constantly, after which the product
+is no longer axis-aligned and the shape test calls it sky. Half the geometry in
+the room took the skew-only path, so half of it had no eye offset - two depths
+for one scene, which is what the user reported three separate ways (bodies
+floating above the floor, doors looking wrong, ramps "trippy, depth off").
+
+So the engine says it instead, and this patch is that: a TAGGED G_NOOP naming
+the class of the NEXT projection load. G_NOOP (0xc0) is already accepted and
+ignored by gfx_pc (:3555) and by the N64 RSP, and neither reads w1, so a tag
+costs one display-list command and changes no draw, tri, vert or texture
+counter anywhere - which is why the oracle's gfx stream is unaffected.
+gDPSetBlendMask is aliased to an UNtagged gDPNoOp, so the payload carries a
+magic in its high half and w1 == 0 stays "not ours".
+
+Only four sites in the whole tree carry a tag, because an untagged projection
+load is WORLD and a MUL into the projection keeps the class of the load:
+
+  * vi.c vi0000ab78()          - SKY. The camera's rotation is folded into P
+                                 and the modelview is identity.
+  * vi.c vi0000aca4()          - GUN when it was called with the viewmodel's
+    vi.c viSetPerspectiveWithFov()  znear of 1.5 (bondgun.c:11426/11441),
+                                 WORLD at menuRenderModel's 10. The znear is a
+                                 plain argument here, so this is the engine's
+                                 own number rather than one read back out of a
+                                 matrix.
+  * menu.c menuRender()        - a FLAT SPAN, because Q-026 is answered
+                                 "flatten" and PD's dialogs are not the
+                                 matrix-free NDC rectangles §2.4 assumed: most
+                                 of the chrome is projected geometry through
+                                 func0f0d479c's own frustum, menuRenderModel
+                                 installs a perspective of its own, the
+                                 hudpiece uses the world's and the health bar
+                                 is drawn in the world projection inside the
+                                 span. Five projections, one dialog - so the
+                                 span is what reaches all five.
+
+The emission is under #ifndef PLATFORM_N64 so a matching N64 build is
+byte-identical.
+
+diff --git a/src/game/menu.c b/src/game/menu.c
+index e71abb17e..604829745 100644
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -6083,6 +6083,23 @@ Gfx *menuRender(Gfx *gdl)
+ 
+ 	gdl = func0f0d479c(gdl);
+ 
++#ifndef PLATFORM_N64
++	// FLAT SPAN (D-055, Q-026 answered "flatten"): everything menuRender draws
++	// is identical in both eyes and sits exactly ON the panel.
++	//
++	// PD's menus are NOT the matrix-free NDC rectangles the 3D plan assumed.
++	// func0f0d479c() above installs a real frustum (guFrustumF, znear 10,
++	// savebuffer.c:70) with a depth-FLATTENED viewport, most of the chrome is
++	// projected geometry through it (ten gSPVertex sites in menugfx.c alone),
++	// menuRenderModel() installs a perspective of its own for the rotating
++	// model, the hudpiece uses the world's, and the health bar is drawn in the
++	// world projection inside this very span. Five projections, one dialog — so
++	// this is a SPAN and not a projection class, and it is the span that reaches
++	// all five. The user, in the headset on 0.0.0.9: "pause menu has depth
++	// intersecting the world".
++	gDPPdDlTag(gdl++, PD_DLSPAN_FLAT_BEGIN);
++#endif
++
+ 	gSPDisplayList(gdl++, var800613a0);
+ 
+ 	// Render the background
+@@ -6445,6 +6462,9 @@ Gfx *menuRender(Gfx *gdl)
+ 
+ #ifndef PLATFORM_N64
+ 	gSPClearExtraGeometryModeEXT(gdl++, G_ASPECT_MODE_EXT);
++	// ...and the flat span closes (D-055), before the world projection comes
++	// back at func0f0d49c8() so that nothing after it is flattened.
++	gDPPdDlTag(gdl++, PD_DLSPAN_FLAT_END);
+ #endif
+ 
+ 	gdl = func0f0d49c8(gdl);
+diff --git a/src/include/gbiex.h b/src/include/gbiex.h
+index fb7591e30..6eb88ea3d 100644
+--- a/src/include/gbiex.h
++++ b/src/include/gbiex.h
+@@ -212,7 +212,54 @@
+ #define G_SETTILEOFFSET_EXT          0x4d
+ #define G_MESH_EXT                   0x4e
+ #define G_SETRECTSCALE_EXT           0x4f
+ 
++/* ------------------------------------------------------------------------ */
++/* DISPLAY-LIST CLASS TAGS (visionOS 3D stereo mode, D-055).                */
++/*                                                                          */
++/* The stereo fold in port/fast3d/gfx_pc.cpp needs to know WHAT the list is  */
++/* drawing, because the three shapes of projection PD hands the renderer     */
++/* need three different eye offsets. It used to RECOVER that from the shape  */
++/* of the projection matrix, and that guess broke on 4J's XBLA art: the      */
++/* device counters came back world 2.27M / sky 2.29M / gun 248k, a sky count */
++/* equal to the world count, and half the geometry got the wrong offset —    */
++/* which is what the user saw in the headset as bodies floating above the      */
++/* floor and ramps reading "trippy, depth off".                             */
++/*                                                                          */
++/* So the engine says it instead. These are TAGGED G_NOOPs (gbi.h:3826):     */
++/* opcode 0xc0 is already accepted and ignored by gfx_pc (:3555) and by the  */
++/* N64 RSP, and w1 is never read by either, so a tag costs one command and   */
++/* changes no draw, tri, vert or texture count anywhere. `gDPSetBlendMask`   */
++/* is aliased to an UNtagged gDPNoOp (gbi.h:2351), whose w1 is 0, so the     */
++/* payload carries a magic in its high half and w1 == 0 is "not ours".       */
++/*                                                                          */
++/* A tag applies to the NEXT projection LOAD and one only — the pending-tag  */
++/* shape gfx_pc already uses for G_SETFONTGLYPH_EXT. An untagged load is     */
++/* PD_DLCLASS_WORLD, which is why only the sky's and the gun's own two       */
++/* projection sites carry one and the other thirty-odd loads in this engine  */
++/* need no change at all. A G_MTX_MUL into the projection KEEPS the class,   */
++/* which is the half the shape test could not do.                           */
++/*                                                                          */
++/* MENU is not a projection class but a span: menuRender() flattens whatever */
++/* it draws (Q-026, answered "flatten"), through all five of its own         */
++/* projection paths, so it brackets itself instead.                         */
++/* ------------------------------------------------------------------------ */
++
++#define PD_DLTAG_MAGIC          0x5044u   /* 'PD'; 0 is an untagged noop */
++#define PD_DLTAG(x)             (((unsigned int)PD_DLTAG_MAGIC << 16) | ((x) & 0xffffu))
++#define PD_DLTAG_PAYLOAD(w1)    ((unsigned int)(w1) & 0xffffu)
++#define PD_DLTAG_IS_OURS(w1)    ((((unsigned int)(w1)) >> 16) == (unsigned int)PD_DLTAG_MAGIC)
++
++/* Projection classes, one-shot: they name the next projection load. */
++#define PD_DLCLASS_WORLD   0   /* the full eye offset and convergence */
++#define PD_DLCLASS_SKY     1   /* convergence skew only: a camera-basis fold */
++#define PD_DLCLASS_GUN     2   /* the viewmodel, converged at its own depth */
++#define PD_DLCLASS_FLAT    3   /* no fold: identical in both eyes, on the panel */
++/* Span markers, sticky between the two: flatten everything drawn inside. */
++#define PD_DLSPAN_FLAT_BEGIN  8
++#define PD_DLSPAN_FLAT_END    9
++
++#define gDPPdDlTag(pkt, x) gDPNoOpTag(pkt, PD_DLTAG(x))
++
+ /* G_EXTRAGEOMETRYMODE flags */
+ 
+ #define G_INVERT_CULLING_EXT     0x00000001
+diff --git a/src/lib/vi.c b/src/lib/vi.c
+index 78e21170d..2226dcc17 100644
+--- a/src/lib/vi.c
++++ b/src/lib/vi.c
+@@ -549,6 +549,14 @@ Gfx *vi0000ab78(Gfx *gdl)
+ 	sp48 = gfxAllocateMatrix();
+ 	guMtxF2L(sp50.m, sp48);
+ 
++#ifndef PLATFORM_N64
++	// SKY (D-055): the camera's ROTATION is folded into the projection above and
++	// the modelview is identity, so a view-space translation folded into this
++	// matrix would be a WORLD-space shift. The sky also draws at 2 x zfar, where
++	// the correct disparity is exactly the convergence skew's infinity term. The
++	// stereo fold reads the tag and applies the skew only.
++	gDPPdDlTag(gdl++, PD_DLCLASS_SKY);
++#endif
+ 	gSPMatrix(gdl++, OS_K0_TO_PHYSICAL(sp4c), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+ 	gSPMatrix(gdl++, OS_K0_TO_PHYSICAL(sp48), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+ 	gSPPerspNormalize(gdl++, sp46);
+@@ -565,6 +573,14 @@ Gfx *vi0000aca4(Gfx *gdl, f32 znear, f32 zfar)
+ 	guPerspectiveF(tmp.m, &scale, g_ViBackData->fovy, g_ViBackData->aspect, znear, zfar, 1);
+ 	guMtxF2L(tmp.m, mtx);
+ 
++#ifndef PLATFORM_N64
++	// GUN (D-055). bgunRender() calls this with znear 1.5 for the viewmodel
++	// (bondgun.c:11426) against the world's own 30 (vi.c:41); menuRenderModel()
++	// calls it with 10 for the rotating character model. The znear is a plain
++	// argument here, so the class is decided from the ENGINE's own number rather
++	// than recovered from the matrix, which is the whole point of D-055.
++	gDPPdDlTag(gdl++, (znear < 5.0f) ? PD_DLCLASS_GUN : PD_DLCLASS_WORLD);
++#endif
+ 	gSPMatrix(gdl++, OS_K0_TO_PHYSICAL(mtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+ 	gSPPerspNormalize(gdl++, scale);
+ 
+@@ -586,6 +602,8 @@ Gfx *viSetPerspectiveWithFov(Gfx *gdl, f32 fovy, f32 znear, f32 zfar)
+ 	guPerspectiveF(tmp.m, &scale, fovy, g_ViBackData->aspect, znear, zfar, 1);
+ 	guMtxF2L(tmp.m, mtx);
+ 
++	// GUN (D-055): the COD-aim sights path, bondgun.c:11441, znear 1.5.
++	gDPPdDlTag(gdl++, (znear < 5.0f) ? PD_DLCLASS_GUN : PD_DLCLASS_WORLD);
+ 	gSPMatrix(gdl++, OS_K0_TO_PHYSICAL(mtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+ 	gSPPerspNormalize(gdl++, scale);
+ 

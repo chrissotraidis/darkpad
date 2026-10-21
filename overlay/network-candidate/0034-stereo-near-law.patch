@@ -1,0 +1,269 @@
+Subject: the gun is nearer than every world pixel it borders (D-061)
+
+the user, on 0.0.0.11: "my only complaint is how the GUN intersects or overlaps
+with elements in the rendered world. it's a little disorienting, especially when
+you get close to a wall and your eyes focus on the edges of your gun and how it
+overlaps with the world around you." And, on being asked whether it was only
+walls: "it's a little disorienting even when it overlaps with the ground. it's
+disorienting often."
+
+THE MECHANISM, verified before it was designed against.
+
+  * PD clears the depth buffer before bgunRender (player.c:6120), so the
+    viewmodel PAINTS OVER the world unconditionally. Occlusion says "the gun is
+    in front" on every pixel of the gun's silhouette.
+  * After D-060 the gun converges at its NEAREST vertex, so the whole weapon
+    sits at the panel or behind it: measured, six matched blocks in the gun's
+    own box, every one at -6 px and not one positive (M-045 addendum).
+  * The world converges at Crosshair Distance. Everything NEARER than that
+    carries crossed disparity, growing as 2*a*e*(1/d - 1/C) without bound. At
+    the 0.0.0.12 defaults a wall 30 units from Joanna's face is 402 px on a
+    2560 px eye - twelve degrees, far past fusion - and the floor she is
+    standing next to, two metres away, is already 33 px in front of the panel.
+
+So on every frame with the weapon up, occlusion and stereo said opposite things
+about the same edge, and the size of the disagreement grew as she approached
+anything. That is the whole of the user's paragraph, and neither half of it is a
+comfort preference: it is a contradiction in the picture.
+
+WHAT THE SIBLINGS DID, and why this is not quite theirs. quake3e hit exactly
+this ("the weapon already sits at ~26x crossed disparity ... far outside fusable
+range") and shipped D-028 v2: the weapon pass rendered with zProj = r_znear, so
+the weapon is at the panel and never in front of it - which is what D-060
+already does here, and is not sufficient, because quake3e's convergence is
+160 units (~1.6 m) where PD's is 762 (25 ft), so quake3e's WORLD barely comes
+out of the panel and PD's comes out of it constantly. q2repro deferred the
+viewmodel explicitly ("a v2 concern") and then left the panel mode for
+hand-tracked VR, where the weapon has real world depth. The harbourmasters
+playbook's nearest relative is the aiming profile (depth x0.3, convergence
+bias x0.5 while a first-person camera is up) - a global softening, not an
+ordering rule. Nobody clamps the world, and nobody had to: no sibling both
+converges 25 ft out and lets the camera reach a wall.
+
+THE LAW. Write U for |a*e/conv|, the NDC shift of a point at infinity - the
+whole of the depth the scene has BEHIND the panel, and the honest unit for the
+depth it may have in front of it.
+
+  WORLD   1/d is softly saturated at (1+N)/conv with N = 2, so no world pixel is
+          more than U*N in front of the panel, and - the saturation being
+          asymptotic - none ever reaches it. The clamp plane is conv/3, which at
+          the shipped defaults is 254 units (8.3 ft): 33 px, 1.04 degrees, a
+          wall rendered at 1.8 m in front of a panel at 3.6 m. The knee starts
+          at conv/2 and the curve is C1, so nothing in the picture carries a
+          crease and a surface sliding through the plane does not change its
+          rate of approach in one frame.
+  GUN     a constant NDC shift - a rigid move along the view axis - putting the
+          viewmodel's FARTHEST vertex at U*G with G = 2.5 > N. Its own internal
+          spread (D-060: nearest vertex at the convergence, the rest behind it,
+          total exactly U) rides on top, so every vertex lands between U*2.5
+          and U*3.5.
+
+  THE INVARIANT: the gun is nearer than every world pixel it borders. Paint
+  order and stereo order are now the same order, for the floor as much as for
+  the wall.
+
+WHAT THIS COSTS, said plainly. The 2D layer is untouched, at zero disparity, so
+the ammo HUD is no longer the nearest thing on screen - the gun is, by U*3.5,
+about 1.7 degrees. That is the same class of conflict D-060 removed, moved from
+the gun's whole silhouette (every frame, growing without bound) to one corner
+of the HUD (bounded, and only where they overlap). It is a trade and it is
+the user's to judge; the alternative - moving the 2D layer forward with the gun -
+takes the crosshair off the convergence plane the "Crosshair Distance" row is
+named after, which is a worse bargain. Q-029 carries it.
+
+Everywhere but visionOS PD_VISION_STEREO is 0 and every line of this is
+preprocessed away. At Stereo Depth 0 % `e` is zero, the fold returns before any
+of it, and the two eyes stay bit-identical - which the gates run.
+
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index fd753adf7..d7ae451d1 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -91,6 +91,9 @@ extern "C" void pdVisionStereoNoteGunDepth(float depth);
+ // depth-tagged 2D rectangle (a light glare) needs to sit on its own fixture.
+ extern "C" float pdVisionStereoGunNear(void);
+ extern "C" void pdVisionStereoNoteGunVertex(float depth);
++// D-061: the near law. Two pure multiples of the fold's own far asymptote, plus
++// the soft knee's width — the whole of the clamp's parameters.
++extern "C" void pdVisionStereoNearLaw(float *outWorldN, float *outGunN, float *outKnee);
+ #else
+ #define PD_VISION_STEREO 0
+ #endif
+@@ -2375,8 +2378,37 @@ struct PDStereoState {
+     float bg_scale;     // bgGetScaleBg2Gfx() for this frame (PD_DLTAG_SCALE)
+     float depth_tag;    // the view depth of the next 2D rect, 0 = none
+     float world_a;      // P[0][0] of the last PLAIN perspective load
++    // D-061, the per-vertex near clamp. Set when a WORLD-classed projection is
++    // folded and zero for every other class, so the test in gfx_sp_load_vertex
++    // is one compare against a float that is 0 unless the clamp is live.
++    float near_k;       // a*eEye, the signed scale of the correction
++    float near_w0;      // clip w at which the knee starts (view units)
++    float near_q0;      // 1/near_w0
++    float near_qm;      // the asymptote: 1/(D_min in view units)
++    float near_dq;      // near_qm - near_q0
+ };
+-static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0, 1.0f, 0.0f, 0.0f };
++static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0, 1.0f, 0.0f, 0.0f,
++                                   0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
++
++/**
++ * D-061: 1/d, softly saturated at `qm`.
++ *
++ * A hard `min(q, qm)` is continuous in VALUE, so it shows no crease in a still
++ * frame, but its slope breaks at the knee and a surface sliding through the
++ * plane changes its rate of approach in one frame. This is C1 and monotone, and
++ * it is one divide:
++ *
++ *     q' = qm - dq / (1 + (q - q0)/dq)          for q > q0
++ *
++ * At q0 it is q0 with slope 1; as q grows it approaches qm and never reaches
++ * it, which is what makes the viewmodel's own plane at U*G a STRICT bound.
++ */
++static inline float gfx_stereo_soft_q(float q, float q0, float qm, float dq) {
++    if (q <= q0 || dq <= 0.0f) {
++        return q;
++    }
++    return qm - dq / (1.0f + (q - q0) / dq);
++}
+ 
+ // What one eye of the last completed frame saw, for `3d state`. The MUL count
+ // is here because D-055 asserted "PD's lists MULTIPLY into the projection" with
+@@ -2418,6 +2450,7 @@ static void gfx_stereo_reset_classes(void) {
+     pd_stereo.bg_scale = 1.0f;
+     pd_stereo.depth_tag = 0.0f;
+     pd_stereo.world_a = 0.0f;
++    pd_stereo.near_k = 0.0f;
+     pd_stereo_mul_p = 0;
+     pd_stereo_load_p = 0;
+     pd_stereo_baked = 0;
+@@ -2521,6 +2554,10 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+         return false;
+     }
+     memcpy(out, P, 16 * sizeof(float));
++    // The clamp is re-armed by every fold and belongs to the projection now
++    // being loaded; a class that does not want it leaves it at zero, and so do
++    // all of the early returns below.
++    pd_stereo.near_k = 0.0f;
+     if (e == 0.0f) {
+         // Stereo Depth 0 %: the mono projection in both eyes, bit for bit. The
+         // gate leans on this - an L/R pair taken at 0 % must be pixel-identical
+@@ -2616,7 +2653,71 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+         // infinity term anyway.
+         out[3][0] -= eEye * a;
+     }
+-    const float skew = a * eEye / C;
++    float skew = a * eEye / C;
++
++#if PD_VISION_STEREO
++    // -----------------------------------------------------------------------
++    // D-061: THE NEAR LAW.
++    //
++    // U = |a*e/conv| is the NDC shift a point at infinity gets — the whole of
++    // the depth the scene has behind the panel, and the unit everything below
++    // is written in. A world point at view depth d gets a*e*(1/conv - 1/d),
++    // whose crossed part grows without bound as d falls, and PD lets Joanna put
++    // her face against a wall. The user, on 0.0.0.11: "how the GUN intersects or
++    // overlaps with elements in the rendered world ... especially when you get
++    // close to a wall", and "it's a little disorienting even when it overlaps
++    // with the ground. it's disorienting often."
++    //
++    // Two halves, and the SECOND one is why the first is not enough: PD clears
++    // the depth buffer before bgunRender (player.c:6120), so the viewmodel is
++    // PAINTED OVER whatever it overlaps — the floor two metres away as much as
++    // a wall. Occlusion therefore says "gun in front" on every pixel of the
++    // gun's silhouette, and stereo has to agree or the eye is handed a
++    // contradiction exactly where it is looking.
++    //
++    //   WORLD: 1/d is softly saturated at (1+N)/conv, so no world pixel is more
++    //          than U*N in front of the panel — and, because the saturation is
++    //          asymptotic, none ever reaches U*N.
++    //   GUN:   a constant NDC shift, i.e. a rigid move along the view axis, that
++    //          puts the viewmodel's FARTHEST vertex at U*G with G > N. Its own
++    //          internal disparity (D-060: nearest vertex at the convergence, the
++    //          rest behind it, total spread exactly U) rides on top, so every
++    //          vertex is between U*G and U*(G+1) — strictly nearer than every
++    //          world pixel it can border.
++    //
++    // The invariant this buys, in one line: THE GUN IS NEARER THAN EVERY WORLD
++    // PIXEL IT BORDERS. Paint order and stereo order are the same order.
++    float worldN = 0.0f, gunN = 0.0f, knee = 0.0f;
++    pdVisionStereoNearLaw(&worldN, &gunN, &knee);
++    if (cls == PD_DLCLASS_GUN) {
++        // The gun's own fold leaves its far end at +U (behind the panel, the
++        // far asymptote of a convergence sitting at its nearest vertex). Wanted
++        // is a*e*(1/conv - (1+gunN)/conv) = -U*gunN, so the constant added is
++        // -(1 + gunN) * a * e / conv. In `conv`'s own units, not C's: the gun's
++        // projection is always the plain one, so s is 1 here.
++        //
++        // And it is the WORLD's `a`, not the gun's. The plane being matched is
++        // a WORLD depth, so the disparity to match is the world's law; the two
++        // agree whenever vi0000aca4 builds the viewmodel's projection from
++        // g_ViBackData->fovy (which is every frame the player is not at the
++        // sights) and differ under COD Style Aiming, where bondgun.c:11441
++        // gives the gun an ADS fov of its own. Using the gun's `a` there would
++        // move its plane by the ratio of the two fovs, exactly while the player
++        // is looking down the sights at something close.
++        const float aw = (pd_stereo.world_a != 0.0f) ? pd_stereo.world_a : a;
++        skew -= (1.0f + gunN) * aw * e / conv;
++    } else if (cls == PD_DLCLASS_WORLD && worldN > 0.0f) {
++        // C is already conv * bg_scale and eEye is e * bg_scale, so these are in
++        // the same view units the vertex's own clip w will be in, whichever of
++        // the two spaces this matrix consumes (D-060).
++        pd_stereo.near_qm = (1.0f + worldN) / C;
++        pd_stereo.near_q0 = (1.0f + worldN * knee) / C;
++        pd_stereo.near_dq = pd_stereo.near_qm - pd_stereo.near_q0;
++        pd_stereo.near_w0 = (pd_stereo.near_q0 > 0.0f) ? 1.0f / pd_stereo.near_q0 : 0.0f;
++        pd_stereo.near_k  = a * eEye;
++    }
++#endif
++
+     for (int r = 0; r < 4; r++) {
+         out[r][0] += skew * out[r][3];
+     }
+@@ -2944,6 +3045,28 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
+         const float z = pos[2];
+         const float w = pos[3];
+ 
++#if PD_VISION_STEREO
++        // D-061: the world's NEAR CLAMP, per vertex, before the aspect
++        // adjustment — which is where this vertex's own x is adjusted, and so
++        // where the fold's own contribution already sits.
++        //
++        // The fold has given this vertex an NDC shift of a*eEye*(1/C - 1/w).
++        // Wanted is the same with 1/w softly saturated at near_qm, so the
++        // correction in NDC is a*eEye*(1/w - q'), and in CLIP x — which is what
++        // this is — it is that times w:
++        //
++        //     dx = near_k * (1 - w*q')
++        //
++        // near_k is zero unless a WORLD-classed projection is current, so the
++        // cost on every other vertex in the frame is one compare against a
++        // float that is already in a register.
++        if (pd_stereo.near_k != 0.0f && w > 0.0f && w < pd_stereo.near_w0) {
++            const float qp = gfx_stereo_soft_q(1.0f / w, pd_stereo.near_q0,
++                                               pd_stereo.near_qm, pd_stereo.near_dq);
++            x += pd_stereo.near_k * (1.0f - w * qp);
++        }
++#endif
++
+         // G_SETRECTSCALE_EXT on a menu's own shapes too (a focused row's
+         // line, a dropdown's background), about the same point the
+         // rectangles are scaled about, in the view's clip space
+@@ -7773,7 +7896,16 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+         float eSigned = 0.0f, conv = 0.0f, gunConv = 0.0f;
+         if (pdVisionStereoFold(&eSigned, &conv, &gunConv) && eSigned != 0.0f &&
+             conv > 0.0f && pd_stereo.world_a != 0.0f) {
+-            const float dx = pd_stereo.world_a * eSigned * (1.0f / conv - 1.0f / d);
++            // D-061: a glare is a world object, so it obeys the world's own
++            // near law — a light fixture in the player's face must not be the
++            // one thing in the frame that still comes 400 px out of the panel.
++            // Same arithmetic, in PD units (a glare's depth is unscaled).
++            float worldN = 0.0f, gunN = 0.0f, knee = 0.0f;
++            pdVisionStereoNearLaw(&worldN, &gunN, &knee);
++            const float qm = (1.0f + worldN) / conv;
++            const float q0 = (1.0f + worldN * knee) / conv;
++            const float q  = gfx_stereo_soft_q(1.0f / d, q0, qm, qm - q0);
++            const float dx = pd_stereo.world_a * eSigned * (1.0f / conv - q);
+             ulxf += dx;
+             lrxf += dx;
+             pd_stereo_depth_rects++;
