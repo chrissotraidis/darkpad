@@ -265,6 +265,17 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
         button.configuration = config;
         button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
         button.tag = [actions[i] integerValue];
+        if (button.tag == 3) {
+            // Keep the action unavailable until its frame-boundary snapshot.
+            // Confirmation still rechecks eligibility before ending anything.
+            button.enabled = NO;
+            [PDShell.shared enqueue:^{
+                button.enabled = mainIosCanEndSession() != 0;
+                button.accessibilityHint = button.enabled
+                    ? @"Asks for confirmation before ending the session"
+                    : @"Unavailable outside an active mission or match";
+            }];
+        }
         [button.heightAnchor constraintGreaterThanOrEqualToConstant:48].active = YES;
         [button addTarget:self action:@selector(selectAction:) forControlEvents:UIControlEventTouchUpInside];
         [_rows addArrangedSubview:button];

@@ -58,6 +58,8 @@ int inputIosPointerIsActive(void);
 int menuIosDialogIsOpen(void);
 // overlay 0056 — confirmed native abort/end-match; frame queue only.
 int mainIosEndSession(void);
+// overlay 0058 — same eligibility check without mutating the session.
+int mainIosCanEndSession(void);
 
 // overlay 0020 — the touch stick as analogue movement. Under CONTROLMODE_PC
 // (the port's default) the right stick is movedata.analogstrafe/analogwalk.
