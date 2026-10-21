@@ -2614,6 +2614,11 @@ static CGVector pdStickCurve(CGVector raw)
 	for (UITouch *t in touches) {
 		PDTouchButtonView *b = [_buttonTouches objectForKey:t];
 		if (b) {
+			// AIM owns its drag until lift, including any final real sample
+			// UIKit did not deliver through touchesMoved. Cancel adds no motion.
+			if (!cancelled && t == _aimDragTouch) {
+				[self addAimDragTo:[t locationInView:self]];
+			}
 			[self liftChip:b latch:!cancelled];
 			[_buttonTouches removeObjectForKey:t];
 			// The lift leaves aim mode: PD's aim button is HOLD by default
