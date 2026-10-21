@@ -50,7 +50,7 @@ using the native mission-abort/match-results path. Cancellation and both exit
 paths are simulator-verified; completed progression survives relaunch. Built-in
 gameplay buttons translate as a group inside the safe area; custom
 placements stay exact. An explicit **Use Goldenpad Controller Layout…** preset now lives in Settings →
-Aiming. It preserves keyboard/mouse and D-pad bindings, keeps a previous-binding
+Controller. It preserves keyboard/mouse and D-pad bindings, keeps a previous-binding
 backup, and applies to all four player slots:
 
 | Action | Controller input |
@@ -122,3 +122,8 @@ black circular treatment. It stays on the left to preserve Darkpad’s separate
 START control. Settings remains the native settings form; the compact menu
 keeps truthful Darkpad actions (End Mission or Match and Diagnostics). Native
 simulator navigation, pause ownership and dismissal were verified.
+
+The Settings form now follows the reference’s separation of Graphics, Touch
+Controls and Controller, with Darkpad’s experimental gyro in Motion Aiming.
+Existing keys and saved values are retained. Asset help describes the current
+art-profile controls rather than the inherited, removed Xbox switch.

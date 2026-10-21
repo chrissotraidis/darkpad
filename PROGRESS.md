@@ -265,6 +265,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator and unsigned device builds PASS (`app-compact-menu-build.log`, `app-compact-menu-device-build.log`). Native UI checks passed: menu appearance, Settings navigation and Done, outside dismissal, direct touch editor, exit confirmation and cancel. Pause/readback confirms menu and editor pause the engine, outside dismissal resumes, and held inputs are zero. Screenshot: `work/evidence/darkpad-compact-menu.png`.
 - Backed up Documents/Library before install; ROM, EEPROM and multiplayer setup hashes all preserved across installation. Same single simulator, current process 83526. Extraction attempt ended before this install: Dr. Caroll died and the helipad objective visibly FAILED, so it does not count as completed coverage. Prior Defection/Investigation saved completion remains preserved. Continue campaign with a fresh Extraction attempt after menu work.
 
+## Settings organization follows the Goldenpad reference
+
+- Reorganized the native form around Graphics, Touch Controls, Controller and Motion Aiming, followed by Audio and optional asset sections. Previously controller and gyro rows were mixed with touch sensitivity under Aiming. All existing settings keys, values and actions are retained; the title is now Settings.
+- Corrected inherited art help that referred to a removed Xbox switch. Graphics now explains the three art profiles and restart requirement for resolution; asset imports point to Graphics → Art profile. Added concise touch and controller help.
+- Simulator and unsigned device builds PASS (`app-settings-groups-build.log`, `app-settings-groups-device-build.log`). Native inspection verified Graphics first, Touch Controls values, separate Controller/Motion Aiming sections, and the controller preset confirmation/cancel from its new location. No controller binding changes made.
+- Backed up Documents/Library before updating the same simulator. ROM, EEPROM and multiplayer setup hashes preserved. Current PID 84504, native Settings open, no active campaign attempt. The previous goal turn made implementation and runtime-verification progress; full P1/P2 acceptance remains pending.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

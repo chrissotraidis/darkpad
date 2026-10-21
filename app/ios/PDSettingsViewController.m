@@ -617,7 +617,7 @@ static CFTimeInterval sPresentStarted;
 	self.view.opaque = YES;
 	self.tableView.backgroundColor = [UIColor colorWithWhite:0.06 alpha:1.0];
 	self.tableView.opaque = YES;
-	self.title = @"Perfect Dark";
+	self.title = @"Settings";
 	self.navigationItem.rightBarButtonItem =
 		[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
 		                                              target:self action:@selector(done)];
@@ -863,66 +863,12 @@ static CFTimeInterval sPresentStarted;
 {
 	__weak typeof(self) weakSelf = self;
 
-	_sections = @[ @"Aiming", @"Controls", @"Display", @"Audio",
-	               @"Xbox 360 (XBLA)", @"GoldenEye 007 (GE Plus)", @"Texture packs", @"Diagnostics" ];
+	_sections = @[ @"Graphics", @"Touch Controls", @"Controller",
+#if !TARGET_OS_VISION
+        @"Motion Aiming",
+#endif
+        @"Audio", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Texture Packs", @"Diagnostics" ];
 	_rows = @[
-		@[
-			// bean's names, and his 0.30 - the 0.20 seed was the family's
-			// starting point for a tuning round and this is the round (Q-004).
-			pdSliderRow(@"Look speed", PDDefLookDegPerPoint, 0.05f, 0.60f),
-			pdSliderRow(@"Vertical look speed", PDDefLookDegPerPointY, 0.05f, 0.60f),
-			pdSwitchRow(@"Invert look (vertical)", PDDefInvertY),
-			pdSliderRow(@"Gamepad look speed", PDDefPadLookSpeed, 60.0f, 540.0f),
-			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
-				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
-					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
-					preferredStyle:UIAlertControllerStyleAlert];
-				[confirm addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-				[confirm addAction:[UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-					[PDShell.shared enqueue:^{
-						NSString *result = [PDController applyGoldenpadLayout];
-						dispatch_async(dispatch_get_main_queue(), ^{
-							UIAlertController *done = [UIAlertController alertControllerWithTitle:@"Controller Layout" message:result preferredStyle:UIAlertControllerStyleAlert];
-							[done addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-							[[weakSelf topPresenter] presentViewController:done animated:YES completion:nil];
-						});
-					}];
-				}]];
-				[[weakSelf topPresenter] presentViewController:confirm animated:YES completion:nil];
-			}),
-#if !TARGET_OS_VISION
-            pdSwitchRow(@"Gyro while aiming (experimental)", PDDefGyroEnabled),
-            pdSliderRow(@"Gyro sensitivity", PDDefGyroSensitivity, 0.25f, 3.0f),
-            pdSwitchRow(@"Invert gyro (vertical)", PDDefGyroInvertY),
-            pdInfoRow(@"Gyro status", ^NSString *{ return [PDGyro.shared status]; }),
-            pdButtonRow(@"Recenter gyro", ^{ [PDGyro.shared recenter]; }),
-#endif
-		],
-		@[
-			pdSegRow(@"Control style", PDDefControlStyle,
-				@[ @"Dual analogue", @"N64 (digital)" ], @[ @0, @1 ]),
-			pdSegRow(@"On-screen controls", PDDefTouchMode,
-				@[ @"Auto", @"On", @"Off" ], @[ @0, @1, @2 ]),
-			pdSliderRow(@"Button opacity", PDDefButtonOpacity, 0.05f, 0.9f),
-#if !TARGET_OS_VISION
-			// Compiled out on visionOS, as bean's is: there are no haptics in
-			// the headset, and a row that drives nothing is a row that lies.
-			pdSwitchRow(@"Haptics", PDDefHaptics),
-#endif
-			// One setting, both gestures (D-037): a double tap of the touch
-			// stick, and a double flick of a gamepad's left stick.
-			pdSwitchRow(@"Double-tap / double-flick stick to roll", PDDefDoubleTapRoll),
-			// The layout editor - which now owns the size as well, so there is
-			// no "Button size" row here. Closing this page first is not
-			// tidiness: the settings window sits at UIWindowLevelAlert over the
-			// game, so the buttons being dragged are underneath it.
-			pdButtonRow(@"Customize Touch Layout…", ^{
-				[PDSettingsViewController dismiss];
-				dispatch_async(dispatch_get_main_queue(), ^{
-					[PDTouchOverlay.current beginLayoutEditing];
-				});
-			}),
-		],
 		@[
 			// The Frame rate row, and the one-line insurance behind it (D-044).
 			//
@@ -966,6 +912,65 @@ static CFTimeInterval sPresentStarted;
 			pdSwitchRow(@"Show FPS", PDDefShowFPS),
 		],
 		@[
+			// bean's names, and his 0.30 - the 0.20 seed was the family's
+			// starting point for a tuning round and this is the round (Q-004).
+			pdSliderRow(@"Touch look speed", PDDefLookDegPerPoint, 0.05f, 0.60f),
+			pdSliderRow(@"Vertical touch look speed", PDDefLookDegPerPointY, 0.05f, 0.60f),
+			pdSwitchRow(@"Invert look (vertical)", PDDefInvertY),
+			pdSegRow(@"Control style", PDDefControlStyle,
+				@[ @"Dual analogue", @"N64 (digital)" ], @[ @0, @1 ]),
+			pdSegRow(@"On-screen controls", PDDefTouchMode,
+				@[ @"Auto", @"On", @"Off" ], @[ @0, @1, @2 ]),
+			pdSliderRow(@"Button opacity", PDDefButtonOpacity, 0.05f, 0.9f),
+#if !TARGET_OS_VISION
+			// Compiled out on visionOS, as bean's is: there are no haptics in
+			// the headset, and a row that drives nothing is a row that lies.
+			pdSwitchRow(@"Haptics", PDDefHaptics),
+#endif
+			// One setting, both gestures (D-037): a double tap of the touch
+			// stick, and a double flick of a gamepad's left stick.
+			pdSwitchRow(@"Double-tap / double-flick stick to roll", PDDefDoubleTapRoll),
+			// The layout editor - which now owns the size as well, so there is
+			// no "Button size" row here. Closing this page first is not
+			// tidiness: the settings window sits at UIWindowLevelAlert over the
+			// game, so the buttons being dragged are underneath it.
+			pdButtonRow(@"Customize Touch Layout…", ^{
+				[PDSettingsViewController dismiss];
+				dispatch_async(dispatch_get_main_queue(), ^{
+					[PDTouchOverlay.current beginLayoutEditing];
+				});
+			}),
+		],
+		@[
+			pdSliderRow(@"Gamepad look speed", PDDefPadLookSpeed, 60.0f, 540.0f),
+			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
+				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
+					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
+					preferredStyle:UIAlertControllerStyleAlert];
+				[confirm addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+				[confirm addAction:[UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+					[PDShell.shared enqueue:^{
+						NSString *result = [PDController applyGoldenpadLayout];
+						dispatch_async(dispatch_get_main_queue(), ^{
+							UIAlertController *done = [UIAlertController alertControllerWithTitle:@"Controller Layout" message:result preferredStyle:UIAlertControllerStyleAlert];
+							[done addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+							[[weakSelf topPresenter] presentViewController:done animated:YES completion:nil];
+						});
+					}];
+				}]];
+				[[weakSelf topPresenter] presentViewController:confirm animated:YES completion:nil];
+			}),
+		],
+#if !TARGET_OS_VISION
+		@[
+            pdSwitchRow(@"Gyro while aiming (experimental)", PDDefGyroEnabled),
+            pdSliderRow(@"Gyro sensitivity", PDDefGyroSensitivity, 0.25f, 3.0f),
+            pdSwitchRow(@"Invert gyro (vertical)", PDDefGyroInvertY),
+            pdInfoRow(@"Gyro status", ^NSString *{ return [PDGyro.shared status]; }),
+            pdButtonRow(@"Recenter gyro", ^{ [PDGyro.shared recenter]; }),
+		],
+#endif
+		@[
 			// the user: "the main point is the game volume and the Other App Audio
 			// option". Three rows, bean's three, in his order (D-033). The
 			// game's own Sound / Music / Sound Mode are the eeprom's and stay in
@@ -994,7 +999,7 @@ static CFTimeInterval sPresentStarted;
 		],
 		@[
 			// Asset imports stay here; the selected art profile controls activation.
-			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Remaster under Display → Art profile"; }),
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Remaster under Graphics → Art profile"; }),
 			// What is in Documents/added-content (or the legacy xbla/), named. The engine's own
 			// xblaImportIsAvailable() answers yes/no and nothing else, and a
 			// player whose file was not recognised needs to be told which file
@@ -1060,7 +1065,7 @@ static CFTimeInterval sPresentStarted;
 			}),
 		],
 		@[
-			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Display → Art profile"; }),
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
 			pdButtonRow(@"Reload packs (F9)", ^{
 				[PDShell.shared enqueue:^{ texpackReload(); }];
 			}),
@@ -1317,34 +1322,24 @@ static CFTimeInterval sPresentStarted;
 	if ((NSUInteger)s >= _sections.count) {
 		return nil;
 	}
-	if ([_sections[(NSUInteger)s] isEqualToString:@"Aiming"]) {
+	if ([_sections[(NSUInteger)s] isEqualToString:@"Motion Aiming"]) {
         return @"Experimental gyro adds fine aim only while aiming. Release aim to reposition the device without moving the view; the next aim starts from neutral. Menus and backgrounding stop motion input.";
     }
-	if ([_sections[(NSUInteger)s] isEqualToString:@"Controls"]) {
-		return @"Dual analogue is the port's own control style (\"Port/Ext\"): the stick walks and "
-		        "runs at the speed you push it, and dragging looks. N64 puts the stick back on the "
-		        "four C directions, which is on or off with no speed in between. "
-		        "In a menu, tap an item to choose it, drag up or down to scroll (a drag never "
-		        "chooses), and tap left or right of the menu to go to the previous or next one. "
-		        "When roll gestures are enabled, double-tap the left of the screen to roll that way, the middle to roll "
-		        "the other.";
-	}
-	if ([_sections[(NSUInteger)s] isEqualToString:@"Display"]) {
-		return @"Resolution changes take effect the next time the app starts: the drawable's size "
-		        "is fixed when the renderer comes up and every buffer the game owns is that size. "
-		        "Lower it if the frame rate dips; Native is the panel's own.";
-	}
+    if ([_sections[(NSUInteger)s] isEqualToString:@"Touch Controls"]) {
+        return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides touch controls when a controller connects. In game menus, tap to select and drag to scroll.";
+    }
+    if ([_sections[(NSUInteger)s] isEqualToString:@"Controller"]) {
+        return @"The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
+    }
+    if ([_sections[(NSUInteger)s] isEqualToString:@"Graphics"]) {
+        return @"Original uses N64 art. Enhanced enables texture filtering and installed texture packs. Remaster uses your imported Xbox 360 assets, with N64 art as the fallback. Resolution changes apply after restarting the app.";
+    }
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Audio"]) {
 		return @"Game volume and how Perfect Dark shares the speaker with other apps.";
 	}
-	if ([_sections[(NSUInteger)s] isEqualToString:@"Xbox 360 (XBLA)"]) {
-		return @"One switch for the whole release — 4J's textures, models, rooms, font and "
-		        "explosions together, the same thing F6 does on a desktop. It also switches "
-		        "GoldenEye's HD look in GE Plus while the GoldenEye XBLA switch below is on. "
-		        "Turning the release off changes the picture straight away. Turning it back on "
-		        "takes effect from the next level you load — the level you are standing in "
-		        "keeps the art it loaded with.";
-	}
+    if ([_sections[(NSUInteger)s] isEqualToString:@"Xbox 360 Art"]) {
+        return @"Import your own Xbox 360 assets, then choose Remaster in Graphics. Newly enabled room art appears when you load the next level. The original N64 ROM is still required.";
+    }
 	if ([_sections[(NSUInteger)s] isEqualToString:@"GoldenEye 007 (GE Plus)"]) {
 		return @"Optional. With your own GoldenEye 007 (US) N64 ROM, GoldenEye's missions and "
 		        "arenas become playable here: choose GE Plus in the Perfect Menu. Add the GoldenEye "
@@ -1352,7 +1347,7 @@ static CFTimeInterval sPresentStarted;
 		        "package (on its own, or in a .7z or .zip). Both go in the "
 		        "added-content folder under any name — with these rows, or with the Files app. "
 		        "Turn GoldenEye XBLA off to play GE Plus in GoldenEye's original N64 look; the "
-		        "file stays where it is. Perfect Dark's own Xbox 360 switch is not affected. "
+		        "file stays where it is. Perfect Dark's selected art profile is not affected. "
 		        "Goldfinger 64, the GoldenEye ROM hack, gets a Perfect Menu row of its own: add "
 		        "goldfinger64.zip, its patch, or the patched ROM (the patch needs the GoldenEye ROM). "
 		        "Changes here take effect the next time you open the app.";
