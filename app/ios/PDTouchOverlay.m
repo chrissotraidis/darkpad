@@ -1690,7 +1690,9 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)updateVisibility
 {
 	NSInteger mode = PDDefInt(PDDefTouchMode);
-	BOOL hide = (mode == 2) || (mode == 0 && self.padConnected);
+	// Auto hides gameplay controls for a pad, but menus remain touchable.
+	// Otherwise taps bypass the normalized pointer and reach SDL mouse input.
+	BOOL hide = (mode == 2) || (mode == 0 && self.padConnected && !_menuOpen);
 	const BOOL wasHidden = self.hidden;
 	self.hidden = hide;
 	if (!hide) {
@@ -2728,6 +2730,7 @@ static CGVector pdStickCurve(CGVector raw)
 	const BOOL wasMenuOpen = _menuOpen;
 	_menuOpen = menuIosDialogIsOpen() ? YES : NO;
 	if (_menuOpen != wasMenuOpen && !_editing) {
+		[self updateVisibility];
 		[self applyMenuChrome];
 	}
 	// A finger still down when the dialog closes under it (a pad's B, a timer)
