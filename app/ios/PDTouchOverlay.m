@@ -517,6 +517,10 @@ static const PDButtonSpec kMenuButtons[] = {
 	// only the non-nil ones are counted.
 	uint32_t _uiHitTests;
 	uint32_t _uiTouchesBegan;
+	uint32_t _uiTouchesMoved;
+	uint32_t _lookPublishes;
+	double _lookPublishedX, _lookPublishedY;
+	CGPoint _lookLastLiftDelta;
 	uint32_t _gearTaps;
 
 	// What was last HANDED TO THE ENGINE, which is the only thing that can be
@@ -2008,6 +2012,11 @@ static const CGFloat kWheelRadius = 32.0;
 #pragma clang diagnostic pop
 	[s appendFormat:@"ui_hittests=%u\n", v ? v->_uiHitTests : 0];
 	[s appendFormat:@"ui_touches_began=%u\n", v ? v->_uiTouchesBegan : 0];
+	[s appendFormat:@"look_last_lift_delta=%.4f,%.4f\n",
+		v ? v->_lookLastLiftDelta.x : 0., v ? v->_lookLastLiftDelta.y : 0.];
+	[s appendFormat:@"ui_touches_moved=%u\nlook_publishes=%u\nlook_published_degrees=%.4f,%.4f\n",
+		v ? v->_uiTouchesMoved : 0, v ? v->_lookPublishes : 0,
+		v ? v->_lookPublishedX : 0., v ? v->_lookPublishedY : 0.];
 	[s appendFormat:@"gear_taps=%u\n", v ? v->_gearTaps : 0];
 	[s appendString:pdRunLoopReport()];
 	for (UIWindow *w in all) {
@@ -2530,6 +2539,7 @@ static CGVector pdStickCurve(CGVector raw)
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
+	_uiTouchesMoved++;
 	if (_editing) {
 		[self dragChipTo:[touches.anyObject locationInView:self]];
 		return;
@@ -2638,6 +2648,11 @@ static CGVector pdStickCurve(CGVector raw)
 				// highlight, tap to choose" is the whole navigation model (D-014).
 				_tapConfirmFrames = 3;
 			}
+			// UIKit can deliver the final position only with the lift (including
+			// drags with no intervening moved callback). Consume that residual
+			// once; _lookLast already includes every real coalesced sample.
+			_lookLastLiftDelta = CGPointMake(p.x - _lookLast.x, p.y - _lookLast.y);
+			if (!cancelled) [self addLookFrom:_lookLast to:p];
 			// Undo any outstanding predicted lead so lifting a finger never
 			// leaves the view a few degrees past where it was pointed.
 			_pendingLookX -= _lookLead.dx * _cLookDegX;
@@ -3194,6 +3209,9 @@ static CGVector pdStickCurve(CGVector raw)
 	}
 
 	if (_pendingLookX != 0.0 || _pendingLookY != 0.0) {
+		_lookPublishes++;
+		_lookPublishedX += _pendingLookX;
+		_lookPublishedY += _pendingLookY;
 		inputIosLookAddDegrees((float)_pendingLookX, (float)_pendingLookY);
 		_pendingLookX = 0.0;
 		_pendingLookY = 0.0;
