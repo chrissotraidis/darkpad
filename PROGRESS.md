@@ -285,6 +285,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Native phone Settings remains full-width in landscape. Done dismisses it and releases native pause/focus with no held inputs. Loaded the existing Dark agent through ordinary game menus: Investigation retains its Agent star and **10m:06s** best time, and Extraction remains unlocked. Evidence: `work/evidence/phone-menu-host/`. No save or gameplay-state edits.
 - Current iPhone process 86659, at Investigation difficulty selection, no active mission. iPad is shut down. The Goldenpad presentation correction and phone/tablet regression checks are complete; full campaign, physical-device qualification and remaining P1/P2 gates remain open.
 
+## Challenge 1 completion and reload; visual issue found
+
+- Previous goal turn made progress by verifying phone menu regression and persisted campaign progression. Continued with normal Combat Simulator Challenge 1, loaded existing Player 18, and completed the five-minute match: game reports **Challenge Completed**, Red 1 / Yellow -1. Fully terminated PID 86659 and relaunched PID 90576; normal menus show Challenge 1's illuminated one-player star. Evidence and private Documents/Library backup under `work/evidence/challenge-one/`. Only the dedicated iPhone simulator was booted.
+- Exercised movement, weapon pickup, SWAP, sniper firing/reload, death and START respawn through ordinary touch commands. Read-only LLDB guided navigation; no health/ammo/objective/save edits. The weapon was a Sniper Rifle (HUD-confirmed), not the initially misidentified Magnum. This is scripted simulator progression evidence, not human usability or comprehensive challenge acceptance.
+- **Open visual defect:** after respawn near (-2802,-642,-1956), turning north and moving toward (-2876,-585,404) produced a black world with radar/HUD still rendered. Later readback at (-2872,-582,405) showed health 0.75, so this cannot be dismissed as the death fade. Result/menu rendering and restart worked. Preserve screenshot `black-scene-live.png`; reproduce the Skedar lower-area traversal and compare render/camera/room state before changing code. Challenge completion does not waive this visual issue.
+- Current process 90576 at Combat Challenges list after reload, no active match. Next action is the black-scene investigation; full campaign, physical acceptance and P2 remain incomplete.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.
