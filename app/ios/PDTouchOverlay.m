@@ -1290,14 +1290,20 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)updateScalePct
 {
 	BOOL selected = _editSelected.length > 0;
-	_editSlider.minimumValue = selected ? 0.55f : 0.6f;
-	_editSlider.maximumValue = selected ? 1.60f : 1.8f;
-	_editSlider.value = selected ? pdControlValue(_editSelected, @"scale", 1, .55, 1.6) : PDDefFloat(PDDefButtonScale);
+	// Leave UIKit in charge of the active slider while tracking. Refresh its
+	// range and stored value only when it is not processing a finger drag.
+	if (!_editSlider.tracking) {
+		_editSlider.minimumValue = selected ? 0.55f : 0.6f;
+		_editSlider.maximumValue = selected ? 1.60f : 1.8f;
+		_editSlider.value = selected ? pdControlValue(_editSelected, @"scale", 1, .55, 1.6) : PDDefFloat(PDDefButtonScale);
+	}
 	_editPct.text = [NSString stringWithFormat:@"%@ size · %.0f%%", selected ? @"Control" : @"Overall", _editSlider.value * 100];
 	_editSlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ size", _editSelected] : @"Overall touch control size";
 	_editSlider.accessibilityValue = _editPct.text;
-	_editOpacitySlider.enabled = selected;
-	_editOpacitySlider.value = selected ? pdControlValue(_editSelected, @"opacity", PDDefFloat(PDDefButtonOpacity), .2, 1) : PDDefFloat(PDDefButtonOpacity);
+	if (!_editOpacitySlider.tracking) {
+		_editOpacitySlider.enabled = selected;
+		_editOpacitySlider.value = selected ? pdControlValue(_editSelected, @"opacity", PDDefFloat(PDDefButtonOpacity), .2, 1) : PDDefFloat(PDDefButtonOpacity);
+	}
 	_editOpacityPct.text = selected ? [NSString stringWithFormat:@"Opacity · %.0f%%", _editOpacitySlider.value * 100] : @"Select a control for opacity";
 	_editOpacitySlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ opacity", _editSelected] : @"Control opacity";
 	_editOpacitySlider.accessibilityValue = _editOpacityPct.text;

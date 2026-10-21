@@ -153,8 +153,10 @@ size slider controls overall scale; selecting a control exposes its own size
 (55–160%) and opacity (20–100%), following Goldenpad’s ranges. Optional style
 fields preserve stored positions and visibility. Existing controls retain the
 global opacity until explicitly customized. FIRE size/opacity persisted through
-a full restart. Continuous native Simulator slider drags are still under
-investigation: accessibility-set values followed by touch apply correctly, but
-the attempted drags did not change the value. This interaction gate remains open.
+a full restart. Continuous drag acceptance requires real touch input. Read-only UIKit event
+tracing showed the current native automation delivers only touch-down and
+touch-up at different coordinates, with no moved events. Native slider tracking
+cannot be validated with that gesture. Accessibility-set values followed by
+touch apply and persist correctly; no custom slider workaround was introduced.
 Physical thumb reach and complete gameplay usability still require hardware
 acceptance; simulator layout checks do not prove those qualities.
