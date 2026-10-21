@@ -4,7 +4,7 @@ This is an index of evidence, not a declaration of release readiness. The requir
 
 ## Current status
 
-P0 has an empty-project-cache build on this Mac. P1 is incomplete. P2 has not been accepted and must retain the working solo baseline. No physical device was found by `xcrun devicectl list devices` at this review. Only the dedicated phone simulator is booted.
+P0 has an empty-project-cache build on this Mac. P1 is incomplete. P2 has not been accepted and must retain the working solo baseline. The user explicitly requested simulator-only testing on 2026-10-20. Physical tests listed below are unverified limitations, not requests for hardware or blockers to continued work. Only one simulator may be booted at a time.
 
 | Requirement | Evidence and scope | Remaining work |
 | --- | --- | --- |
@@ -23,4 +23,6 @@ P0 has an empty-project-cache build on this Mac. P1 is incomplete. P2 has not be
 
 ## Next useful checks
 
-Continue campaign coverage using the verified keyboard-look fallback for simulator navigation: a 500 ms Right press changed yaw by 105 degrees (`work/evidence/keyboard-look/`). This does not replace physical touch acceptance. Preserve honest distinctions between ordinary UI play, diagnostic-driven input and human usability. When hardware is available, use the PRD's device conditions and thresholds; do not infer them from simulator timing. Optional art can be tested independently with supplied or appropriately licensed assets, without delaying the original-ROM core.
+Continue campaign coverage using the verified keyboard-look fallback for simulator navigation: a 500 ms Right press changed yaw by 105 degrees (`work/evidence/keyboard-look/`). This does not replace physical touch acceptance. Preserve honest distinctions between ordinary UI play, diagnostic-driven input and human usability. Continue only with simulators as requested; do not infer hardware timing, thermal behavior or physical usability from them. Optional art can be tested independently with supplied or appropriately licensed assets, without delaying the original-ROM core.
+
+Latest control redesign: compact Goldenpad-style labels/colors and clearer action grouping, with native Fire/Reload/Start/Back/menu checks on the phone simulator. Build and screenshots: `work/evidence/control-layout-redesign/`. Both installs preserved all 773 Documents/Library files excluding OS launch snapshots. Tablet visual recheck remains pending.

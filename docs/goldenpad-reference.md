@@ -139,9 +139,8 @@ from `Sources/RecompPrototypeTouchLayout.swift`: aim/fire/action form a
 right-side column, with crouch and weapon below. Tablet core positions use
 its reference coordinates. Phone fire retains its reference position; aim,
 use and the lower row allow clearance for Perfect Dark's additional actions
-and landscape safe areas. Reload, alternate fire and the gadget wheel sit
-left of the main column. Game START sits below and left of ellipsis on phones
-to avoid the aim/reload controls; tablet START stays directly below ellipsis.
+and landscape safe areas. Reload sits beside Aim, Weapon sits below-left of Duck, and Next/Alt occupy
+the upper-left edge. START sits directly below the upper-right ellipsis.
 
 Horizontal safe-area correction translates the default cluster together;
 lower controls clamp above the home indicator. Short phones proportionally
@@ -160,3 +159,23 @@ cannot be validated with that gesture. Accessibility-set values followed by
 touch apply and persist correctly; no custom slider workaround was introduced.
 Physical thumb reach and complete gameplay usability still require hardware
 acceptance; simulator layout checks do not prove those qualities.
+
+## Labeled control correction
+
+Direct inspection of `RecompMomentaryButton` in
+`Sources/RecompPrototypeInput.swift` revealed that the earlier icon-only rings
+were inherited from bean, not Goldenpad. The current controls use compact
+rounded bold labels, thin outlines and subdued action colors: gray Fire/Aim/Reload,
+green Use, yellow Duck, blue Weapon/Next, red Start and purple Alt. Fire is the
+largest target; Use and Duck have clear separation. Internal action IDs and saved
+customizations remain intact. Overlapping expanded hit margins choose the closest
+normalized target rather than the first action in the array; ordinary controls
+retain a minimum 44-point hit diameter.
+
+The simulator build passes. Native simulator taps verified Fire (8→7 rounds),
+Reload (7/92→8/91), Start/Back and the upper-right utility menu. Investigation's
+saved 10:06 completion remains visible after installation/relaunch. Evidence:
+`work/evidence/control-layout-redesign/`. This revised layout has phone visual
+coverage; tablet visual recheck remains pending. The user explicitly requested
+simulator-only testing on 2026-10-20; physical-device tests are outside the current
+execution scope, with no hardware-usability claims.

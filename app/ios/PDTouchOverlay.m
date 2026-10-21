@@ -208,24 +208,22 @@ typedef struct {
 #define PD_CK_ALTMODE    PDPadL       // CK_LTRIG — "Fire Mode", the secondary function
 #define PD_CK_RADIAL     PDPadDown    // CK_DPAD_D — "Radial Menu", the weapon wheel
 
-// Goldenpad's phone aim/fire/action column and lower crouch/weapon row.
-// PD-only actions sit to its left. Small spacing adjustments accommodate
-// the extra actions and landscape cutouts; explicit saved positions win.
+// Goldenpad's labeled, compact aim/fire/action column. Less frequent PD-only
+// actions live on the leading edge, leaving the look surface and thumb arc clear.
 static const PDButtonSpec kButtons[] = {
-	{ "FIRE",   PDPadG,           "scope",                       0.938389, 0.573504, 38 },
-	{ "AIM",    PDPadR,           "target",                      0.942733, 0.380000, 28 },
-	{ "USE",    PDPadB,           "hand.raised.fill",            0.932070, 0.760000, 28 },
-	{ "CROUCH", PD_CK_CROUCH,     "arrow.down",                  0.870000, 0.898291, 26 },
-	{ "RELOAD", PD_CK_X_RELOAD,   "arrow.triangle.2.circlepath", 0.840000, 0.380000, 26 },
-	{ "SWAP",   PD_CK_Y_NEXTWEAP, "arrow.left.arrow.right",      0.790000, 0.940171, 26 },
-	{ "START",  PDPadStart,       "line.3.horizontal",           0.946288, 0.240171, 20 },
-	{ "ALT",    PD_CK_ALTMODE,    "switch.2",                    0.710000, 0.800000, 26 },
-	{ "WHEEL",  PD_CK_RADIAL,     "circle.hexagongrid.fill",     0.760000, 0.573504, 26 },
+	{ "FIRE",   PDPadG,           "scope",                       0.938389, 0.573504, 32 },
+	{ "AIM",    PDPadR,           "target",                      0.942733, 0.408547, 27 },
+	{ "USE",    PDPadB,           "hand.raised.fill",            0.932070, 0.744444, 26 },
+	{ "CROUCH", PD_CK_CROUCH,     "arrow.down",                  0.875000, 0.898291, 23 },
+	{ "RELOAD", PD_CK_X_RELOAD,   "arrow.triangle.2.circlepath", 0.845182, 0.408547, 24 },
+	{ "SWAP",   PD_CK_Y_NEXTWEAP, "arrow.left.arrow.right",      0.180000, 0.130000, 22 },
+	{ "START",  PDPadStart,       "line.3.horizontal",           0.946288, 0.240171, 22 },
+	{ "ALT",    PD_CK_ALTMODE,    "switch.2",                    0.260000, 0.130000, 22 },
+	{ "WHEEL",  PD_CK_RADIAL,     "circle.hexagongrid.fill",     0.790000, 0.898291, 26 },
 };
-// Same action order, using Goldenpad's distinct tablet arrangement.
 static const CGPoint kTabletButtonUnits[] = {
 	{0.91, 0.71}, {0.91, 0.58}, {0.91, 0.84}, {0.81, 0.89},
-	{0.81, 0.58}, {0.71, 0.89}, {0.972, 0.14}, {0.61, 0.89}, {0.71, 0.71},
+	{0.81, 0.58}, {0.12, 0.12}, {0.972, 0.14}, {0.19, 0.12}, {0.71, 0.89},
 };
 #define PD_NUM_BUTTONS ((int)(sizeof(kButtons) / sizeof(kButtons[0])))
 
@@ -236,7 +234,7 @@ static const CGPoint kTabletButtonUnits[] = {
 // the other side of the screen - so a custom FIRE placement carries across for
 // free; unitX/unitY here are unused.
 static const PDButtonSpec kLeftFire =
-	{ "FIRE_L", PDPadG, "scope", 0.0, 0.0, 38 };
+	{ "FIRE_L", PDPadG, "scope", 0.0, 0.0, 32 };
 
 // In a menu the gameplay chips are in the way - the dialog is centred and they
 // sit on top of it - so they are hidden and this one takes their place. PD's
@@ -263,20 +261,13 @@ static const PDButtonSpec kMenuButtons[] = {
 
 @implementation PDTouchButtonView {
 	CAShapeLayer *_ring;
-	CALayer *_glyph;
+	UILabel *_title;
+	UIColor *_actionColor;
 	CGFloat _alpha;
 	CGFloat _dim;   // 1.0, or bean's 0.5 for the temporary aim-mode mirror
 }
 
-/**
- * bean's chip: a thin white ring with an SF Symbol in it and nothing else.
- *
- * The look is his (touch_overlay_uikit.mm:1388-1416): stroke at the opacity
- * setting, a translucent fill only while it is held, and the glyph at rather
- * more than the ring's alpha (min(alpha * 2.2, 1)) so the figure reads at an
- * opacity that would make a filled disc invisible. No label: the glyph is the
- * face (the user, 2026-09-14).
- */
+/** Goldenpad's compact, labeled circles with subdued action colors. */
 - (instancetype)initWithSpec:(const PDButtonSpec *)spec
                        scale:(CGFloat)scale
                        alpha:(CGFloat)alpha
@@ -297,44 +288,36 @@ static const PDButtonSpec kMenuButtons[] = {
 			CGRectMake(1.25, 1.25, r * 2 - 2.5, r * 2 - 2.5)].CGPath;
 		_ring.fillColor = UIColor.clearColor.CGColor;
 		_ring.strokeColor = [UIColor colorWithWhite:1.0 alpha:alpha * dim].CGColor;
-		_ring.lineWidth = 2.5;
+		_ring.lineWidth = 1.0;
 		[self.layer addSublayer:_ring];
 
-		// The symbol is rasterised once, here, at the size this chip is drawn -
-		// a CALayer with a CGImage rather than a UIImageView, so the chip stays
-		// one view with no subview to lay out - and rendered with the tint
-		// DRAWN rather than asked for. -imageWithTintColor: records the tint as
-		// a rendering instruction that only UIImageView honours; reading
-		// .CGImage off it hands the layer the untinted template, which came out
-		// as a grey ghost (measured, 2026-09-13).
-		const CGFloat pt = MAX(r * 0.72, 12.0);
-		const CGFloat ga = MIN(alpha * 2.2, 1.0) * dim;
-		UIImageSymbolConfiguration *cfg =
-			[UIImageSymbolConfiguration configurationWithPointSize:pt
-			                                               weight:UIImageSymbolWeightSemibold];
-		UIImage *sym = [UIImage systemImageNamed:@(spec->symbol) withConfiguration:cfg];
-		if (sym) {
-			const CGSize box = CGSizeMake(pt, pt);
-			UIGraphicsImageRenderer *rend = [[UIGraphicsImageRenderer alloc] initWithSize:box];
-			UIImage *img = [rend imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
-				(void)ctx;
-				const CGSize sz = sym.size;
-				const CGFloat k = MIN(box.width / sz.width, box.height / sz.height);
-				const CGRect dst = CGRectMake((box.width - sz.width * k) / 2,
-				                              (box.height - sz.height * k) / 2,
-				                              sz.width * k, sz.height * k);
-				[[UIColor colorWithWhite:1.0 alpha:ga] set];
-				[[sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] drawInRect:dst];
-			}];
-			_glyph = [CALayer layer];
-			_glyph.contents = (__bridge id)img.CGImage;
-			_glyph.contentsGravity = kCAGravityResizeAspect;
-			_glyph.contentsScale = img.scale > 0 ? img.scale : PDVisionLayerScale();
-			_glyph.frame = CGRectMake(r - pt / 2, r - pt / 2, pt, pt);
-			[self.layer addSublayer:_glyph];
+		BOOL navigation = [_label isEqualToString:@"BACK"];
+		_actionColor = UIColor.systemGrayColor;
+		if ([_label isEqualToString:@"USE"]) _actionColor = UIColor.systemGreenColor;
+		if ([_label isEqualToString:@"CROUCH"]) _actionColor = UIColor.systemYellowColor;
+		if ([_label isEqualToString:@"WHEEL"] || [_label isEqualToString:@"SWAP"])
+			_actionColor = UIColor.systemBlueColor;
+		if ([_label isEqualToString:@"START"]) _actionColor = UIColor.systemRedColor;
+		if ([_label isEqualToString:@"ALT"]) _actionColor = UIColor.systemPurpleColor;
+		if (navigation) {
+			UIImageView *back = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.backward"]];
+			back.tintColor = [UIColor colorWithWhite:1 alpha:MIN(alpha * 2.2, 1)];
+			back.contentMode = UIViewContentModeScaleAspectFit;
+			back.frame = CGRectMake(r - 10, r - 10, 20, 20);
+			[self addSubview:back];
 		} else {
-			NSLog(@"perfectdark: [touch] no SF Symbol \"%s\" for %s", spec->symbol, spec->label);
+			_title = [[UILabel alloc] initWithFrame:CGRectInset(self.bounds, 3, 0)];
+			NSDictionary *names = @{@"CROUCH": @"DUCK", @"WHEEL": @"WEAPON", @"SWAP": @"NEXT", @"FIRE_L": @"FIRE"};
+			_title.text = names[_label] ?: _label;
+			CGFloat fontSize = [_label isEqualToString:@"START"] ? 8 : MIN(12, r * .38);
+			UIFontDescriptor *font = [[UIFont systemFontOfSize:fontSize weight:UIFontWeightBold].fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
+			_title.font = [UIFont fontWithDescriptor:font size:fontSize];
+			_title.textAlignment = NSTextAlignmentCenter;
+			_title.adjustsFontSizeToFitWidth = YES;
+			_title.minimumScaleFactor = .7;
+			[self addSubview:_title];
 		}
+		[self restyle];
 	}
 	return self;
 }
@@ -369,14 +352,14 @@ static const PDButtonSpec kMenuButtons[] = {
 		// yellow, so what can be dragged is unmistakable.
 		_ring.strokeColor = [UIColor colorWithRed:1 green:0.85 blue:0.4 alpha:0.95 * _dim].CGColor;
 		_ring.fillColor = UIColor.clearColor.CGColor;
+		_title.textColor = [UIColor colorWithWhite:1 alpha:_dim];
 	} else {
-		_ring.strokeColor =
-			[UIColor colorWithWhite:1.0 alpha:MIN(_alpha * ((_held || _engaged) ? 2.0 : 1.0), 1.0) * _dim].CGColor;
-		_ring.fillColor = _held
-			? [UIColor colorWithWhite:1.0 alpha:_alpha * 0.4 * _dim].CGColor
-			: _engaged
-			? [UIColor colorWithWhite:1.0 alpha:_alpha * 0.2 * _dim].CGColor
-			: UIColor.clearColor.CGColor;
+		CGFloat visibility = MIN(_alpha * 2.2, 1.0) * _dim;
+		_ring.strokeColor = [UIColor colorWithWhite:1 alpha:visibility * .52].CGColor;
+		UIColor *color = (_held || _engaged) && [_label isEqualToString:@"AIM"]
+			? UIColor.systemYellowColor : _actionColor;
+		_ring.fillColor = [color colorWithAlphaComponent:visibility * ((_held || _engaged) ? .95 : .32)].CGColor;
+		_title.textColor = (_held || _engaged) ? UIColor.blackColor : [UIColor colorWithWhite:1 alpha:visibility * .96];
 	}
 	[CATransaction commit];
 }
@@ -920,11 +903,14 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 		// Game navigation belongs on the leading side; never replace ellipsis.
 		return CGPointMake(inset.left + radius + 12, MAX(48, inset.top + radius + 12));
 	}
+	if ([label isEqualToString:@"SWAP"] || [label isEqualToString:@"ALT"]) {
+		CGFloat spacing = MAX(56, radius * 2 + 12);
+		return CGPointMake(inset.left + 24 + ( [label isEqualToString:@"ALT"] ? spacing : 0), MAX(48, inset.top + radius + 12));
+	}
 	if ([label isEqualToString:@"START"]) {
 		CGRect menu = [self convertRect:PDUtilityMenuFrame(self.window) fromView:self.window];
-		// Offset phone START from the aim column so both remain independent
-		// on shorter landscape displays. The ellipsis keeps its own anchor.
-		return CGPointMake(CGRectGetMidX(menu) - (tablet ? 0 : (size.width < 740 ? 140 : 72)), CGRectGetMaxY(menu) + 12 + radius);
+		// Keep START directly below the utility button, as in Goldenpad.
+		return CGPointMake(CGRectGetMidX(menu), CGRectGetMaxY(menu) + 12 + radius);
 	}
 	// Translate horizontally as a group to preserve the reference's columns.
 	// Clamp only lower controls vertically: translating the whole cluster up
@@ -1622,6 +1608,7 @@ static const CGFloat kWheelRadius = 32.0;
 		_scale = 1.0;
 	}
 	// Fit the reference-sized rings on compact landscape phones as a group.
+	if (self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad) _scale *= 1.18;
 	CGFloat shortSide = MIN(self.bounds.size.width, self.bounds.size.height);
 	if (self.traitCollection.userInterfaceIdiom != UIUserInterfaceIdiomPad && shortSide > 0) {
 		_scale *= MIN(1.0, shortSide / 375.0);
@@ -1665,8 +1652,7 @@ static const CGFloat kWheelRadius = 32.0;
 		[_menuButtons addObject:b];
 	}
 
-	// The chips carry their own opacity now (bean's look: a ring at the opacity
-	// setting with the glyph at more than it), so the VIEW stays fully opaque -
+	// Each labeled chip carries its own opacity; keep the view fully opaque -
 	// dimming the whole layer would take the stick and the editor with it.
 	self.alpha = 1.0;
 #if !TARGET_OS_VISION
@@ -2162,6 +2148,8 @@ static const CGFloat kWheelRadius = 32.0;
 			return _leftFire;
 		}
 	}
+	PDTouchButtonView *closest = nil;
+	CGFloat bestDistance = CGFLOAT_MAX;
 	for (PDTouchButtonView *b in (_menuOpen ? _menuButtons : _buttons)) {
 		if (b.hidden) {
 			continue;   // the ALT chip on a GoldenEye level (D-085)
@@ -2169,12 +2157,14 @@ static const CGFloat kWheelRadius = 32.0;
 		CGFloat dx = p.x - b.center.x, dy = p.y - b.center.y;
 		// bean's target: a quarter larger than the ring that is drawn. A
 		// fingertip is 40pt wide and the ring is the mark, not the target.
-		CGFloat r = b.radius * kHitRadiusFactor;
-		if (dx * dx + dy * dy <= r * r) {
-			return b;
+		CGFloat r = MAX(22, b.radius * kHitRadiusFactor);
+		CGFloat distance = (dx * dx + dy * dy) / (r * r);
+		if (distance <= 1 && distance < bestDistance) {
+			closest = b;
+			bestDistance = distance;
 		}
 	}
-	return nil;
+	return closest;
 }
 
 - (void)beginTouchAt:(CGPoint)p touch:(nullable UITouch *)touch
