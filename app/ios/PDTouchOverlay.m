@@ -1182,8 +1182,12 @@ static const CGFloat kWheelRadius = 32.0;
 		[UIColor colorWithRed:0.85 green:0.20 blue:0.22 alpha:0.95], @selector(resetLayout));
 	UIButton *done = pill(@"checkmark",
 		[UIColor colorWithRed:0.18 green:0.78 blue:0.34 alpha:0.95], @selector(endLayoutEditing));
+	reset.accessibilityLabel = @"Reset touch layout";
+	reset.accessibilityHint = @"Restore default control positions, visibility and size";
+	done.accessibilityLabel = @"Done editing touch controls";
 
 	UISlider *sl = [UISlider new];
+	sl.accessibilityLabel = @"Touch control size";
 	sl.minimumValue = 0.6f;
 	sl.maximumValue = 1.8f;
 	sl.value = MIN(1.8f, MAX(0.6f, PDDefFloat(PDDefButtonScale)));
@@ -1226,6 +1230,7 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)updateScalePct
 {
 	_editPct.text = [NSString stringWithFormat:@"%.0f%%", PDDefFloat(PDDefButtonScale) * 100.0];
+	_editSlider.accessibilityValue = _editPct.text;
 }
 
 /** The slider scales every chip live, as bean's does. */
