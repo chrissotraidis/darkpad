@@ -2,11 +2,12 @@ Subject: candidate-only iOS input seam; network touch look remains pending
 
 --- a/port/include/input.h
 +++ b/port/include/input.h
-@@ -239,6 +239,17 @@
+@@ -239,6 +239,18 @@
  
  // returns changes in mouse position since last frame, scaled by sensitivity
  // returns 0, 0 when the mouse is not locked into the window
 +#ifdef PLATFORM_IOS
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy);
 +// The iOS shell's two ways in (app/ios/): absolute view-angle DEGREES for the
 +// touch/gyro look, added to whatever the mouse contributed and never scaled by
 +// the mouse sensitivity, and one button mask + stick the touch layer and the
@@ -22,7 +23,7 @@ Subject: candidate-only iOS input seam; network touch look remains pending
  // returns changes in mouse position since last frame, scaled by absolute sensitivity
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -1222,6 +1225,94 @@
+@@ -1222,6 +1225,101 @@
  	return sens;
  }
  
@@ -62,6 +63,13 @@ Subject: candidate-only iOS input seam; network touch look remains pending
 +{
 +	iosLookPendingX += degx;
 +	iosLookPendingY += degy;
++}
++
++// Read-only: repeated consumers must see the same latched frame.
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy)
++{
++	*degx = iosLookFrameX;
++	*degy = iosLookFrameY;
 +}
 +
 +void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
@@ -180,3 +188,99 @@ Subject: candidate-only iOS input seam; network touch look remains pending
  	if (dx) *dx = mdx;
  	if (dy) *dy = mdy;
  }
+--- a/port/src/net/net.c
++++ b/port/src/net/net.c
+@@ -49,6 +49,22 @@
+ static s32 s_NetMouseDX = 0;
+ static s32 s_NetMouseDY = 0;
+ 
++#ifdef PLATFORM_IOS
++// Preserve fractional degrees independently of integer mouse counts/sensitivity.
++static f32 s_NetTouchDegreesX = 0.f;
++static f32 s_NetTouchDegreesY = 0.f;
++#endif
++
++static void netInputClearMotion(void)
++{
++	s_NetMouseDX = 0;
++	s_NetMouseDY = 0;
++#ifdef PLATFORM_IOS
++	s_NetTouchDegreesX = 0.f;
++	s_NetTouchDegreesY = 0.f;
++#endif
++}
++
+ static s32 s_NetSignalsInstalled = 0;
+ s32 g_NetPlayersPassThrough = 0;
+ 
+@@ -179,8 +195,7 @@
+ {
+ 	g_NetTick = 0;
+ 	g_NetInStageLoop = 0;
+-	s_NetMouseDX = 0;
+-	s_NetMouseDY = 0;
++	netInputClearMotion();
+ 	frametimeNetReset();
+ 
+ 	// The host's last tick rate is a client's tick rate (lvTick), and only
+@@ -344,8 +359,7 @@
+ 	}
+ 
+ 	// the tick has spent the frame's mouse; any further tick sees none
+-	s_NetMouseDX = 0;
+-	s_NetMouseDY = 0;
++	netInputClearMotion();
+ }
+ 
+ void netPosePuppets(f32 alpha)
+@@ -389,6 +403,12 @@
+ 	inputMouseGetRawDelta(&dx, &dy);
+ 	s_NetMouseDX += dx;
+ 	s_NetMouseDY += dy;
++#ifdef PLATFORM_IOS
++	f32 touchx, touchy;
++	inputIosLookGetFrameDegrees(&touchx, &touchy);
++	s_NetTouchDegreesX += touchx;
++	s_NetTouchDegreesY += touchy;
++#endif
+ }
+ 
+ /**
+@@ -411,6 +431,23 @@
+ 	}
+ }
+ 
++#ifdef PLATFORM_IOS
++// Tick reads are repeatable and never spend motion during presentation.
++void netInputTouchDegrees(f32 *dx, f32 *dy)
++{
++	const s32 active = g_NetInStageLoop && g_NetPass != NETPASS_PRESENT_ONLY;
++	*dx = active ? s_NetTouchDegreesX : 0.f;
++	*dy = active ? s_NetTouchDegreesY : 0.f;
++}
++
++// The presentation predictor must be able to see the unspent motion.
++void netPendingTouchDegrees(f32 *dx, f32 *dy)
++{
++	*dx = g_NetInStageLoop ? s_NetTouchDegreesX : 0.f;
++	*dy = g_NetInStageLoop ? s_NetTouchDegreesY : 0.f;
++}
++#endif
++
+ // The mouse summed since the last tick and not yet spent (netpredict.c's view)
+ void netPendingMouse(s32 *dx, s32 *dy)
+ {
+--- a/port/include/net/net.h
++++ b/port/include/net/net.h
+@@ -265,6 +265,11 @@
+ // Mouse: summed over a presented frame's inputUpdate(), spent by one tick
+ void netInputAccumulateMouse(void);
+ void netInputMouseRaw(s32 *dx, s32 *dy);
++#ifdef PLATFORM_IOS
++// Floating-point touch/gyro degrees awaiting the next simulation tick.
++void netInputTouchDegrees(f32 *dx, f32 *dy);
++void netPendingTouchDegrees(f32 *dx, f32 *dy);
++#endif
+ 
+ // gfxReset: the player-count row the display list pools are sized by
+ s32 netGfxSizeIndex(s32 index);
