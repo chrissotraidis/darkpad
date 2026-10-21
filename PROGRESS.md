@@ -272,6 +272,13 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 - Simulator and unsigned device builds PASS (`app-settings-groups-build.log`, `app-settings-groups-device-build.log`). Native inspection verified Graphics first, Touch Controls values, separate Controller/Motion Aiming sections, and the controller preset confirmation/cancel from its new location. No controller binding changes made.
 - Backed up Documents/Library before updating the same simulator. ROM, EEPROM and multiplayer setup hashes preserved. Current PID 84504, native Settings open, no active campaign attempt. The previous goal turn made implementation and runtime-verification progress; full P1/P2 acceptance remains pending.
 
+## Tablet menu layout and centered Settings
+
+- Shut down Darkpad P0 iPhone before creating/booting the dedicated Darkpad UI iPad (11-inch M5 simulator, iOS 26.5), `9482A2EA-45E6-4E19-A76D-CC5F511609FD`. Only that simulator is currently booted. Phone campaign saves/container remain separate and untouched.
+- Native iPad inspection confirmed the compact popover fits. Settings was still stretched across the tablet, unlike the Goldenpad form. Added a containing native host that centers tablet Settings at up to 680×760 points with rounded corners and a dimmed game background; utility overlays retain full-window bounds. Phone Settings stays full-window by design.
+- Simulator/device builds PASS (`app-ipad-settings-build.log`, `app-ipad-settings-device-build.log`). iPad native checks passed for centered form, Done dismissal, reopening the correctly anchored popover and returning to Settings. Evidence under `work/evidence/ipad-menu/`. Backed up iPad Documents/Library before installation; EEPROM and ROM hashes match afterward. No existing phone saves copied into this new test container.
+- Current iPad process 85731, Settings open. Phone is shutdown and still has the previous installed build; verify the host-container change on phone after shutting down iPad. This is simulator layout evidence, not physical M2 iPad qualification.
+
 ## Next work
 
 Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581ECA`, iPhone 17 Pro / iOS 26.5. Reuse this target; never boot another concurrently. Current container is recorded in ignored `work/evidence/sim-current-container.txt` and must be re-resolved after installs.

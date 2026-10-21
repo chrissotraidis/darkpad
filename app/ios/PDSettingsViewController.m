@@ -321,6 +321,45 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 
 // ---------------------------------------------------------------------------
 
+// Keep tablet forms readable while utilities retain their game-sized overlay.
+@interface PDSettingsHostController : UIViewController
+@property (nonatomic, strong) UINavigationController *navigation;
+@end
+@implementation PDSettingsHostController
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    [self addChildViewController:self.navigation];
+    [self.view addSubview:self.navigation.view];
+    [self.navigation didMoveToParentViewController:self];
+}
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations
+{
+    return UIInterfaceOrientationMaskLandscape;
+}
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    BOOL utility = [self.navigation.topViewController isKindOfClass:PDUtilitiesViewController.class];
+    CGRect bounds = self.view.bounds;
+    BOOL sheet = !utility && self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad
+        && bounds.size.width >= 700;
+    if (sheet) {
+        UIEdgeInsets safe = self.view.safeAreaInsets;
+        CGFloat width = MIN(680, bounds.size.width - safe.left - safe.right - 40);
+        CGFloat height = MIN(760, bounds.size.height - safe.top - safe.bottom - 40);
+        self.navigation.view.frame = CGRectMake((bounds.size.width - width) / 2,
+            safe.top + (bounds.size.height - safe.top - safe.bottom - height) / 2, width, height);
+    } else {
+        self.navigation.view.frame = bounds;
+    }
+    self.view.backgroundColor = sheet ? [UIColor colorWithWhite:0 alpha:0.35] : UIColor.clearColor;
+    self.navigation.view.layer.cornerRadius = sheet ? 20 : 0;
+    self.navigation.view.clipsToBounds = sheet;
+}
+@end
+
+static PDSettingsHostController *sHost;
 static UIWindow *sWindow;
 static PDSettingsViewController *sSettingsController;
 static BOOL sUtilityOwnsPause;
@@ -373,11 +412,13 @@ static CFTimeInterval sPresentStarted;
 		return;
 	}
 	[self present];
-	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	UINavigationController *nav = sHost.navigation;
 	[nav setNavigationBarHidden:YES animated:NO];
 	nav.view.backgroundColor = UIColor.clearColor;
 	sWindow.backgroundColor = UIColor.clearColor;
 	[nav setViewControllers:@[[PDUtilitiesViewController new]] animated:NO];
+	[sHost.view setNeedsLayout];
+	[sHost.view layoutIfNeeded];
 }
 
 + (void)present
@@ -397,9 +438,11 @@ static CFTimeInterval sPresentStarted;
 	} else {
 		[self build];
 	}
-	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	UINavigationController *nav = sHost.navigation;
 	[nav setNavigationBarHidden:NO animated:NO];
 	[nav setViewControllers:@[sSettingsController] animated:NO];
+	[sHost.view setNeedsLayout];
+	[sHost.view layoutIfNeeded];
 	sWindow.hidden = NO;
 	[sWindow makeKeyAndVisible];
 	// The GoldenEye rows read a cached scan; refresh it OFF the main thread and
@@ -480,7 +523,9 @@ static CFTimeInterval sPresentStarted;
 	sWindow = scene ? [[UIWindow alloc] initWithWindowScene:scene]
 	                : [[UIWindow alloc] initWithFrame:PDVisionFallbackWindowFrame()];
 	sWindow.windowLevel = UIWindowLevelAlert;
-	sWindow.rootViewController = nav;
+	sHost = [PDSettingsHostController new];
+	sHost.navigation = nav;
+	sWindow.rootViewController = sHost;
 	sWindow.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
 	sWindow.hidden = YES;
 	NSLog(@"perfectdark: [settings] built frame=%@ scene=%@",
@@ -506,7 +551,7 @@ static CFTimeInterval sPresentStarted;
 	// Force the table through its first layout and cell construction, which is
 	// the expensive half and the half a hidden window would otherwise defer to
 	// the moment it is shown.
-	UINavigationController *nav = (UINavigationController *)sWindow.rootViewController;
+	UINavigationController *nav = sHost.navigation;
 	[nav.view layoutIfNeeded];
 	PDSettingsViewController *vc = [self presentedControllerEvenIfHidden];
 	[vc.tableView layoutIfNeeded];
@@ -601,6 +646,7 @@ static CFTimeInterval sPresentStarted;
 	sWindow.windowScene = nil;
 	sWindow = nil;
 	sSettingsController = nil;
+	sHost = nil;
 	NSLog(@"perfectdark: [settings] window destroyed (heal experiment)");
 }
 

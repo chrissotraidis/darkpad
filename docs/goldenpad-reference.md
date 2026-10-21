@@ -127,3 +127,8 @@ The Settings form now follows the reference’s separation of Graphics, Touch
 Controls and Controller, with Darkpad’s experimental gyro in Motion Aiming.
 Existing keys and saved values are retained. Asset help describes the current
 art-profile controls rather than the inherited, removed Xbox switch.
+
+On iPad, Settings uses a centered form up to 680×760 points over a dimmed
+game. The utility popover keeps full-window placement and dismissal. The
+layout and transitions were visually checked on the dedicated 11-inch iPad
+simulator, with the phone simulator shut down first.
