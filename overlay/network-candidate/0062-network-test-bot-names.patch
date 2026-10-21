@@ -1,11 +1,21 @@
 --- a/port/src/net/netsession.c
 +++ b/port/src/net/netsession.c
-@@ -4224,6 +4224,9 @@
+@@ -4217,6 +4217,10 @@
+ 
+ 	for (s = 0; s < sims && s < MAX_BOTS; s++) {
+ 		mpSetSimSlotOn(s, true);
++		// Fresh dedicated hosts start with disabled bot profiles.
++		if (g_BotConfigsArray[s].difficulty == BOTDIFF_DISABLED) {
++			mpSetBotDifficulty(s, BOTDIFF_NORMAL);
++		}
+ 	}
+ 
+ 	if (sims > 4) {
+@@ -4224,6 +4228,8 @@
  	}
  
  	if (sims > 0) {
-+		// Slot activation alone leaves the default names empty. Generate
-+		// them before RULES is sent, as the normal setup menu does.
++		// Generate names from valid profiles before RULES is sent.
 +		mpGenerateBotNames();
  		g_Vars.lvmpbotlevel = 1;
  	}

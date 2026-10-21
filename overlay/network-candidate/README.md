@@ -50,3 +50,5 @@ Fresh audit `work/upstream-audit.Y21Gln`:55/55. `tests/candidate_network_command
 
 
 Candidate-only additions are now applied by audit-upstream.sh in the same sorted series as replacements (matching names applied once). 0062-network-test-bot-names.patch calls the existing mpGenerateBotNames after test-host slot activation and before RULES serialization. This fixes empty names created by the automated match setup; it does not change ranking rendering or wire format. Fresh reconstruction LNGjjN passes56/56, identity f6b10b456fa7ae7d6439087103cf54a8c78c57fb3db1c51aa62093a67e6f6eac. Both platform binaries must be rebuilt before paired testing; installed candidates still have the previous identity. See PROGRESS.md for current runtime evidence.
+
+Runtime correction: calling name generation alone left names blank because fresh test bots had BOTDIFF_DISABLED. 0062 now initializes disabled test profiles to Normal via mpSetBotDifficulty before generating names. jNhZeV56/56 and syntax pass; full rebuilt/runtime verification pending (f778b98fa3d272ca identity).
