@@ -604,3 +604,11 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Native ellipsis → Settings now visibly reports “HD pack: PD Forever Plus HD v0.10”. Screenshot active-pack-status.png. Startup also renders pack branding. Settings remains open/paused.
 - Post-update comparison: all pre-existing save, preference and texture files match SHA256. Only launch-beacon/lifecycle/heartbeat logs changed; three OS SplashBoard snapshots were removed by the update. No save bytes modified, no container reset. This verifies update preservation, not an additional mission completion.
 - Remaining immediate work: same-scene Original/HD comparison and gameplay texture orientation/transparency coverage, followed by broader solo acceptance and the separate networking integration. No physical-device tests; goal active.
+
+## HD gameplay profile round trip
+
+- Previous turn made progress installing the status fix and verifying save preservation. Revalidated clean worktree and sole booted iPad; continued PID56263 without restart/install.
+- Loaded existing tablet Dark save via normal UI and launched Defection Agent. Tablet save shows no completed Defection time; earlier phone completion evidence must not be conflated with this separate tablet save.
+- Same stationary rooftop view Enhanced→Original→Enhanced visibly replaces and restores paving, skyline and neon-sign detail without mission restart. Original status says replacement packs off; Enhanced names Forever Plus HD v0.10. Evidence work/evidence/hd-gameplay/{enhanced-rooftop,original-rooftop,enhanced-restored}.png. Initial Enhanced capture precedes gun raise; scene comparison is not a pixel-identical animation comparison.
+- Restored HD: touch Fire8→6, Reload6/72→8/70; bullet impact, laser line, hand/weapon animation render. Rooftop sign/paving orientation appears correct in this view. No comprehensive transparency, interior, full campaign or performance acceptance inferred.
+- Same sole iPad remains paused via ellipsis in Defection opening with Enhanced enabled. Next broaden HD interior/effect coverage and advance outstanding solo/network work. Goal remains active.
