@@ -1303,6 +1303,9 @@ static CFTimeInterval sPresentStarted;
 				// a settings change the player then swipes away should not be
 				// lost, and the write is a few hundred bytes.
 				configSave("$S/pd.ini");
+				// Read status after the coalesced engine apply, not when the
+				// profile control first changes (the engine still has the old profile).
+				dispatch_async(dispatch_get_main_queue(), ^{ [self refreshTexturePackStatus]; });
 			}];
 		});
 }
@@ -1593,7 +1596,6 @@ static CFTimeInterval sPresentStarted;
 		[self commit];
 		if ([row.key isEqualToString:PDDefGraphicsProfile]) {
 			[self.tableView reloadData];
-			[self refreshTexturePackStatus];
 		}
 	}
 }
