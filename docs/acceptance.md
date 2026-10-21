@@ -23,4 +23,4 @@ P0 has an empty-project-cache build on this Mac. P1 is incomplete. P2 has not be
 
 ## Next useful checks
 
-Continue campaign coverage with an input path that can actually deliver continuous look. Preserve honest distinctions between ordinary UI play, diagnostic-driven input and human usability. When hardware is available, use the PRD's device conditions and thresholds; do not infer them from simulator timing. Optional art can be tested independently with supplied or appropriately licensed assets, without delaying the original-ROM core.
+Continue campaign coverage using the verified keyboard-look fallback for simulator navigation: a 500 ms Right press changed yaw by 105 degrees (`work/evidence/keyboard-look/`). This does not replace physical touch acceptance. Preserve honest distinctions between ordinary UI play, diagnostic-driven input and human usability. When hardware is available, use the PRD's device conditions and thresholds; do not infer them from simulator timing. Optional art can be tested independently with supplied or appropriately licensed assets, without delaying the original-ROM core.
