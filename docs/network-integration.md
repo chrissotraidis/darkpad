@@ -102,3 +102,19 @@ Next isolate simulator pointer/touch delivery versus engine command consumption,
 - Live isolated candidate on the sole iPad connected to matching Mac host, stage0x32 with zero bots. Evidence work/network-look-trace.0nuxbk9y: first lift -310.5 points published -93.15 degrees; reverse +310.5 points brought accumulated yaw to zero and visibly restored corridor heading. Vertical lift78 points published23.4 degrees and visibly pitched toward floor. All three had zero touchesMoved callbacks and exactly one publication per gesture. Saved reverse/vertical screenshots and passive state/windows reports.
 - Through tick10800,5323/5323 prediction comparisons matched with zero corrections;5551 snapshots decoded with zero malformed at tick11100. These are short gesture/session checks, not full aiming ergonomics, completed matches, co-op or sustained performance acceptance. Small position drift between first/reverse snapshots means no strict zero-translation assertion.
 - Candidate explicitly stopped and Mac host exited0. One simulator remains booted. Source/build and candidate installation verified; physical tests excluded by user, performance/release readiness incomplete. Next complete bot-match/network interaction and lifecycle checks, and regress this shared overlay fix in the solo build. Goal remains active.
+
+## Current runtime checks (21 October 2026)
+
+Matching simulator/Mac candidate identity is `f778b98fa3d272ca` (56 applied patches). The candidate-only test-host setup initializes valid bot profiles and names before transmitting rules. Named four-bot timed matches now reach results. Shared shell fixes retain final movement on camera, AIM and menu touches; the normal solo build also passes menu scrolling with preserved saves and HD artwork. See PROGRESS.md for build and preservation manifests.
+
+Background/foreground was exercised for approximately29 seconds against a live Mac host; the client resumed and reached Game Over. This is simulator evidence, not physical LAN or performance qualification.
+
+FIRE release reproduction recipe, using one simulator and a matching dedicated Mac host:
+
+1. Use stage0x32, StartArmed, Falcon2, two-minute limit. With no bots, hold FIRE500ms, release and observe ammunition without further input. Repeat after START/Back and Home/reopen.
+2. With4Normal bots, background for about26 seconds until killed; reopen, tap FIRE to respawn, drag look, open START stats, tap outside the dialog, Back, then hold FIRE500ms. Observe ammunition after release and compare host/client shot totals at match end.
+3. Check passive candidate bridge8786 masks, not solo8775. Preserve screenshots/logs; stop both test processes.
+
+Observed: zero-bot case produced exactly6 shots from3 presses (`work/network-timed-match.bfl9ro1n`); death/respawn case produced exactly2 shots (`work/network-timed-match.vbjna5e0`). Earlier `k2_1eqqf` reported32 shots after brief presses and remains unexplained. Do not claim it fixed; capture per-shot pad/mouse/command state if it recurs.
+
+Normal lobby join/return, two co-op missions and progression, both host roles, and controlled latency/loss remain incomplete. Keep this engine isolated from the working solo pin.
