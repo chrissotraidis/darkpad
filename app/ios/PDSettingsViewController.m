@@ -239,9 +239,9 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
     _rows = [UIStackView new];
     _rows.axis = UILayoutConstraintAxisVertical;
     [_scroll addSubview:_rows];
-    NSArray *titles = @[@"End Mission or Match…", @"Settings", @"Edit Touch Controls", @"Diagnostics"];
-    NSArray *icons = @[@"arrow.uturn.backward", @"gearshape", @"hand.draw", @"exclamationmark.bubble"];
-    NSArray *actions = @[@3, @0, @1, @2];
+    NSArray *titles = @[@"Settings", @"Edit Touch Controls", @"Diagnostics", @"End Session…"];
+    NSArray *icons = @[@"gearshape", @"hand.draw", @"waveform.path.ecg", @"stop.circle"];
+    NSArray *actions = @[@0, @1, @2, @3];
     for (NSInteger i = 0; i < titles.count; i++) {
         if (i) {
             UIView *divider = [UIView new];
@@ -255,7 +255,7 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
         config.image = [UIImage systemImageNamed:icons[i]];
         config.imagePadding = 12;
         config.contentInsets = NSDirectionalEdgeInsetsMake(10, 12, 10, 12);
-        config.baseForegroundColor = i == 0 ? UIColor.systemRedColor : UIColor.labelColor;
+        config.baseForegroundColor = [actions[i] integerValue] == 3 ? UIColor.systemRedColor : UIColor.labelColor;
         config.titleTextAttributesTransformer = ^NSDictionary *(NSDictionary *attributes) {
             NSMutableDictionary *result = attributes.mutableCopy;
             result[NSFontAttributeName] = [UIFontMetrics.defaultMetrics scaledFontForFont:

@@ -189,3 +189,18 @@ Reload/Weapon/Duck form the inner column. This keeps tablet controls close toget
 and reserves the central look area. Saved custom coordinates continue to take
 precedence. Phone landscape and tablet training were visually checked in the
 simulator; this does not establish physical thumb ergonomics.
+
+
+### Final wrap-up controls
+
+The final solo build enlarges Fire and anchors the action group near the lower
+safe edge, using an inward arc for Reload, Weapon and Duck. Idle buttons are
+neutral dark surfaces; held/selected states retain action colors. Labels remain
+rounded and bold, with larger small-control text. Explicit saved custom layouts
+are retained; Reset in the touch editor adopts the revised defaults.
+
+The utility menu lists Settings, Edit Touch Controls and Diagnostics before
+End Session. End Session is disabled when unavailable and always asks for
+confirmation; START still opens the game's own pause/inventory screen.
+Phone simulator Fire/Reload, saved progression, native settings and confirmed
+exit were checked. This does not certify physical thumb ergonomics.

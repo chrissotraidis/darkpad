@@ -212,7 +212,7 @@ typedef struct {
 // Goldenpad's labeled, compact aim/fire/action column. Less frequent PD-only
 // actions live on the leading edge, leaving the look surface and thumb arc clear.
 static const PDButtonSpec kButtons[] = {
-	{ "FIRE",   PDPadG,           "scope",                       0.938389, 0.573504, 32 },
+	{ "FIRE",   PDPadG,           "scope",                       0.938389, 0.573504, 36 },
 	{ "AIM",    PDPadR,           "target",                      0.942733, 0.408547, 27 },
 	{ "USE",    PDPadB,           "hand.raised.fill",            0.932070, 0.744444, 26 },
 	{ "CROUCH", PD_CK_CROUCH,     "arrow.down",                  0.875000, 0.898291, 23 },
@@ -326,7 +326,7 @@ static const PDButtonSpec kMenuButtons[] = {
 			_title = [[UILabel alloc] initWithFrame:CGRectInset(self.bounds, 3, 0)];
 			NSDictionary *names = @{@"CROUCH": @"DUCK", @"WHEEL": @"WEAPON", @"SWAP": @"NEXT", @"FIRE_L": @"FIRE"};
 			_title.text = names[_label] ?: _label;
-			CGFloat fontSize = [_label isEqualToString:@"START"] ? 8 : MIN(12, r * .38);
+			CGFloat fontSize = [_label isEqualToString:@"START"] ? 9 : MIN(12, r * .43);
 			UIFontDescriptor *font = [[UIFont systemFontOfSize:fontSize weight:UIFontWeightBold].fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
 			_title.font = [UIFont fontWithDescriptor:font size:fontSize];
 			_title.textAlignment = NSTextAlignmentCenter;
@@ -382,7 +382,11 @@ static const PDButtonSpec kMenuButtons[] = {
 		_ring.strokeColor = [UIColor colorWithWhite:1 alpha:visibility * .52].CGColor;
 		UIColor *color = (_held || _engaged) && [_label isEqualToString:@"AIM"]
 			? UIColor.systemYellowColor : _actionColor;
-		_ring.fillColor = [color colorWithAlphaComponent:visibility * ((_held || _engaged) ? .95 : .32)].CGColor;
+		// Quiet neutral surfaces keep scenery readable; color communicates a
+		// held or selected action rather than nine competing idle badges.
+		_ring.fillColor = (_held || _engaged)
+			? [color colorWithAlphaComponent:visibility * .95].CGColor
+			: [UIColor colorWithWhite:.06 alpha:visibility * .58].CGColor;
 		_title.textColor = (_held || _engaged) ? UIColor.blackColor : [UIColor colorWithWhite:1 alpha:visibility * .96];
 	}
 	[CATransaction commit];
@@ -941,26 +945,21 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 		// Keep START directly below the utility button, as in Goldenpad.
 		return CGPointMake(CGRectGetMidX(menu), CGRectGetMaxY(menu) + 12 + radius);
 	}
-	// Keep the action cluster within a thumb's reach. Screen percentages made
-	// the gaps grow with tablet width/height, despite fixed-size buttons.
-	// Preserve Goldenpad's aim/fire/use column with PD actions just inside it.
-	NSInteger column = -1, row = 0;
-	if ([label isEqualToString:@"AIM"]) { column = 0; row = -1; }
-	if ([label isEqualToString:@"FIRE"]) { column = 0; row = 0; }
-	if ([label isEqualToString:@"USE"]) { column = 0; row = 1; }
-	if ([label isEqualToString:@"RELOAD"]) { column = 1; row = -1; }
-	if ([label isEqualToString:@"WHEEL"]) { column = 1; row = 0; }
-	if ([label isEqualToString:@"CROUCH"]) { column = 1; row = 1; }
-	if (column >= 0) {
-		CGFloat spacing = 76 * _scale;
-		// Leave a separate strip for the safe-area-adjusted ammo gauge and
-		// numbers on both form factors. Tablets need more room because the
-		// height-scaled game HUD extends farther inward on their wider viewport.
-		CGFloat outerX = size.width - inset.right - MAX((tablet ? 180 : 88) * _scale, radius + 16);
-		CGFloat fireY = size.height * (tablet ? .64 : .60);
-		fireY = MIN(fireY, size.height - inset.bottom - 20 - 32 * _scale - spacing);
-		fireY = MAX(fireY, inset.top + 32 * _scale + spacing + 20);
-		return CGPointMake(outerX - column * spacing, fireY + row * spacing);
+	// Anchor the thumb cluster to the lower safe edge, rather than the
+	// middle of the viewport. Fire is primary; utility actions form an arc
+	// inward and below it. Keep the game's ammo strip unobstructed.
+	CGPoint offset = CGPointMake(NAN, NAN);
+	if ([label isEqualToString:@"FIRE"]) offset = CGPointZero;
+	if ([label isEqualToString:@"AIM"]) offset = CGPointMake(0, -82);
+	if ([label isEqualToString:@"USE"]) offset = CGPointMake(0, 82);
+	if ([label isEqualToString:@"RELOAD"]) offset = CGPointMake(-76, -48);
+	if ([label isEqualToString:@"WHEEL"]) offset = CGPointMake(-142, 54);
+	if ([label isEqualToString:@"CROUCH"]) offset = CGPointMake(-76, 104);
+	if (isfinite(offset.x)) {
+		CGFloat outerX = size.width - inset.right - (tablet ? 150 : 86) * _scale;
+		CGFloat fireY = size.height - inset.bottom - 154 * _scale;
+		fireY = MAX(fireY, inset.top + 126 * _scale);
+		return CGPointMake(outerX + offset.x * _scale, fireY + offset.y * _scale);
 	}
 	// Translate remaining controls inside the safe area.
 	// Clamp only lower controls vertically: translating the whole cluster up
