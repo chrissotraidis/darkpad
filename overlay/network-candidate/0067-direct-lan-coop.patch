@@ -1,0 +1,75 @@
+Subject: Expose Perfect Dark co-op missions in Direct LAN hosting
+
+--- a/port/src/netlobbymenu.c
++++ b/port/src/netlobbymenu.c
+@@ -1519,25 +1519,63 @@
+ 	return 0;
+ }
+ 
++static MenuItemHandlerResult handlerMission(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerDifficulty(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerCoopRadar(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerCoopFriendlyFire(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerSetupScenario(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerSetupArena(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerSetupWeapons(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerSetupLimits(s32 operation, struct menuitem *item, union handlerdata *data);
++static MenuItemHandlerResult handlerSetupSimulants(s32 operation, struct menuitem *item, union handlerdata *data);
++
++static MenuItemHandlerResult handlerDirectGame(s32 op, struct menuitem *item, union handlerdata *data)
++{
++	switch (op) {
++	case MENUOP_GETOPTIONCOUNT:
++		data->dropdown.value = 2;
++		break;
++	case MENUOP_GETOPTIONTEXT:
++		return (intptr_t)(data->dropdown.value ? "Co-op Mission\n" : "Combat Simulator\n");
++	case MENUOP_GETSELECTEDINDEX:
++		data->dropdown.value = g_NetCoopSetup.on ? 1 : 0;
++		break;
++	case MENUOP_SET:
++		g_NetCoopSetup.on = data->dropdown.value == 1;
++		g_NetCoopSetup.anti = 0;
++		g_NetCoopSetup.campaign = 0;
++		// Direct LAN's mission list is Perfect Dark's local campaign.
++		if (g_NetCoopSetup.game[0]) g_NetCoopSetup.stageindex = 0;
++		g_NetCoopSetup.game[0] = '\0';
++		break;
++	}
++	return 0;
++}
++
+ static struct menuitem s_DirectHostItems[] = {
+ 	{ MENUITEMTYPE_LABEL, 0, 0, (uintptr_t)textDirectHostStatus, 0, NULL },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)"Scenario...\n", 0, (void *)&g_MpScenarioMenuDialog },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)"Arena...\n", 0, (void *)&g_MpArenaMenuDialog },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)"Weapons...\n", 0, (void *)&g_MpWeaponsMenuDialog },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)"Limits...\n", 0, (void *)&g_MpLimitsMenuDialog },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)"Simulants...\n", 0, (void *)&g_MpSimulantsMenuDialog },
++	{ MENUITEMTYPE_DROPDOWN, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Game", 0, handlerDirectGame },
++	{ MENUITEMTYPE_DROPDOWN, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Mission", 0, handlerMission },
++	{ MENUITEMTYPE_DROPDOWN, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Difficulty", 0, handlerDifficulty },
++	{ MENUITEMTYPE_CHECKBOX, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Radar", 0, handlerCoopRadar },
++	{ MENUITEMTYPE_CHECKBOX, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Friendly Fire", 0, handlerCoopFriendlyFire },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Scenario...\n", 0, handlerSetupScenario },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Arena...\n", 0, handlerSetupArena },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Weapons...\n", 0, handlerSetupWeapons },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Limits...\n", 0, handlerSetupLimits },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Simulants...\n", 0, handlerSetupSimulants },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Start Match\n", 0, handlerDirectStart },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_CLOSESDIALOG, (uintptr_t)"Stop Hosting\n", 0, NULL },
+ 	{ MENUITEMTYPE_END },
+ };
+-static struct menudialogdef s_DirectHostDialog = { MENUDIALOGTYPE_DEFAULT, (uintptr_t)"Host LAN Combat", s_DirectHostItems, dialogDirectHost, MENUDIALOGFLAG_LITERAL_TEXT, NULL };
++static struct menudialogdef s_DirectHostDialog = { MENUDIALOGTYPE_DEFAULT, (uintptr_t)"Host LAN Game", s_DirectHostItems, dialogDirectHost, MENUDIALOGFLAG_LITERAL_TEXT, NULL };
+ 
+ static struct menuitem s_DirectLanItems[] = {
+ 	{ MENUITEMTYPE_LABEL, 0, 0, (uintptr_t)textDirectMessage, 0, NULL },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)textDirectAddress, 0, (void *)&s_DirectAddressDialog },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)textDirectPort, 0, (void *)&s_DirectPortDialog },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Join\n", 0, handlerDirectJoin },
+-	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Host Combat...\n", 0, handlerDirectHost },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Host Game...\n", 0, handlerDirectHost },
+ 	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_CLOSESDIALOG, (uintptr_t)"Back\n", 0, NULL },
+ 	{ MENUITEMTYPE_END },
+ };
