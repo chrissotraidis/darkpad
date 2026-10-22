@@ -36,6 +36,7 @@ settings:
     ENABLE_DEBUG_DYLIB: "NO"
     OTHER_CFLAGS: "-fno-strict-aliasing -Wno-deprecated-declarations"
     HEADER_SEARCH_PATHS:
+      - "$(DERIVED_FILE_DIR)"
       - "$(SRCROOT)/ios"
       - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include"
       - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include/SDL2"
@@ -84,6 +85,12 @@ targets:
       - path: ios/icon/AppIcon76x76@2x.png
       - path: ios/icon/AppIcon83.5x83.5@2x.png
       - path: ios/icon/AppIcon1024.png
+    preBuildScripts:
+      - name: Stamp current shell build
+        script: '"$SRCROOT/../scripts/write-build-stamp.sh"'
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - "$(DERIVED_FILE_DIR)/build_stamp.h"
     settings:
       base:
         SDKROOT: iphoneos
@@ -184,6 +191,12 @@ targets:
       # M6: the 3D settings sheet's UIKit table, the `vp3d.*` apply, and the
       # sheet's open/close state (plan §2.10). Hosted by PDVisionApp.swift.
       - path: vision3d/PDVisionSettingsViewController.m
+    preBuildScripts:
+      - name: Stamp current shell build
+        script: '"$SRCROOT/../scripts/write-build-stamp.sh"'
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - "$(DERIVED_FILE_DIR)/build_stamp.h"
     settings:
       base:
         SDKROOT: xros

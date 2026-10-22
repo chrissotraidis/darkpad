@@ -22,7 +22,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "build_stamp.h"
+#include <build_stamp.h>
 
 @interface PDWatchdog ()
 + (void)observeLifecycle;

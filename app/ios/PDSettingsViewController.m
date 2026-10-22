@@ -26,7 +26,7 @@
 #import "PDVision3D.h"   // the 3D rows (D-082); vision3d/ is on this target's path only
 #endif
 
-#include "build_stamp.h"
+#include <build_stamp.h>
 
 #import <objc/runtime.h>
 

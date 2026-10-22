@@ -24,7 +24,7 @@
 #import "PDShell.h"
 #import "PDCrash.h"
 
-#include "build_stamp.h"
+#include <build_stamp.h>
 
 static char sCrashPath[1024];
 static char sHeader[512];

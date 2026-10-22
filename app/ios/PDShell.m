@@ -30,7 +30,7 @@ extern int lvIsPaused(void);
 #include <mach/mach.h>
 #include <sys/utsname.h>
 
-#include "build_stamp.h"
+#include <build_stamp.h>
 
 // A queued unit of work plus, when somebody is waiting for it, the semaphore to
 // signal once it has run.

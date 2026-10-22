@@ -58,7 +58,7 @@
 #import "PDBridge.h"
 #endif
 
-#include "build_stamp.h"
+#include <build_stamp.h>
 
 #define PD_CONFIG_PATH "$S/pd.ini"
 
