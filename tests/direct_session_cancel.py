@@ -60,6 +60,12 @@ int main(void) {
     for (int owned = 0; owned < 2; ++owned)
         for (int active = 0; active < 2; ++active)
             for (int gone = 0; gone < 2; ++gone) check(owned, active, gone);
+    // A stale dialog can tick while a failed match is still tearing down.
+    // Cancel refuses cleanup then; consuming the notice would lose it.
+    s_DirectMenuSession = 1; s_MatchActive = 1;
+    s_ClientState = NETCS_GONE; g_NetNoticePending = 1;
+    dialogDirectLan(MENUOP_TICK, NULL, NULL);
+    assert(g_NetNoticePending == 1 && s_DirectMenuSession == 1);
     // Failure seen by the dialog is consumed once, while a teardown before
     // its tick leaves the reason pending for the main menu.
     s_DirectMenuSession = 1; s_MatchActive = 0;

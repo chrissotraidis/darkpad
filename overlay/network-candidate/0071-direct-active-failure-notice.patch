@@ -1,0 +1,16 @@
+Subject: Retain disconnect notice while active-match cleanup is deferred
+
+--- a/port/src/netlobbymenu.c
++++ b/port/src/netlobbymenu.c
+@@ -1589,8 +1589,9 @@
+ 			const char *why = netSessionNoticeText();
+ 			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "%s", why && why[0] ? why : "Connection ended. You can try again.");
+ 			netSessionDirectCancel();
+-			// The reason is now visible inline; do not show it again on Back.
+-			g_NetNoticePending = 0;
++			// A match teardown can still tick this old dialog. Cancel refuses
++			// cleanup while the match is active, so retain the notice then.
++			if (!netSessionDirectState()) g_NetNoticePending = 0;
+ 		} else if (state == 2) {
+ 			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Connected. Waiting for the host to start.");
+ 		}
