@@ -256,6 +256,11 @@ static const PDButtonSpec kMenuButtons[] = {
 };
 #define PD_NUM_MENU_BUTTONS ((int)(sizeof(kMenuButtons) / sizeof(kMenuButtons[0])))
 
+@class PDTouchButtonView;
+@interface PDTouchOverlay (ControlAccessibility)
+- (BOOL)activateAccessibleChip:(PDTouchButtonView *)chip;
+@end
+
 @interface PDTouchButtonView : UIView
 @property (nonatomic) unsigned mask;
 @property (nonatomic) CGFloat radius;
@@ -290,6 +295,9 @@ static const PDButtonSpec kMenuButtons[] = {
 		_alpha = alpha;
 		_dim = dim;
 		self.userInteractionEnabled = NO;
+		self.isAccessibilityElement = YES;
+		self.accessibilityLabel = pdControlName(_label);
+		self.accessibilityTraits = UIAccessibilityTraitButton;
 		self.backgroundColor = UIColor.clearColor;
 
 		_ring = [CAShapeLayer layer];
@@ -329,6 +337,13 @@ static const PDButtonSpec kMenuButtons[] = {
 		[self restyle];
 	}
 	return self;
+}
+
+- (BOOL)accessibilityActivate
+{
+	PDTouchOverlay *overlay = [self.superview isKindOfClass:PDTouchOverlay.class]
+		? (PDTouchOverlay *)self.superview : nil;
+	return overlay && !self.hidden && [overlay activateAccessibleChip:self];
 }
 
 - (void)setHeld:(BOOL)held
@@ -2184,6 +2199,24 @@ static const CGFloat kWheelRadius = 32.0;
 
 // ---------------------------------------------------------------------------
 // Touch handling
+
+// Accessibility activation is one tap, using the same short-press latch as
+// touch-up. Never release a chip already held by a real finger.
+- (BOOL)activateAccessibleChip:(PDTouchButtonView *)chip
+{
+	if (self.hidden || chip.hidden || chip.held || (_buttonMask & chip.mask) || chip.superview != self) { return NO; }
+	if (_editing) {
+		[self editBeganAt:chip.center];
+		if (_dragChip) { [self commitDrag]; }
+		return YES;
+	}
+	// Address this element directly, even if a custom layout overlaps chips.
+	chip.held = YES;
+	_buttonMask |= chip.mask;
+	_unpublishedMask |= chip.mask;
+	[self liftChip:chip latch:YES];
+	return YES;
+}
 
 - (PDTouchButtonView *)buttonAtPoint:(CGPoint)p
 {
