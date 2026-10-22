@@ -9,6 +9,10 @@ source = (pathlib.Path(sys.argv[1]) / 'src/game/player.c').read_text()
 start = source.index('s32 playerIosGetPos(')
 end = source.index('\n}', start) + 2
 accessor = source[start:end]
+if 'static struct player *playerIosLocalPlayer(void)' in source:
+ helper_start=source.index('static struct player *playerIosLocalPlayer(void)')
+ helper_end=source.index('\n}',helper_start)+2
+ accessor=source[helper_start:helper_end]+'\n'+accessor
 code = r"""
 #include <assert.h>
 #include <stddef.h>
