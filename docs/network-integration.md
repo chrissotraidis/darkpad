@@ -1,6 +1,6 @@
 # Networking integration experiment
 
-The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; full results return, menu hosting and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
+The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; results return and host exit between matches also pass. Menu hosting and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
 
 ## Reproduce the compatibility audit
 
@@ -132,3 +132,5 @@ Next: verify timeout/Back no longer produces a duplicate notice, then launch the
 ## Latest Direct LAN evidence
 
 Build `6901f7d303d97b36` (59 patches) passes menu join, connected cancellation, rejoin and a completed two-minute bot match back to a usable Perfect Menu without the former empty notice. Saved data was preserved on installation. Automatic Direct LAN dialog restoration is still incomplete: the session remains connected but only the main menu appears. Revised0065 defers opening the dialog to the main-menu tick; source `fb4bf2344adf5b5b` audits59/59 and is building, not runtime accepted. See PROGRESS.md for handles/artifacts. Menu hosting and co-op are still open.
+
+The subsequent `fb4bf2344adf5b5b` build passes the deferred-restoration runtime check: UI join, full timed bot match, Game Over → Direct LAN while still connected, graceful host exit displayed inline, then Back to usable Perfect Menu without an extra notice. Evidence: `work/network-timed-match.wi_f7xz2` including host log, restored-direct.png and clean-return.png. Both platform builds and simulator app linking passed; installed saved data is unchanged. This supersedes the restoration gap above, without claiming mid-match host-loss, hosting UI or co-op acceptance.
