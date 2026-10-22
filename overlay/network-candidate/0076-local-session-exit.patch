@@ -1,0 +1,37 @@
+Subject: ios: allow co-op spectators to leave through the session menu
+
+Resolve availability and abort ownership from the local slot. A dead co-op
+player is still in a live network session; clients follow the existing native
+leave path instead of locally manufacturing a match result.
+
+--- a/port/src/pdmain.c
++++ b/port/src/pdmain.c
+@@ -1011,11 +1011,12 @@
+  */
+ s32 mainIosCanEndSession(void)
+ {
+-	if (!g_Vars.currentplayer || !g_Vars.currentplayer->prop
++	struct player *p = g_NetMode != NETMODE_NONE ? netLocalPlayer(NULL) : g_Vars.currentplayer;
++	if (!p || !p->prop
+ 			|| g_Vars.stagenum == STAGE_CITRAINING || g_MainIsEndscreen
+ 			|| g_InCutscene
+-			|| (g_Vars.currentplayer->isdead
+-				&& !g_Vars.normmplayerisrunning)) {
++			|| (p->isdead && !g_Vars.normmplayerisrunning
++				&& !(g_NetMode != NETMODE_NONE && g_Vars.coopplayernum >= 0))) {
+ 		return 0;
+ 	}
+ 	return 1;
+@@ -1026,7 +1027,11 @@
+ 	if (!mainIosCanEndSession()) {
+ 		return 0;
+ 	}
+-	g_Vars.currentplayer->aborted = true;
++	/* Match the native Abort Mission path: a guest leaves, a host ends
++	 * the mission for everyone. A dead local co-op player still owns this. */
++	if (g_NetMode != NETMODE_NONE && netCoopClientAbort()) return 1;
++	struct player *p = g_NetMode != NETMODE_NONE ? netLocalPlayer(NULL) : g_Vars.currentplayer;
++	p->aborted = true;
+ 	mainEndStage();
+ 	return 1;
+ }
