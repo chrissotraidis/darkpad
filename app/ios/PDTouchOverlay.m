@@ -46,6 +46,7 @@ extern float menuIosRowFraction(void);
 // Declared here rather than in PDShell.h: that header belongs to another seam
 // and this is the only file that asks the question.
 extern int playerIosIsPaused(void);
+extern int playerIosIsCinematic(void);
 
 // app/gfx/gfx_angle_egl.mm — the SDL_MetalView the renderer draws into. Its
 // -window is SDL's UIWindow whether or not UIKit can enumerate it (D-038).
@@ -452,6 +453,7 @@ static const PDButtonSpec kMenuButtons[] = {
 	// thread by -publish and read by the touch handlers, which run on the same
 	// thread (SDL pumps the run loop from inside the game loop).
 	BOOL _menuOpen;
+	BOOL _cinematic;
 	UITouch *_pointerTouch;
 	CGPoint _pointerPoint;
 	CGPoint _pointerDownPoint;
@@ -963,7 +965,7 @@ static NSMutableSet<NSString *> *pdHiddenLabels(void)
 /** bean: the mirrored FIRE exists only while AIM is held. */
 - (BOOL)leftFireVisible
 {
-	return !_editing && !_menuOpen && (_buttonMask & PDPadR) != 0 && ![self userHid:_leftFire];
+	return !_editing && !_menuOpen && !_cinematic && (_buttonMask & PDPadR) != 0 && ![self userHid:_leftFire];
 }
 
 /** The AIM chip, by its mask rather than its label (a custom layout moves the
@@ -1093,7 +1095,7 @@ static const CGFloat kWheelRadius = 32.0;
 	const BOOL armed = playerIosGunState(&gunfunc) > 0;
 	alt.engaged = armed && gunfunc == 1;
 	const BOOL suppressed = playerIosOnGoldenEyeLevel() && !playerIosGunHasSecondary();
-	const BOOL hide = _menuOpen || suppressed || [self userHid:alt];
+	const BOOL hide = _menuOpen || _cinematic || suppressed || [self userHid:alt];
 	if (alt.hidden == hide) {
 		return;
 	}
@@ -2264,6 +2266,9 @@ static const CGFloat kWheelRadius = 32.0;
 		return;
 	}
 
+	// Start still skips cinematics; empty space must not queue movement/look.
+	if (_cinematic) { return; }
+
 	if (p.x < self.bounds.size.width * kStickZoneFrac) {
 		[self noteStickTapAt:p];
 		if (!_stickTouch) {
@@ -2449,7 +2454,7 @@ static CGVector pdStickCurve(CGVector raw)
 	for (PDTouchButtonView *b in _buttons) {
 		if (b.held) { b.held = NO; _buttonMask &= ~b.mask; }
 		_latchMask &= ~b.mask; _unpublishedMask &= ~b.mask;   // D-086: a drop, not a tap
-		b.hidden = _menuOpen || [self userHid:b];   // D-088: hidden by the player
+		b.hidden = _menuOpen || (_cinematic && b.mask != PDPadStart) || [self userHid:b];   // D-088: hidden by the player
 	}
 	if (_leftFire.held) { _leftFire.held = NO; _buttonMask &= ~_leftFire.mask; }
 	_latchMask &= ~_leftFire.mask; _unpublishedMask &= ~_leftFire.mask;
@@ -2464,7 +2469,10 @@ static CGVector pdStickCurve(CGVector raw)
 	[self hideStickChrome];
 	_stickTouch = nil;
 	_stickValue = CGVectorMake(0, 0);
-	NSLog(@"perfectdark: [touch] %@ chrome", _menuOpen ? @"menu" : @"gameplay");
+	_lookTouch = nil;
+	_pendingLookX = _pendingLookY = 0;
+	_rollFrames = 0;
+	NSLog(@"perfectdark: [touch] %@ chrome", _menuOpen ? @"menu" : (_cinematic ? @"cinematic" : @"gameplay"));
 }
 
 /** Menu pointer: focus follows the finger, and a vertical drag scrolls. */
@@ -2786,8 +2794,10 @@ static CGVector pdStickCurve(CGVector raw)
 	}
 
 	const BOOL wasMenuOpen = _menuOpen;
+	const BOOL wasCinematic = _cinematic;
+	_cinematic = playerIosIsCinematic() != 0;
 	_menuOpen = menuIosDialogIsOpen() ? YES : NO;
-	if (_menuOpen != wasMenuOpen && !_editing) {
+	if ((_menuOpen != wasMenuOpen || _cinematic != wasCinematic) && !_editing) {
 		[self updateVisibility];
 		[self applyMenuChrome];
 	}

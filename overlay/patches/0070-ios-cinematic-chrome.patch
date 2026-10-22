@@ -1,0 +1,16 @@
+Subject: iOS: expose cinematic state for touch chrome
+
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -8900,4 +8900,10 @@
+ 
+ 	return p && p->activemenumode != AMMODE_CLOSED;
+ }
+-#endif
++
++/** Shell chrome only: retain Start/menu while no playable camera exists. */
++s32 playerIosIsCinematic(void)
++{
++	return g_InCutscene || !g_Vars.currentplayer || !g_Vars.currentplayer->prop;
++}
++#endif
