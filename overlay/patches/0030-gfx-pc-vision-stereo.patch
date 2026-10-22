@@ -1,0 +1,470 @@
+Subject: gfx_pc: both eyes per host frame, and the per-eye projection fold
+
+The visionOS 3D stereo mode's engine half (Phase 6 M3/dev1, D-049/D-050/D-055;
+docs/visionos-3d-plan.md §2.3 and §2.4). Three changes, all behind
+TARGET_OS_VISION:
+
+  * gfx_run's body becomes gfx_run_eye, and gfx_run walks the display list
+    TWICE per host frame at the SAME game time - eye L then eye R - into the
+    two eye framebuffers of one ring slot. Slot 0 of the backend's framebuffer
+    table already follows the current eye (patch 0031), so the MSAA resolve,
+    copy_framebuffer, the Vivid Colours / Black Level grade pass and the
+    readback all land on the eye being drawn with nothing else changed.
+
+  * the signed per-eye view offset and the convergence skew are folded into
+    the projection at the TWO sites that form MP - gfx_sp_matrix's tail and
+    gfx_sp_pop_matrix - and never into rsp.P_matrix itself. A rewritten P
+    would compound on the next G_MTX_MUL that arrives with G_MTX_PROJECTION,
+    which is the doubled-offset bug sm64coopdx's D-026 paid for.
+
+  * WHICH RULE a projection gets is read from a TAG the engine emits into the
+    display list (patch 0032, src/include/gbiex.h), not recovered from the
+    shape of the matrix. That is D-055, and it replaces D-049's three-class
+    P-shape test, which was measured wrong on device: with 4J's XBLA release on
+    it classified as much geometry "sky" as "world" (2290014 against 2266415),
+    because PD's lists MULTIPLY into the projection and the product stops being
+    axis-aligned. Half the room then had no eye offset at all, which is what
+    the user saw as floating bodies, wrong doors and "trippy" ramps.
+
+    Four rules now: WORLD (the full fold, and every untagged projection in the
+    engine), SKY (the convergence skew only - a translation folded behind the
+    camera rotation would be a world-space shift), GUN (the viewmodel converges
+    at its own |mv[3][2]| with a separation scaled to that depth - D-049's
+    C_gun = znear = 1.5 was a ~2.7 NDC-unit sideways shift, which is why the
+    gun class counter read 247990 while the user could see no gun), and FLAT (no
+    fold: bit-identical in both eyes, ON the panel - menuRender's own span, and
+    an orthographic projection, of which this engine has a dozen contrary to
+    §2.4).
+
+2D is untouched and needs to be: PD's rectangles are computed straight in NDC
+and never go through MP, so they are identical in both eyes - zero disparity
+for the HUD, for free.
+
+Everywhere else PD_VISION_STEREO is 0: PD_MP_UPDATE expands to the identical
+gfx_matrix_mul call the code had before, the tag reader and the class state
+disappear with it, the pre-swap capture's guard disappears, and gfx_run is
+gfx_run_eye plus one tail call. The oracle's byte-for-byte replay parity is the
+proof and the gate runs it.
+
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index 91299e85f..7e697bc46 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -45,6 +45,51 @@
+ #include "pd_frame_prof.h"
+ #endif
+ 
++// ---------------------------------------------------------------------------
++// visionOS 3D stereo mode (Phase 6 M3, D-049/D-050; docs/visionos-3d-plan.md
++// §2.3/§2.4).
++//
++// TWO things happen here and nowhere else in the renderer:
++//
++//  1. gfx_run() walks the display list TWICE per host frame, at the SAME game
++//     time - eye L then eye R - into the two eye framebuffers of one ring slot
++//     (app/vision3d/PDEyeTargets.mm). Slot 0 of the backend's framebuffer
++//     table already follows whichever eye is current (patch 0031), so the
++//     second walk needs no other change: the MSAA resolve, the grade pass and
++//     the readback all land on the eye being drawn.
++//
++//  2. the per-eye view offset and the convergence skew are folded into the
++//     PROJECTION at the two places MP is formed - never into rsp.P_matrix
++//     itself. Rewriting P in place would compound on the next G_MTX_MUL that
++//     arrives with G_MTX_PROJECTION (sm64coopdx D-026 paid for exactly that:
++//     a doubled eye offset on any list that multiplies into P).
++//
++// On every other platform PD_VISION_STEREO is 0, PD_MP_UPDATE expands to the
++// identical gfx_matrix_mul call the code had before, and gfx_run is gfx_run_eye
++// with one extra tail call the compiler folds away. The oracle's byte-for-byte
++// parity is the proof, and the M3 gate runs it.
++// ---------------------------------------------------------------------------
++#ifdef __APPLE__
++#include <TargetConditionals.h>
++#endif
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++#define PD_VISION_STEREO 1
++#define PD_EYE_LEFT  0
++#define PD_EYE_RIGHT 1
++extern "C" int pdVisionStereoFold(float *outOffset, float *outConvergence,
++                                  float *outGunConvergence);
++extern "C" void pdVisionSetEye(int eye);
++extern "C" int pdVisionGetEye(void);
++extern "C" int pdVisionEyesPerFrame(void);
++extern "C" void pdVisionEyeNoteRender(void);
++extern "C" int pdVisionEyeIsCapture(int eye);
++extern "C" void pdVisionEyeBeginPair(void);
++extern "C" void pdVisionStereoNoteClass(int cls);
++extern "C" void pdVisionStereoNoteGunDepth(float depth);
++#else
++#define PD_VISION_STEREO 0
++#endif
++
+ uintptr_t gfxFramebuffer;
+ 
+ #define ALIGN(x, a) (((x) + (a - 1)) & ~(a - 1))
+@@ -2244,6 +2289,221 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+     memcpy(res, tmp, sizeof(tmp));
+ }
+ 
++#if PD_VISION_STEREO
++// ---------------------------------------------------------------------------
++// THE DISPLAY LIST SAYS WHAT IT IS DRAWING (D-055, supersedes D-049's §2.4
++// three-class matrix-shape test).
++//
++// D-049 recovered the class of a projection from the SHAPE of the matrix:
++// axis-aligned meant world, a non-zero off-diagonal meant the sky's
++// camera-basis fold, and a znear of 1.5 recovered from P[3][2]/(P[2][2]-1)
++// meant the gun. On the simulator, with N64 art, that read world 187440 /
++// sky 1540 / gun 104 and looked right. On the user's headset, with 4J's XBLA
++// release on, it read
++//
++//     stereo_cls_world=2266415  stereo_cls_sky=2290014  stereo_cls_gun=247990
++//
++// — a sky count EQUAL to the world count. Half the geometry in the room was
++// taking the skew-only path, which means half of it had no eye offset at all:
++// two different depths for one scene. That is exactly what he reported, in
++// three separate complaints (dead bodies floating above the floor, doors
++// "looking wrong", going down ramps "trippy, depth off").
++//
++// The cause is that the shape of P is not a property of the subject. PD's
++// lists multiply into the projection (G_MTX_MUL with G_MTX_PROJECTION), and
++// 4J's mesh lists do it a great deal; the moment they do, the product stops
++// being axis-aligned and the shape test calls it sky. No refinement of the
++// test fixes that, because the information is not in the matrix.
++//
++// So the ENGINE says it. A tagged G_NOOP (src/include/gbiex.h, PD_DLTAG_*)
++// names the class of the NEXT projection load, and gfx_sp_matrix latches it;
++// an untagged load — which is all thirty-odd of the others in this engine — is
++// WORLD, and a MUL into the projection keeps whatever class the load had.
++// Only three sites in the whole tree carry a tag: the sky's projection
++// (vi0000ab78, vi.c), the gun's (vi0000aca4 and viSetPerspectiveWithFov, by
++// the znear THEY WERE CALLED WITH rather than one read back out of a matrix),
++// and menuRender's own flat span.
++// ---------------------------------------------------------------------------
++struct PDStereoState {
++    int pending_class;  // the class the next projection LOAD will take
++    int p_class;        // the class of the projection now in rsp.P_matrix
++    int flat_span;      // inside menuRender: flatten everything
++};
++static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0 };
++
++/** The tagged-G_NOOP reader. Untagged noops (gDPSetBlendMask) have w1 == 0. */
++static void gfx_stereo_dl_tag(uint32_t w1) {
++    if (!PD_DLTAG_IS_OURS(w1)) {
++        return;
++    }
++    switch (PD_DLTAG_PAYLOAD(w1)) {
++        case PD_DLSPAN_FLAT_BEGIN: pd_stereo.flat_span = 1; break;
++        case PD_DLSPAN_FLAT_END:   pd_stereo.flat_span = 0; break;
++        case PD_DLCLASS_SKY:       pd_stereo.pending_class = PD_DLCLASS_SKY; break;
++        case PD_DLCLASS_GUN:       pd_stereo.pending_class = PD_DLCLASS_GUN; break;
++        default:                   pd_stereo.pending_class = PD_DLCLASS_WORLD; break;
++    }
++}
++
++/** Both eyes start from the same state, so both walks read the same tags. */
++static void gfx_stereo_reset_classes(void) {
++    pd_stereo.pending_class = PD_DLCLASS_WORLD;
++    pd_stereo.p_class = PD_DLCLASS_WORLD;
++    pd_stereo.flat_span = 0;
++}
++
++/**
++ * The per-eye projection, from the mono one (plan §2.4, D-049's arithmetic).
++ *
++ * PD's matrices are ROW-vector (v * M): guPerspectiveF writes P[2][3] = -1 and
++ * P[3][2] = 2nf/(n-f), and gfx_matrix_mul forms MP = MV * P. So folding a view
++ * translation T = translate(-e, 0, 0) into P is exactly (T * P), whose only
++ * changed row is row 3:
++ *
++ *     eyeP[3][i] = P[3][i] - e * P[0][i]
++ *
++ * and the convergence skew - which makes the two eyes coincide at distance C
++ * instead of at infinity - is a constant NDC x shift of +a*e/C. A term added to
++ * P[2][0] contributes d*z to clip x and d*z/w = -d to NDC x (w = -z), so the
++ * term is -a*e/C. `e` is signed: +e is the RIGHT eye.
++ *
++ * FOUR RULES, one per class:
++ *
++ *  1. WORLD - the full fold: translation plus the skew at the crosshair plane.
++ *     Every untagged projection in the engine, which is all of them but four.
++ *
++ *  2. SKY - vi0000ab78 (vi.c:527) multiplies the camera's ROTATION into P and
++ *     loads identity as the modelview. A translation folded into that matrix is
++ *     a WORLD-space shift rather than a view-space one (the rotation sits
++ *     between them), and it is not wanted anyway: the sky is drawn at 2 x zfar,
++ *     where the correct disparity is exactly the convergence skew's infinity
++ *     term. SKEW ONLY. (harbourmasters §2.13's camera-basis fold.)
++ *
++ *  3. GUN - and this is the one D-049 got WRONG, not merely imprecisely.
++ *
++ *     D-049 kept the full translation fold and set C_gun = znear = 1.5. The NDC
++ *     x shift a convergence C contributes is a*e/C, so at C = 1.5 with the
++ *     default half-separation e = 3.15 that is 2.1 * a ~ 2.7 NDC UNITS - and
++ *     NDC is [-1, 1]. The viewmodel was shifted more than a whole screen width
++ *     sideways and drew entirely outside the frustum, in both eyes. That is why
++ *     the gun class counter read 247990 on the headset (the branch was TAKEN)
++ *     while the user could see no gun at all. `C_gun = znear` reads like quake3e
++ *     D-028 v2 but it is not: the gun's znear is 1.5 PD units, a centimetre and
++ *     a half, and the viewmodel's geometry sits tens of units away. Converging
++ *     at a plane thirty times nearer than the subject is a divergence, not a
++ *     convergence.
++ *
++ *     What D-028 v2 actually asks for is that the weapon sit AT the panel and
++ *     never in front of it. So the viewmodel converges at ITS OWN DEPTH, taken
++ *     from the modelview that is being multiplied in right now (row 3 of a
++ *     row-vector modelview is the model origin in view space, so |mv[3][2]| is
++ *     the depth of the thing about to be drawn), and its separation is scaled
++ *     by that depth against the world's convergence:
++ *
++ *         C_gun = |mv[3][2]|,  e_gun = e * C_gun / conv
++ *
++ *     Two things fall out. The panel-plane skew a*e_gun/C_gun = a*e/conv is
++ *     IDENTICAL to the world's, so the gun's convergence plane is the world's
++ *     convergence plane, which is the panel. And the gun's origin lands at zero
++ *     disparity while vertices nearer or further within the weapon keep a real,
++ *     correctly-signed disparity of 2*a*e*(d'-d)/(conv*d') - about a quarter of
++ *     a per cent of the screen width across a gun's length, which is the
++ *     comfortable end of "plausible" rather than the diplopic end.
++ *
++ *     `3d gunconv <units>` replaces C_gun with a fixed plane (and scales e_gun
++ *     to match) for the user's one A/B round, exactly as the plan intended.
++ *
++ *  4. FLAT - no fold at all, so the two eyes are bit-identical and the content
++ *     sits exactly ON the panel. Two things take it:
++ *       * menuRender's flat span (Q-026, answered "flatten"). PD's dialogs are
++ *         NOT the matrix-free NDC rectangles §2.4 assumed - most of the chrome
++ *         is projected geometry through func0f0d479c's own frustum - so under
++ *         the world fold the pause menu had depth, and in the headset it
++ *         intersected the world.
++ *       * an ORTHOGRAPHIC projection, which is sm64's own P[3][3] > 0.5 gate.
++ *         §2.4 asserted there is no orthographic matrix in this engine and that
++ *         is simply false: camGetOrthogonalMtxL() is loaded at a dozen sites
++ *         (the star field, explosion and smoke sprites, shards, bg.c's
++ *         portals). w is 1 there, so both the translation fold and the skew
++ *         degenerate into depth-dependent nonsense; and a sprite billboarded in
++ *         an orthographic projection has no parallax to show anyway.
++ *
++ * Returns false when 3D is off, in which case out[][] is untouched.
++ */
++static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
++                                  float out[4][4]) {
++    float e = 0.0f, conv = 0.0f, gunConv = 0.0f;
++    if (!pdVisionStereoFold(&e, &conv, &gunConv)) {
++        return false;
++    }
++    memcpy(out, P, 16 * sizeof(float));
++    if (e == 0.0f) {
++        // Stereo Depth 0 %: the mono projection in both eyes, bit for bit. The
++        // gate leans on this - an L/R pair taken at 0 % must be pixel-identical
++        // and the eye must still reproduce the 2D oracle frame.
++        return true;
++    }
++
++    const float a = P[0][0];
++    if (a == 0.0f || conv <= 0.0f) {
++        return false;
++    }
++
++    // The class, in the order that decides it: a span beats a shape, a shape
++    // beats a tag. (An orthographic matrix inside the menu span is flat either
++    // way, so the order only matters for the counters.)
++    int cls = pd_stereo.p_class;
++    if (pd_stereo.flat_span || P[3][3] > 0.5f) {
++        cls = PD_DLCLASS_FLAT;
++    }
++    pdVisionStereoNoteClass(cls);
++
++    if (cls == PD_DLCLASS_FLAT) {
++        // Untouched: identical in both eyes, and on the panel.
++        return true;
++    }
++
++    float C = conv;
++    float eEye = e;
++    if (cls == PD_DLCLASS_GUN) {
++        // The viewmodel's own depth, or the A/B's fixed plane.
++        float d = fabsf(mv[3][2]);
++        if (!(d > 1.0f)) {
++            d = 1.0f;       // a modelview with no translation: nothing to converge on
++        }
++        if (d > 4000.0f) {
++            d = 4000.0f;
++        }
++        C = (gunConv > 0.0f) ? gunConv : d;
++        eEye = e * C / conv;
++        pdVisionStereoNoteGunDepth(d);
++    }
++
++    if (cls != PD_DLCLASS_SKY) {
++        for (int i = 0; i < 4; i++) {
++            out[3][i] = P[3][i] - eEye * P[0][i];
++        }
++    }
++    // The skew: the whole of the sky's disparity, and the convergence of the
++    // world's and the gun's.
++    out[2][0] += -a * eEye / C;
++    return true;
++}
++
++/** MP = MV * (the eye's P). Called at the only two sites that form MP. */
++static void gfx_stereo_update_mp(const float mv[4][4]) {
++    float eyeP[4][4];
++    if (gfx_stereo_projection(rsp.P_matrix, mv, eyeP)) {
++        gfx_matrix_mul(rsp.MP_matrix, mv, eyeP);
++    } else {
++        gfx_matrix_mul(rsp.MP_matrix, mv, rsp.P_matrix);
++    }
++}
++#define PD_MP_UPDATE(mv) gfx_stereo_update_mp(mv)
++#else
++#define PD_MP_UPDATE(mv) gfx_matrix_mul(rsp.MP_matrix, (mv), rsp.P_matrix)
++#endif
++
+ // A G_MTX's matrix as the RSP reads it, from addr
+ static inline void gfx_mtx_read(const int32_t* addr, float matrix[4][4]) {
+ #ifndef GBI_FLOATS
+@@ -2277,8 +2537,20 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+     if (parameters & G_MTX_PROJECTION) {
+         if (parameters & G_MTX_LOAD) {
+             memcpy(rsp.P_matrix, matrix, sizeof(matrix));
++#if PD_VISION_STEREO
++            // A LOAD takes the class of the tag that preceded it, and the
++            // pending tag is one-shot: an untagged load is WORLD (D-055).
++            pd_stereo.p_class = pd_stereo.pending_class;
++            pd_stereo.pending_class = PD_DLCLASS_WORLD;
++#endif
+         } else {
+             gfx_matrix_mul(rsp.P_matrix, matrix, rsp.P_matrix);
++            // A MUL into the projection KEEPS the class: it is the same camera
++            // and the same subject, with a transform folded in. This is the
++            // half the old matrix-shape test could not do — 4J's XBLA lists
++            // multiply into P, the product stops being axis-aligned, and the
++            // shape test read the whole of it as sky (device: sky 2.29M against
++            // world 2.27M, which is what put PD's geometry at two depths).
+         }
+     } else { // G_MTX_MODELVIEW
+         if ((parameters & G_MTX_PUSH) && rsp.modelview_matrix_stack_size < 11) {
+@@ -2294,7 +2566,7 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+         }
+         rsp.lights_changed = 1;
+     }
+-    gfx_matrix_mul(rsp.MP_matrix, rsp.modelview_matrix_stack[rsp.modelview_matrix_stack_size - 1], rsp.P_matrix);
++    PD_MP_UPDATE(rsp.modelview_matrix_stack[rsp.modelview_matrix_stack_size - 1]);
+ }
+ 
+ static void gfx_sp_pop_matrix(uint32_t count) {
+@@ -2302,8 +2574,7 @@ static void gfx_sp_pop_matrix(uint32_t count) {
+         if (rsp.modelview_matrix_stack_size > 0) {
+             --rsp.modelview_matrix_stack_size;
+             if (rsp.modelview_matrix_stack_size > 0) {
+-                gfx_matrix_mul(rsp.MP_matrix, rsp.modelview_matrix_stack[rsp.modelview_matrix_stack_size - 1],
+-                               rsp.P_matrix);
++                PD_MP_UPDATE(rsp.modelview_matrix_stack[rsp.modelview_matrix_stack_size - 1]);
+             }
+         }
+     }
+@@ -8073,6 +8344,13 @@ static void gfx_run_dl(Gfx* cmd) {
+         switch (opcode) {
+                 // RSP commands:
+             case G_NOOP:
++#if PD_VISION_STEREO
++                // A TAGGED noop is the engine telling the stereo fold what it
++                // is about to draw (D-055, src/include/gbiex.h). An untagged
++                // one - gDPSetBlendMask is aliased to one - has w1 == 0 and is
++                // ignored exactly as before.
++                gfx_stereo_dl_tag(cmd->words.w1);
++#endif
+                 break;
+             case G_MTX: {
+                 gfx_sp_matrix(C0(16, 8), (const int32_t*)seg_addr(cmd->words.w1));
+@@ -8433,6 +8711,11 @@ static void gfx_sp_reset() {
+     rsp.modelview_matrix_stack_size = 1;
+     rsp.current_num_lights = 2;
+     rsp.lights_changed = true;
++#if PD_VISION_STEREO
++    // Called at the top of every eye's walk, so both eyes read the same tags
++    // from the same starting state (D-055).
++    gfx_stereo_reset_classes();
++#endif
+ }
+ 
+ extern "C" void gfx_get_dimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
+@@ -8674,8 +8957,23 @@ extern "C" void gfx_start_frame(void) {
+ 
+ uint32_t num_dls = 0;
+ 
+-extern "C" void gfx_run(Gfx* commands) {
+-    ++num_dls;
++/**
++ * One eye's worth of frame: the whole of what gfx_run used to be.
++ *
++ * In 2D it runs once and nothing has changed. In 3D it runs TWICE per host
++ * frame at the same game time, and every line of it is deliberately identical
++ * for both eyes - including gfx_sp_reset() at the top (the display list loads
++ * its own P and modelview, vi.c) and the resolve/grade/readback tail, which
++ * follow the current eye through patch 0031's framebuffer-0 redirect.
++ *
++ * Running it twice must not change the GAME. That is not obvious and it is not
++ * assumed: the M3 gate runs the M-001 seeded replay with 3D on at Stereo Depth
++ * 0 % and requires the eye's frame 1500 to reproduce the committed oracle frame
++ * while `gfx: N draws` reads exactly twice the oracle's counters. If anything in
++ * gfx_run_dl ever acquires frame-level state, that is the assertion that catches
++ * it.
++ */
++static void gfx_run_eye(Gfx* commands) {
+ #ifdef PD_IOS_PROFILER
+     // The prologue, which is where ANGLE-Metal asks CoreAnimation for the next
+     // drawable - and blocks if they are all in flight. On a 120 Hz panel that
+@@ -8745,7 +9043,17 @@ extern "C" void gfx_run(Gfx* commands) {
+ 
+     // Last chance to read the frame back: swap_buffers_begin() presents it and
+     // leaves the back buffer undefined.
+-    if (gfx_pre_swap_callback) {
++    //
++    // ONE EYE ONLY in 3D. The callback reads framebuffer 0, which is whichever
++    // eye is bound, and writes a file - so running it for both eyes would write
++    // the PNG twice and leave whichever finished last. The capture eye is R by
++    // default and PD_VP3D_SHOWEYE's eye when that is set, which is what makes
++    // two scripted replays an L-vs-R measurement.
++    if (gfx_pre_swap_callback
++#if PD_VISION_STEREO
++            && pdVisionEyeIsCapture(pdVisionGetEye())
++#endif
++       ) {
+         gfx_pre_swap_callback();
+     }
+ 
+@@ -8753,9 +9061,32 @@ extern "C" void gfx_run(Gfx* commands) {
+     pdProfEnd(PDPROF_GFXEND);
+ #endif
+ 
++#if PD_VISION_STEREO
++    // Counted here rather than at the top: an eye that was started but dropped
++    // (gfx_wapi->start_frame() said no) is not an eye that was rendered, and
++    // `eye_renders == 2 x frames` has to stay a fact rather than a hope.
++    pdVisionEyeNoteRender();
++#endif
++
++    // In 3D this is the publish, and it is a no-op for eye L: the compositor may
++    // only ever see a ring slot whose BOTH eyes are finished
++    // (app/gfx/gfx_angle_egl.mm -> pdVisionEyePublish).
+     gfx_wapi->swap_buffers_begin();
+ }
+ 
++extern "C" void gfx_run(Gfx* commands) {
++    ++num_dls;
++#if PD_VISION_STEREO
++    if (pdVisionEyesPerFrame() > 1) {
++        // Bounds the producer (frames in flight <= 2) and selects eye L.
++        pdVisionEyeBeginPair();
++        gfx_run_eye(commands);
++        pdVisionSetEye(PD_EYE_RIGHT);
++    }
++#endif
++    gfx_run_eye(commands);
++}
++
+ extern "C" void gfx_set_pre_swap_callback(GfxPreSwapCallback cb) {
+     gfx_pre_swap_callback = cb;
+ }

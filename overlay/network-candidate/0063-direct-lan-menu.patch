@@ -1,0 +1,194 @@
+Subject: Add an account-free direct IPv4 LAN join menu
+
+--- a/port/src/net/netsession.c
++++ b/port/src/net/netsession.c
+@@ -190,6 +190,7 @@
+ 
+ // A room from the lobby (netlobby.c): set at runtime, never saved to pd.ini
+ static s32 s_LobbyRoomOn = 0;
++static s32 s_DirectMenuSession = 0;
+ static char s_LobbyRoomId[16] = "";
+ static char s_LobbyRoomSecret[72] = "";
+ static s64 s_LobbyClock = 0; // the lobby's unix clock minus this machine's
+@@ -5305,17 +5306,26 @@
+ 	return 0;
+ }
+ 
++/** Direct sessions share transport setup, but never join a lobby room. */
++s32 netSessionDirectConnect(const char *addr, u16 port)
++{
++	s32 result;
++	if (!addr || !addr[0] || !port) return -1;
++	result = netSessionLobbyConnect(addr, port, "", "Player", NULL, 0);
++	if (result == 0) {
++		s_LobbyRoomOn = 0;
++		s_DirectMenuSession = 1;
++	}
++	return result;
++}
++
+ /**
+  * The room is left or gone: the session it made closes (a host says
+  * goodbye to its clients, a client to its host). Not mid-match: the lobby
+  * waits for the stage to stop first.
+  */
+-void netSessionLobbyStop(void)
+-{
+-	if (!s_LobbyRoomOn) {
+-		return;
+-	}
+-
++static void netSessionStopMenuSession(void)
++{
+ 	if (g_NetHostSocket) {
+ 		netSessionClose();
+ 		netTransportShutdown();
+@@ -5334,6 +5344,7 @@
+ 	}
+ 
+ 	memset(s_Clients, 0, sizeof(s_Clients));
++	s_DirectMenuSession = 0;
+ 	s_Role = NETROLE_NONE;
+ 	s_LobbyRoomOn = 0;
+ 	s_LobbyRoomId[0] = '\0';
+@@ -5347,6 +5358,29 @@
+ 	g_NetLocalSlot = 0;
+ 
+ 	sysLogPrintf(LOG_NOTE, "net: lobby: the room's session is closed");
++}
++
++void netSessionLobbyStop(void)
++{
++	if (s_LobbyRoomOn) netSessionStopMenuSession();
++}
++
++// Menu ownership keeps this from closing command-line or lobby sessions.
++s32 netSessionDirectState(void)
++{
++	if (!s_DirectMenuSession) return 0;
++	if (s_ClientState == NETCS_GONE) return -1;
++	return s_ClientState >= NETCS_JOINED ? 2 : 1;
++}
++
++void netSessionDirectCancel(void)
++{
++	// Loading a stage also closes menus: that is not cancellation.
++	if (!s_DirectMenuSession || s_MatchActive) return;
++	if (s_ClientState != NETCS_GONE) netClientLeave();
++	netSessionStopMenuSession();
++	// Consume failures and the notice queued by an intentional leave.
++	g_NetNoticePending = 0;
+ }
+ 
+ // 1 host, 2 client, 0 none (a lobby room's session only)
+--- a/port/src/netlobbymenu.c
++++ b/port/src/netlobbymenu.c
+@@ -1422,6 +1422,89 @@
+ 	return 0;
+ }
+ 
++// Direct LAN deliberately bypasses account creation and public room services.
++extern s32 netSessionDirectConnect(const char *addr, u16 port);
++extern s32 netSessionDirectState(void);
++extern void netSessionDirectCancel(void);
++extern const char *netSessionNoticeText(void);
++static char s_DirectAddress[MPSETUP_MAXNAME + 1] = "127.0.0.1";
++static char s_DirectPort[MPSETUP_MAXNAME + 1] = "27382";
++static char s_DirectMessage[96] = "Enter the host's IPv4 address and port.";
++static struct menudialogdef s_DirectLanDialog;
++
++static char *textDirectAddress(struct menuitem *item) { static char text[48]; snprintf(text, sizeof(text), "Host: %s\n", s_DirectAddress); return text; }
++static char *textDirectPort(struct menuitem *item) { static char text[48]; snprintf(text, sizeof(text), "Port: %s\n", s_DirectPort); return text; }
++static char *textDirectMessage(struct menuitem *item) { static char text[100]; snprintf(text, sizeof(text), "%s\n", s_DirectMessage); return text; }
++
++static MenuItemHandlerResult handlerDirectEdit(s32 op, struct menuitem *item, union handlerdata *data)
++{
++	char *value = item->param == 5 ? s_DirectPort : s_DirectAddress;
++	if (op == MENUOP_GETTEXT) snprintf(data->keyboard.string, MPSETUP_MAXNAME + 1, "%s", value);
++	if (op == MENUOP_SETTEXT) snprintf(value, MPSETUP_MAXNAME + 1, "%s", data->keyboard.string);
++	return 0;
++}
++static struct menuitem s_DirectAddressItems[] = {
++	{ MENUITEMTYPE_KEYBOARD, 15, 0, 0, 0, handlerDirectEdit },
++	{ MENUITEMTYPE_END },
++};
++static struct menuitem s_DirectPortItems[] = {
++	{ MENUITEMTYPE_KEYBOARD, 5, 0, 0, 0, handlerDirectEdit },
++	{ MENUITEMTYPE_END },
++};
++static struct menudialogdef s_DirectAddressDialog = { MENUDIALOGTYPE_DEFAULT, (uintptr_t)"Host IPv4 Address", s_DirectAddressItems, NULL, MENUDIALOGFLAG_LITERAL_TEXT, NULL };
++static struct menudialogdef s_DirectPortDialog = { MENUDIALOGTYPE_DEFAULT, (uintptr_t)"Host Port", s_DirectPortItems, NULL, MENUDIALOGFLAG_LITERAL_TEXT, NULL };
++
++static MenuItemHandlerResult handlerDirectJoin(s32 op, struct menuitem *item, union handlerdata *data)
++{
++	if (op == MENUOP_CHECKDISABLED) return netSessionDirectState() > 0;
++	if (op == MENUOP_SET) {
++		unsigned a, b, c, d;
++		char extra, *end;
++		long port = strtol(s_DirectPort, &end, 10);
++		if (sscanf(s_DirectAddress, "%u.%u.%u.%u%c", &a, &b, &c, &d, &extra) != 4
++				|| a > 255 || b > 255 || c > 255 || d > 255 || end == s_DirectPort || *end || port < 1 || port > 65535) {
++			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Enter a valid IPv4 address and port (1-65535).");
++		} else if (netSessionDirectConnect(s_DirectAddress, (u16)port) != 0) {
++			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Cannot join: a session is active or the socket failed.");
++		} else {
++			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Connecting to %s:%ld...", s_DirectAddress, port);
++		}
++	}
++	return 0;
++}
++static struct menuitem s_DirectLanItems[] = {
++	{ MENUITEMTYPE_LABEL, 0, 0, (uintptr_t)textDirectMessage, 0, NULL },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)textDirectAddress, 0, (void *)&s_DirectAddressDialog },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_SELECTABLE_OPENSDIALOG, (uintptr_t)textDirectPort, 0, (void *)&s_DirectPortDialog },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT, (uintptr_t)"Join\n", 0, handlerDirectJoin },
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_LITERAL_TEXT | MENUITEMFLAG_SELECTABLE_CLOSESDIALOG, (uintptr_t)"Back\n", 0, NULL },
++	{ MENUITEMTYPE_END },
++};
++static MenuDialogHandlerResult dialogDirectLan(s32 op, struct menudialogdef *dialogdef, union handlerdata *data)
++{
++	if (op == MENUOP_OPEN && !netSessionDirectState())
++		snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Enter the host's IPv4 address and port.");
++	if (op == MENUOP_TICK) {
++		s32 state = netSessionDirectState();
++		if (state < 0) {
++			const char *why = netSessionNoticeText();
++			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "%s", why && why[0] ? why : "Connection ended. You can try again.");
++			netSessionDirectCancel();
++		} else if (state == 2) {
++			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Connected. Waiting for the host to start.");
++		}
++	}
++	if (op == MENUOP_CLOSE) netSessionDirectCancel();
++	return 0;
++}
++static struct menudialogdef s_DirectLanDialog = { MENUDIALOGTYPE_DEFAULT, (uintptr_t)"Direct LAN", s_DirectLanItems, dialogDirectLan, MENUDIALOGFLAG_LITERAL_TEXT, NULL };
++
++MenuItemHandlerResult netDirectMenuHandler(s32 op, struct menuitem *item, union handlerdata *data)
++{
++	if (op == MENUOP_SET) menuPushDialog(&s_DirectLanDialog);
++	return 0;
++}
++
+ // The name box, Next and Back: the dialog, in the middle of the screen
+ static struct menuitem s_OnlineItems[] = {
+ 	{ MENUITEMTYPE_LIST, 0, MENUITEMFLAG_LIST_CUSTOMRENDER | MENUITEMFLAG_LIST_LEAVEATENDS, NAMEBOX_W, NAMEBOX_H, handlerNameBox },
+--- a/src/game/mainmenu.c
++++ b/src/game/mainmenu.c
+@@ -4987,6 +4987,7 @@
+ }
+ 
+ #ifndef PLATFORM_N64
++MenuItemHandlerResult netDirectMenuHandler(s32 operation, struct menuitem *item, union handlerdata *data);
+ MenuItemHandlerResult netLobbyMenuHandlerOnlineMain(s32 operation, struct menuitem *item, union handlerdata *data); // port/src/netlobbymenu.c
+ #endif
+ 
+@@ -5527,6 +5528,8 @@
+ 		menuhandlerMainMenuCombatSimulator,
+ 	},
+ #ifndef PLATFORM_N64
++	{ MENUITEMTYPE_SELECTABLE, 0, MENUITEMFLAG_BIGFONT | MENUITEMFLAG_LITERAL_TEXT,
++		(uintptr_t)"Direct LAN", 0, netDirectMenuHandler },
+ 	{
+ 		// netplay: the lobby's rooms, one step from here (port/src/netlobbymenu.c)
+ 		MENUITEMTYPE_SELECTABLE,

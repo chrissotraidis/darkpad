@@ -1,0 +1,169 @@
+Subject: platform: PLATFORM_IOS, an iOS/visionOS target and a static-library build
+
+The port has no Apple-mobile target: platform.h maps __APPLE__ straight to
+PLATFORM_OSX and CMake maps APPLE to "osx". iOS and visionOS are that, plus a
+handful of things that are not true there - the executable's directory is a
+read-only bundle, there are no subprocesses, nothing may replace the running
+binary, and there is no desktop GL.
+
+So PLATFORM_IOS is defined *alongside* PLATFORM_OSX rather than instead of it:
+every existing Apple code path keeps working unchanged and only the places that
+genuinely differ gain a second gate. TARGET_OS_VISION additionally sets
+PLATFORM_VISIONOS for Phase 5.
+
+CMake side:
+  - PD_IOS is true when CMAKE_SYSTEM_NAME is iOS/visionOS/tvOS. It is set
+    before project() because the macOS deployment-target block up there must
+    not claim 11.0 on a platform whose floor is 15.0 (or 26.0 on xrOS).
+  - TARGET_OS becomes "ios", so the version banner and the build id say so.
+  - `-rpath @executable_path` is dropped: an app bundle's frameworks are found
+    by Xcode, and that flag is a link error waiting to happen on iOS.
+  - EXTRA_LIBRARIES loses libdl (inside libSystem on iOS) and libstdc++.
+  - PD_GL_ANGLE accepts ANGLE as .framework slices, which is how it is built
+    for iOS and visionOS, as well as the .dylib pair used on macOS.
+  - PD_STATIC_LIB builds libpd.a instead of the executable. That is D-009:
+    CMake owns the engine cross-build, xcodegen/Xcode owns the bundle, the
+    signing and the OTA export. With the option off (every desktop build)
+    nothing changes.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a95196865..0c5b821e2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,7 +1,15 @@
+ cmake_minimum_required(VERSION 3.16)
+ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+ 
+-if(APPLE)
++# PD_IOS: iOS / visionOS cross build. CMAKE_SYSTEM_NAME arrives from the cache
++# before project(), so this is usable up here where the deployment target is
++# chosen. iOS and visionOS pick their own target (15.0 / 26.0) on the command
++# line and must not be given macOS's.
++if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "visionOS" OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
++  set(PD_IOS TRUE)
++endif()
++
++if(APPLE AND NOT PD_IOS)
+   if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+     # ARM Macs start at OS 11.
+     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum OS X deployment version")
+@@ -61,6 +69,11 @@ message(STATUS "Target arch: ${TARGET_ARCH}")
+ if(WIN32)
+   # Windows
+   set(TARGET_OS "windows")
++elseif(PD_IOS)
++  # iOS / visionOS. PLATFORM_IOS is defined alongside PLATFORM_OSX in
++  # src/include/platform.h, so every existing Apple code path keeps working and
++  # only the handful of places that genuinely differ branch on PLATFORM_IOS.
++  set(TARGET_OS "ios")
+ elseif(APPLE)
+   # OSX
+   set(TARGET_OS "osx")
+@@ -265,9 +278,11 @@ add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>)
+ add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-function>)
+ 
+ # Platform-specific flags
+-if (APPLE)
++if (APPLE AND NOT PD_IOS)
+   # Make it look for libs in the executable folder manually since CMake's rpath system is wack
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rpath @executable_path")
++elseif (PD_IOS)
++  # Nothing: the frameworks live in the app bundle and Xcode links them.
+ else()
+   # This warning is not recognized by XCode/Clang for some reason.
+   add_compile_options(-Wno-format-truncation)
+@@ -342,18 +357,27 @@ if(PD_GL_ANGLE)
+   if(NOT PD_ANGLE_DIR OR NOT PD_ANGLE_INCLUDE_DIR OR NOT PD_ANGLE_GLUE)
+     message(FATAL_ERROR "PD_GL_ANGLE needs PD_ANGLE_DIR, PD_ANGLE_INCLUDE_DIR and PD_ANGLE_GLUE")
+   endif()
+-  if(NOT EXISTS "${PD_ANGLE_DIR}/libEGL.dylib" OR NOT EXISTS "${PD_ANGLE_GLUE}")
+-    message(FATAL_ERROR "PD_GL_ANGLE: no libEGL.dylib in ${PD_ANGLE_DIR}, or no glue at ${PD_ANGLE_GLUE}")
++  if(NOT EXISTS "${PD_ANGLE_DIR}/libEGL.dylib" AND NOT EXISTS "${PD_ANGLE_DIR}/libEGL.framework")
++    message(FATAL_ERROR "PD_GL_ANGLE: no libEGL.dylib and no libEGL.framework in ${PD_ANGLE_DIR}")
++  endif()
++  if(NOT EXISTS "${PD_ANGLE_GLUE}")
++    message(FATAL_ERROR "PD_GL_ANGLE: no glue at ${PD_ANGLE_GLUE}")
+   endif()
+   enable_language(OBJCXX)
+   set(GL_LIBRARY "")
+   include_directories(SYSTEM "${PD_ANGLE_INCLUDE_DIR}")
+   add_definitions(-DPD_GL_ANGLE)
+-  list(APPEND LIBS
+-    "${PD_ANGLE_DIR}/libEGL.dylib"
+-    "${PD_ANGLE_DIR}/libGLESv2.dylib"
+-    "-framework QuartzCore" "-framework Metal" "-framework Foundation"
+-    "-Wl,-rpath,${PD_ANGLE_DIR}")
++  if(EXISTS "${PD_ANGLE_DIR}/libEGL.dylib")
++    list(APPEND LIBS
++      "${PD_ANGLE_DIR}/libEGL.dylib"
++      "${PD_ANGLE_DIR}/libGLESv2.dylib"
++      "-Wl,-rpath,${PD_ANGLE_DIR}")
++  else()
++    # Framework slices (iOS, visionOS). The app target embeds them; a static
++    # engine library records them as an interface dependency only.
++    list(APPEND LIBS "-F${PD_ANGLE_DIR}" "-framework libEGL" "-framework libGLESv2")
++  endif()
++  list(APPEND LIBS "-framework QuartzCore" "-framework Metal" "-framework Foundation")
+ endif()
+ 
+ if(NOT DEFINED GL_LIBRARY)
+@@ -450,6 +474,9 @@ if(NOT EXTRA_LIBRARIES)
+         -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic)
+   elseif(NINTENDO_SWITCH)
+     set(EXTRA_LIBRARIES stdc++ pthread)
++  elseif(PD_IOS)
++    # No libdl on iOS (it is inside libSystem) and no libstdc++ at all.
++    set(EXTRA_LIBRARIES c++ m)
+   else()
+     set(EXTRA_LIBRARIES stdc++ m dl)
+   endif()
+@@ -706,10 +733,21 @@ list(APPEND SRC ${LANGPACK_C})
+ # Game target
+ 
+ set(BIN_NAME "${BIN_BASENAME}")
+-add_executable(pd ${SRC})
++#
++# PD_STATIC_LIB: build the whole engine as libpd.a instead of an executable.
++# That is how the iOS and visionOS app bundles are assembled - CMake owns the
++# engine build, Xcode owns the bundle, the signing and the export (D-009) -
++# and the entry point moves to the shell (port/src/main.c: pdEngineMain).
++option(PD_STATIC_LIB "Build the engine as a static library instead of an executable" OFF)
++if(PD_STATIC_LIB)
++  add_library(pd STATIC ${SRC})
++  set_target_properties(pd PROPERTIES OUTPUT_NAME "pd")
++else()
++  add_executable(pd ${SRC})
++  set_target_properties(pd PROPERTIES OUTPUT_NAME "${BIN_NAME}")
++endif()
+ add_dependencies(pd pd_headers)
+ target_link_libraries(pd ${LIBS})
+-set_target_properties(pd PROPERTIES OUTPUT_NAME "${BIN_NAME}")
+ if(WIN32)
+   set_target_properties(pd PROPERTIES WIN32_EXECUTABLE TRUE)
+ endif()
+diff --git a/src/include/platform.h b/src/include/platform.h
+index 79a1864e8..3a14716b5 100644
+--- a/src/include/platform.h
++++ b/src/include/platform.h
+@@ -11,8 +11,21 @@
+ 	#define PLATFORM_POSIX 1
+ 	#define PLATFORM_LINUX 1
+ #elif defined(__APPLE__)
++	#include <TargetConditionals.h>
+ 	#define PLATFORM_POSIX 1
++	// PLATFORM_OSX stays defined on iOS and visionOS on purpose: every Apple
++	// code path in the tree (the savedir legacy pick in fs.c, _NSGetExecutablePath
++	// in update.c, the Cocoa bits of the port layer) is written against it and
++	// keeps working. PLATFORM_IOS is the *additional* gate, used only where the
++	// two genuinely differ - no writable executable directory, no subprocesses,
++	// no self-replacing binary, no desktop GL.
+ 	#define PLATFORM_OSX 1
++	#if TARGET_OS_IPHONE
++		#define PLATFORM_IOS 1
++		#if TARGET_OS_VISION
++			#define PLATFORM_VISIONOS 1
++		#endif
++	#endif
+ #else
+ 	// assume POSIX-compatible
+ 	#define PLATFORM_POSIX 1

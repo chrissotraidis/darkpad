@@ -1,0 +1,90 @@
+Subject: iOS: select the tapped dropdown entry using rendered list bounds
+
+Fixes Combat Simulator bot count taps committing the previously selected value.
+Retains controller behavior and does not change menu data allocation.
+
+--- a/src/game/menuitem.c
++++ b/src/game/menuitem.c
+@@ -45,6 +45,17 @@
+ 
+ u8 g_MpSelectedPlayersForStats[MAX_PLAYERS];
+ 
++#ifdef PLATFORM_IOS
++// The open dropdown can move above its owning row and scroll independently.
++// Keep the last rendered geometry, so a touch selects what was actually seen.
++static struct {
++	struct menudialog *dialog;
++	struct menuitem *item;
++	union menuitemdata *data;
++	s32 x, y, width, height, offset, halfheight;
++} g_IosDropdownHit[MAX_PLAYERS];
++#endif
++
+ #if VERSION >= VERSION_NTSC_1_0
+ s32 g_ScissorX1 = 0;
+ s32 g_ScissorX2 = 0;
+@@ -351,6 +362,20 @@
+ 	halfheight *= g_LineHeight;
+ 
+ 	itemdata->viewheight = context->height;
++#ifdef PLATFORM_IOS
++	if (context->item->type == MENUITEMTYPE_DROPDOWN || context->item->type == MENUITEMTYPE_PLAYERSTATS) {
++		g_IosDropdownHit[g_MpPlayerNum].dialog = context->dialog;
++		g_IosDropdownHit[g_MpPlayerNum].item = context->item;
++		g_IosDropdownHit[g_MpPlayerNum].data = context->data;
++		g_IosDropdownHit[g_MpPlayerNum].x = context->x;
++		g_IosDropdownHit[g_MpPlayerNum].y = context->y;
++		g_IosDropdownHit[g_MpPlayerNum].width = context->width;
++		g_IosDropdownHit[g_MpPlayerNum].height = context->height;
++		g_IosDropdownHit[g_MpPlayerNum].offset = itemdata->curoffsety;
++		g_IosDropdownHit[g_MpPlayerNum].halfheight = halfheight;
++	}
++#endif
++
+ 
+ 	if (context->item->type == MENUITEMTYPE_DROPDOWN || context->item->type == MENUITEMTYPE_PLAYERSTATS) {
+ 		gdl = menugfxDrawDropdownBackground(gdl, context->x, context->y, context->x + context->width, context->y + context->height);
+@@ -905,6 +930,9 @@
+ 	union handlerdata handlerdata;
+ 	union handlerdata handlerdata2;
+ 
++#ifdef PLATFORM_IOS
++	g_IosDropdownHit[g_MpPlayerNum].item = NULL;
++#endif
+ 	data->dropdown.list.curoffsety = 0;
+ 	data->dropdown.list.index = 0;
+ 	data->dropdown.unk08 = 0;
+@@ -1036,6 +1064,33 @@
+ 
+ 	if ((tickflags & MENUTICKFLAG_ITEMISFOCUSED) && item->handler) {
+ 		if (dialog->dimmed && item == dialog->focuseditem) {
++#ifdef PLATFORM_IOS
++			if (inputs->select && inputs->mouseheld && g_MenuUsingMouse && inputIosPointerIsActive()) {
++				const s32 n = g_MpPlayerNum;
++				union handlerdata hd;
++				bool hit = false;
++				if (g_IosDropdownHit[n].dialog == dialog && g_IosDropdownHit[n].item == item
++						&& g_IosDropdownHit[n].data == data
++						&& inputs->mousex >= g_IosDropdownHit[n].x
++						&& inputs->mousex < g_IosDropdownHit[n].x + g_IosDropdownHit[n].width
++						&& inputs->mousey >= g_IosDropdownHit[n].y
++						&& inputs->mousey < g_IosDropdownHit[n].y + g_IosDropdownHit[n].height) {
++					const s32 rel = inputs->mousey - g_IosDropdownHit[n].y
++						- g_IosDropdownHit[n].halfheight + g_IosDropdownHit[n].offset;
++					const s32 index = menuitem0f0e5d2c(rel, item);
++					item->handler(MENUOP_GETOPTIONCOUNT, item, &hd);
++					if (rel >= 0 && index >= 0 && index < (s32)hd.list.value) {
++						data->list.index = index;
++						data->list.targetoffsety = menuitemListGetOffsetY(index, item);
++						hd.list.value = index;
++						item->handler(MENUOP_LISTITEMFOCUS, item, &hd);
++						hit = true;
++					}
++				}
++				// Outside the rendered choices: never commit the previous value.
++				if (!hit) inputs->select = false;
++			}
++#endif
+ 			menuitemListTick(item, inputs, tickflags, data);
+ 
+ 			if (mpIsPlayerLockedOut(g_MpPlayerNum)) {

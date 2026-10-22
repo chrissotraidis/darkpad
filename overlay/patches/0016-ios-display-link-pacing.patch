@@ -1,0 +1,82 @@
+Subject: gfx_sdl2: on iOS the display link paces the frame, not a busy-wait
+
+docs/pacing.md is the design; this is the one place in the engine it touches.
+
+Upstream presents when `sync_framerate_with_timer()` says so - a `sysSleep`
+followed by a `sysCpuRelax()` spin on the performance counter
+(gfx_sdl2.cpp:329-361). On a phone that spin is a burnt core, heat, and, once
+the thermal state leaves nominal, a LOWER sustained frame rate than doing
+nothing would have given. Stacked under ANGLE's own `eglSwapInterval(1)` wait
+it is also two clocks that do not agree, which is micro-stutter no profiling
+run can explain because nothing is actually slow.
+
+On iOS the frame therefore waits on a CADisplayLink running on its own thread
+(app/ios/PDPacing.m) and presents exactly once per callback, with the ANGLE
+swap interval set to 0 so nothing waits twice. The wait answers 0 when the app
+is backgrounded, and then the present is skipped rather than swapped into a
+CAMetalLayer drawable the system has taken back - the family's "looks like a
+port bug, is actually a lifecycle bug" failure.
+
+Nothing here changes the sim rate or `--fixed-step`, so the seeded replay is
+untouched; a replay run bypasses the pacer entirely on the shell side.
+
+Every other platform keeps upstream's limiter exactly as it was.
+
+diff --git a/port/fast3d/gfx_sdl2.cpp b/port/fast3d/gfx_sdl2.cpp
+index 4738da8a9..0eb8b0530 100644
+--- a/port/fast3d/gfx_sdl2.cpp
++++ b/port/fast3d/gfx_sdl2.cpp
+@@ -23,6 +23,11 @@ extern "C" int pdAngleSetSwapInterval(int interval);
+ extern "C" int pdAngleGetSwapInterval(void);
+ #endif
+ 
++#ifdef PLATFORM_IOS
++// app/ios/PDPacing.m — the display-link pacer. 1 = present now, 0 = skip.
++extern "C" int pdIosPacingWaitForPresent(void);
++#endif
++
+ static SDL_Window* wnd;
+ static SDL_GLContext ctx;
+ static SDL_Renderer* renderer;
+@@ -243,7 +248,13 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+     }
+     sysLogPrintf(LOG_NOTE, "SDL: created GL3.0es context through ANGLE (%s)", pdAngleGetVendorString());
+     pdAngleGetDrawableSize(&window_width, &window_height);
++#ifdef PLATFORM_IOS
++    // 0, not 1: the display link is the clock, and two waits stacked on two
++    // clocks is what micro-stutter is made of (docs/pacing.md).
++    pdAngleSetSwapInterval(0);
++#else
+     pdAngleSetSwapInterval(1);
++#endif
+     SDL_ShowWindow(wnd);
+     qpc_freq = SDL_GetPerformanceFrequency();
+     return;
+@@ -462,6 +473,19 @@ static inline void sync_framerate_with_timer(void) {
+ }
+ 
+ static void gfx_sdl_swap_buffers_begin(void) {
++#ifdef PLATFORM_IOS
++    // CADisplayLink is the only pacer on iOS (docs/pacing.md). The desktop
++    // limiter above it is a sysCpuRelax() spin - a burnt core, heat, and a
++    // clock that does not agree with the display server's - so it does not run
++    // here at all. Instead the game thread blocks in the kernel until the link
++    // says the next frame is due, and presents once. A 0 answer means the app
++    // is backgrounded: skip the present rather than swap into a CAMetalLayer
++    // drawable the system has taken back.
++    if (!pdIosPacingWaitForPresent()) {
++        return;
++    }
++    pdAngleSwapBuffers();
++#else
+     if (target_fps) {
+         sync_framerate_with_timer();
+     }
+@@ -476,6 +500,7 @@ static void gfx_sdl_swap_buffers_begin(void) {
+         SDL_GL_SwapWindow(wnd);
+ #endif
+     }
++#endif
+ }
+ 
+ static void gfx_sdl_swap_buffers_end(void) {

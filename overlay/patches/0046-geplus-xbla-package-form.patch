@@ -1,0 +1,1516 @@
+Subject: GE Plus: the GoldenEye XBLA release in its Xbox 360 package form
+
+gebean.c reads the GoldenEye XBLA release only as its loose files: a folder
+holding files/new/char, or a .7z/.zip with entries under it. The same release
+also comes as the console's own download - one STFS package, title 584108A9,
+740 MB - usually inside a .7z that keeps the console's folders
+(<top>/0000000000000000/584108A9/000D0000/<package>). Every file in the package
+but default.xex is byte for byte the loose release's (all 1,802 compared by
+md5), so this is a second way in, not a second release.
+
+Accepted now, found by content in added-content/ (and the older xbla/ dirs):
+the package itself (STFS magic and title id 584108A9 at 0x360, never its
+name), a folder holding it (GEBEAN_SCAN_DEPTH 2 -> 4: the folder as it comes
+out of its archive has the package four names down), and a .7z or .zip holding
+it (an entry under 584108A9/000D0000/, or named as the package). A .rar is still
+never looked into.
+
+The unpack fills the same cache the archive form does (files/ at the top of
+cache/xbla/goldeneye) with the same files (gebeanWantEntry), on the same worker
+thread behind the same notice, so nothing after it changes:
+- the bare package (or a folder's) is read where it lies with x360.c's reader;
+- an archive's package cannot be: it is inside one solid LZMA2 block. Rather
+  than spooling 740 MB to disk to read 400 MB of it, the block is decoded as a
+  stream (archive.c's new archiveStreamEntry(), which holds the decoder's
+  dictionary and a 1 MB piece, never the entry) and the package's own layout is
+  followed as it goes by: its file table comes first, gives every wanted file's
+  4 KB blocks by their offsets in the package, and each block is written where
+  it belongs as it passes. Only a package whose wanted files are not stored in
+  consecutive blocks (which needs its hash tables followed) is spooled whole
+  into the cache first and read from there; this release's are all consecutive.
+- free space is checked before anything is written (iOS: the volume's capacity
+  for important use, app/ios/PDXbla.m; elsewhere statvfs): what the unpack
+  writes plus 64 MB. Without it, nothing is written, a notice says how much is
+  needed for five seconds, the game goes on in the N64 look, the cache gets a
+  .needs-space note for the settings page, and the next start tries again.
+
+The cache's marker now names what it was unpacked from (file name and size),
+so a release replaced by another file is unpacked again; a marker written
+before this patch is empty and still good for the archive form it can only
+have come from. Every unpack starts by emptying the cache (all but the
+Community Edition's folder), so nothing a killed unpack left half written is
+ever taken for a finished one; the marker is written last. The Community
+Edition's patch is not offered the package as an archive to take more files
+from (gebeanTreeInfo() names no archive for it).
+
+Nothing here draws anything differently: with the loose form, or with no
+GoldenEye files, the game reads exactly what it read before.
+
+diff --git a/port/include/archive.h b/port/include/archive.h
+index 4821e683e..57b0a6665 100644
+--- a/port/include/archive.h
++++ b/port/include/archive.h
+@@ -61,6 +61,26 @@ s32 archiveExtractMatching(const char *path, const char *destDir, archivefilter
+  */
+ void archiveGetProgress(s32 *done, s32 *total);
+ 
++/** Takes the next len bytes of an entry; 0 stops the stream. */
++typedef s32 (*archivesink)(const u8 *data, u32 len, void *arg);
++
++/**
++ * The largest file entry of a .7z or .zip whose name has needle in it (compared
++ * as archiveFindEntry() does), decoded as a stream and handed to sink a piece at
++ * a time, in order. *size is set to the entry's length before the first piece.
++ *
++ * For one entry too big to want in memory or on disk twice: the GoldenEye XBLA
++ * release in its Xbox 360 package form is a 740MB package inside one solid
++ * block of a .7z, and what is held at once here is the decoder's dictionary
++ * and a 1MB piece, never the entry. Nothing is written to disk.
++ *
++ * 1 when the whole entry was handed over, 0 when the sink stopped it, -1 on a
++ * fault, when nothing is named like needle, or when the entry is in a 7z block
++ * that is not one LZMA or LZMA2 coder or a zip entry that is neither stored
++ * nor deflated (or zip64). A .rar is never read here.
++ */
++s32 archiveStreamEntry(const char *path, const char *needle, archivesink sink, void *arg, u64 *size);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/port/include/gebean.h b/port/include/gebean.h
+index 28a3bfe96..ce3af719d 100644
+--- a/port/include/gebean.h
++++ b/port/include/gebean.h
+@@ -427,6 +427,15 @@ void gebeanFontClose(struct gebeanfont *font);
+ 
+ s32 gebeanTreeInfo(char *root, u32 rootLen, char *archive, u32 archiveLen, char *cache, u32 cacheLen);
+ 
++/**
++ * The release in its Xbox 360 package form (iOS port overlay 0046): whether a
++ * file is GoldenEye XBLA's STFS package (title 584108A9, read at 0x360), and
++ * whether a .7z or .zip holds it. xblaimport.c asks both to pass the package
++ * over when looking for Perfect Dark's own, which is an STFS package too.
++ */
++s32 gebeanIsPackageFile(const char *path);
++s32 gebeanArchiveHoldsPackage(const char *path);
++
+ /**
+  * The GoldenEye XBLA Community Edition, applied by the game from the player's
+  * own updater zip in added-content/ (gebeance.c). Chosen in the menu, drawn
+diff --git a/port/src/archive.c b/port/src/archive.c
+index 66eeb41bb..aec9352c5 100644
+--- a/port/src/archive.c
++++ b/port/src/archive.c
+@@ -1041,6 +1041,408 @@ static s32 archiveExtract7zMatching(const char *path, const char *destDir, archi
+ 	return written;
+ }
+ 
++/* -------------------------------------------------------------------------
++ * One large entry, as a stream (iOS port overlay 0046)
++ * ------------------------------------------------------------------------- */
++
++// How much compressed zip data is read at a time.
++#define ARCHIVE_ZIP_CHUNK (1 << 18)
++
++/**
++ * The 7z half of archiveStreamEntry(). The entry's block is decoded from its
++ * start, the bytes of the files before the entry are decoded past, and the
++ * entry's own go to the sink; decoding stops at its last byte.
++ */
++static s32 archiveStream7z(const char *path, const char *needle, archivesink sink, void *arg, u64 *size)
++{
++	struct archive7z a;
++	const CSzArEx *db;
++	CSzFolder *folder;
++	const CSzCoderInfo *coder;
++	CLzma2Dec lzma2;
++	CLzmaDec lzma;
++	UInt32 pick = (UInt32)-1;
++	UInt32 fi;
++	UInt64 skip = 0;
++	UInt64 left;
++	UInt64 packLeft;
++	UInt64 unpackLeft;
++	Byte *chunk;
++	s32 islzma2;
++	s32 result = -1;
++
++	if (!archive7zOpen(&a, path)) {
++		sysLogPrintf(LOG_ERROR, "archive: could not read %s as a 7z", path);
++		return -1;
++	}
++
++	db = &a.db;
++
++	for (UInt32 i = 0; i < db->db.NumFiles; i++) {
++		char name[ARCHIVE_MAXNAME];
++
++		if (!db->db.Files[i].IsDir && db->FileIndexToFolderIndexMap[i] != (UInt32)-1
++				&& archive7zName(db, i, name) && archiveNameHas(name, needle)
++				&& (pick == (UInt32)-1 || db->db.Files[i].Size > db->db.Files[pick].Size)) {
++			pick = i;
++		}
++	}
++
++	if (pick == (UInt32)-1) {
++		sysLogPrintf(LOG_ERROR, "archive: nothing in %s is named like %s", path, needle);
++		archive7zClose(&a);
++		return -1;
++	}
++
++	fi = db->FileIndexToFolderIndexMap[pick];
++	folder = db->db.Folders + fi;
++
++	if (folder->NumCoders != 1 || folder->NumPackStreams != 1 || folder->NumBindPairs != 0) {
++		sysLogPrintf(LOG_ERROR, "archive: %s is in a block of a kind this cannot stream", path);
++		archive7zClose(&a);
++		return -1;
++	}
++
++	coder = &folder->Coders[0];
++
++	if (coder->MethodID == ARCHIVE_7Z_LZMA2 && coder->Props.size == 1) {
++		islzma2 = 1;
++	} else if (coder->MethodID == ARCHIVE_7Z_LZMA && coder->Props.size == 5) {
++		islzma2 = 0;
++	} else {
++		sysLogPrintf(LOG_ERROR, "archive: %s is compressed with a method this cannot stream", path);
++		archive7zClose(&a);
++		return -1;
++	}
++
++	// what the block holds ahead of the entry
++	for (UInt32 i = archive7zNextInFolder(db, db->FolderStartFileIndex[fi], fi);
++			i < db->db.NumFiles && i != pick; i = archive7zNextInFolder(db, i + 1, fi)) {
++		skip += db->db.Files[i].Size;
++	}
++
++	left = db->db.Files[pick].Size;
++	*size = left;
++	packLeft = db->db.PackSizes[db->FolderStartPackStreamIndex[fi]];
++	unpackLeft = SzFolder_GetUnpackSize(folder);
++
++	if (LookInStream_SeekTo(&a.look.s, SzArEx_GetFolderStreamPos(db, fi, 0)) != SZ_OK
++			|| !(chunk = malloc(ARCHIVE_7Z_CHUNK))) {
++		archive7zClose(&a);
++		return -1;
++	}
++
++	if (islzma2) {
++		Lzma2Dec_Construct(&lzma2);
++
++		if (Lzma2Dec_Allocate(&lzma2, coder->Props.data[0], &a.alloc) != SZ_OK) {
++			free(chunk);
++			archive7zClose(&a);
++			return -1;
++		}
++
++		Lzma2Dec_Init(&lzma2);
++	} else {
++		LzmaDec_Construct(&lzma);
++
++		if (LzmaDec_Allocate(&lzma, coder->Props.data, 5, &a.alloc) != SZ_OK) {
++			free(chunk);
++			archive7zClose(&a);
++			return -1;
++		}
++
++		LzmaDec_Init(&lzma);
++	}
++
++	while (left > 0 && unpackLeft > 0) {
++		const void *inBuf = NULL;
++		size_t lookahead = 1 << 18;
++		SizeT inProcessed;
++		SizeT outLen = ARCHIVE_7Z_CHUNK;
++		SizeT pos = 0;
++		ELzmaStatus status;
++		SRes res;
++
++		if (lookahead > packLeft) {
++			lookahead = (size_t)packLeft;
++		}
++
++		if (outLen > unpackLeft) {
++			outLen = (SizeT)unpackLeft;
++		}
++
++		if (a.look.s.Look(&a.look.s, &inBuf, &lookahead) != SZ_OK) {
++			break;
++		}
++
++		inProcessed = lookahead;
++		res = islzma2
++			? Lzma2Dec_DecodeToBuf(&lzma2, chunk, &outLen, inBuf, &inProcessed, LZMA_FINISH_ANY, &status)
++			: LzmaDec_DecodeToBuf(&lzma, chunk, &outLen, inBuf, &inProcessed, LZMA_FINISH_ANY, &status);
++
++		if (res != SZ_OK || (inProcessed == 0 && outLen == 0)
++				|| a.look.s.Skip(&a.look.s, inProcessed) != SZ_OK) {
++			break;
++		}
++
++		packLeft -= inProcessed;
++		unpackLeft -= outLen;
++
++		if (skip >= outLen) {
++			skip -= outLen;
++			continue;
++		}
++
++		pos = (SizeT)skip;
++		skip = 0;
++
++		{
++			const SizeT take = (UInt64)(outLen - pos) < left ? outLen - pos : (SizeT)left;
++
++			if (!sink(chunk + pos, (u32)take, arg)) {
++				result = 0;
++				break;
++			}
++
++			left -= take;
++		}
++	}
++
++	if (left == 0) {
++		result = 1;
++	} else if (result != 0) {
++		sysLogPrintf(LOG_ERROR, "archive: %s stopped decoding with %llu bytes of the entry to go",
++				path, (unsigned long long)left);
++	}
++
++	if (islzma2) {
++		Lzma2Dec_Free(&lzma2, &a.alloc);
++	} else {
++		LzmaDec_Free(&lzma, &a.alloc);
++	}
++
++	free(chunk);
++	archive7zClose(&a);
++
++	return result;
++}
++
++/** The zip half: a stored or deflated entry, read and inflated a piece at a time. */
++static s32 archiveStreamZip(const char *path, const char *needle, archivesink sink, void *arg, u64 *size)
++{
++	FILE *f = fopen(path, "rb");
++	u8 *tail = NULL, *cdir = NULL, *in = NULL, *out = NULL;
++	off_t fileSize;
++	u32 back, eocd = 0, numEntries, cdirOfs, cdirLen;
++	u32 method = 0, csize = 0, usize = 0, localOfs = 0, best = 0;
++	s32 found = 0;
++	s32 result = -1;
++	u8 local[30];
++	u64 left, inLeft;
++	z_stream zs;
++	s32 inflating = 0;
++
++	if (!f) {
++		return -1;
++	}
++
++	if (fseeko(f, 0, SEEK_END) != 0 || (fileSize = ftello(f)) < ZIP_EOCD_MINLEN || fileSize > 0xffffffffLL) {
++		goto done;
++	}
++
++	back = (u32)fileSize < ZIP_EOCD_MAXBACK ? (u32)fileSize : ZIP_EOCD_MAXBACK;
++
++	if (!(tail = malloc(back)) || fseeko(f, fileSize - back, SEEK_SET) != 0 || fread(tail, 1, back, f) != back) {
++		goto done;
++	}
++
++	for (u32 i = ZIP_EOCD_MINLEN; i <= back; i++) {
++		if (archiveReadU32(tail + back - i) == ZIP_EOCD_SIG) {
++			eocd = back - i;
++			found = 1;
++			break;
++		}
++	}
++
++	if (!found) {
++		goto done;
++	}
++
++	found = 0;
++	numEntries = archiveReadU16(tail + eocd + 10);
++	cdirLen = archiveReadU32(tail + eocd + 12);
++	cdirOfs = archiveReadU32(tail + eocd + 16);
++
++	if (!archiveFits(cdirOfs, cdirLen, (u32)fileSize) || !(cdir = malloc(cdirLen ? cdirLen : 1))
++			|| fseeko(f, cdirOfs, SEEK_SET) != 0 || fread(cdir, 1, cdirLen, f) != cdirLen) {
++		goto done;
++	}
++
++	for (u32 i = 0, pos = 0; i < numEntries; i++) {
++		char name[ARCHIVE_MAXNAME];
++		u32 nameLen;
++
++		if (!archiveFits(pos, 46, cdirLen) || archiveReadU32(cdir + pos) != ZIP_CDIR_SIG) {
++			break;
++		}
++
++		nameLen = archiveReadU16(cdir + pos + 28);
++
++		if (nameLen == 0 || nameLen >= sizeof(name) || !archiveFits(pos + 46, nameLen, cdirLen)) {
++			break;
++		}
++
++		memcpy(name, cdir + pos + 46, nameLen);
++		name[nameLen] = '\0';
++
++		if (name[nameLen - 1] != '/' && name[nameLen - 1] != '\\' && archiveNameHas(name, needle)
++				&& (!found || archiveReadU32(cdir + pos + 24) > best)) {
++			found = 1;
++			method = archiveReadU16(cdir + pos + 10);
++			csize = archiveReadU32(cdir + pos + 20);
++			usize = best = archiveReadU32(cdir + pos + 24);
++			localOfs = archiveReadU32(cdir + pos + 42);
++		}
++
++		pos += 46 + nameLen + archiveReadU16(cdir + pos + 30) + archiveReadU16(cdir + pos + 32);
++	}
++
++	if (!found) {
++		sysLogPrintf(LOG_ERROR, "archive: nothing in %s is named like %s", path, needle);
++		goto done;
++	}
++
++	// a zip64 entry keeps its real sizes elsewhere; nothing this reads needs one
++	if (csize == 0xffffffff || usize == 0xffffffff || localOfs == 0xffffffff || (method != 0 && method != 8)) {
++		sysLogPrintf(LOG_ERROR, "archive: the entry in %s is stored in a way this cannot stream", path);
++		goto done;
++	}
++
++	if (fseeko(f, localOfs, SEEK_SET) != 0 || fread(local, 1, sizeof(local), f) != sizeof(local)
++			|| archiveReadU32(local) != ZIP_LOCAL_SIG
++			|| fseeko(f, (off_t)localOfs + 30 + archiveReadU16(local + 26) + archiveReadU16(local + 28), SEEK_SET) != 0) {
++		goto done;
++	}
++
++	if (!(in = malloc(ARCHIVE_ZIP_CHUNK)) || !(out = malloc(ARCHIVE_7Z_CHUNK))) {
++		goto done;
++	}
++
++	*size = usize;
++	left = usize;
++	inLeft = method == 0 ? usize : csize;
++
++	if (method == 8) {
++		memset(&zs, 0, sizeof(zs));
++
++		if (inflateInit2(&zs, -MAX_WBITS) != Z_OK) {
++			goto done;
++		}
++
++		inflating = 1;
++	}
++
++	result = 1;
++
++	while (left > 0) {
++		const u32 want = inLeft < ARCHIVE_ZIP_CHUNK ? (u32)inLeft : ARCHIVE_ZIP_CHUNK;
++
++		if (want == 0 || fread(in, 1, want, f) != want) {
++			result = -1;
++			break;
++		}
++
++		inLeft -= want;
++
++		if (method == 0) {
++			if (!sink(in, want, arg)) {
++				result = 0;
++				break;
++			}
++
++			left -= want;
++			continue;
++		}
++
++		zs.next_in = in;
++		zs.avail_in = want;
++
++		// until this piece of input is used up AND inflate had room to spare,
++		// which is how it says it holds nothing more back
++		for (;;) {
++			s32 zr;
++			u32 got;
++
++			zs.next_out = out;
++			zs.avail_out = ARCHIVE_7Z_CHUNK;
++			zr = inflate(&zs, Z_NO_FLUSH);
++
++			if (zr != Z_OK && zr != Z_STREAM_END) {
++				result = -1;
++				break;
++			}
++
++			got = ARCHIVE_7Z_CHUNK - zs.avail_out;
++
++			if (got > left) {
++				result = -1;
++				break;
++			}
++
++			if (got && !sink(out, got, arg)) {
++				result = 0;
++				break;
++			}
++
++			left -= got;
++
++			if (zr == Z_STREAM_END || left == 0 || (zs.avail_in == 0 && zs.avail_out > 0)) {
++				break;
++			}
++		}
++
++		if (result != 1) {
++			break;
++		}
++	}
++
++	if (result == 1 && left != 0) {
++		result = -1;
++	}
++
++done:
++	if (inflating) {
++		inflateEnd(&zs);
++	}
++
++	free(in);
++	free(out);
++	free(cdir);
++	free(tail);
++	fclose(f);
++
++	return result;
++}
++
++s32 archiveStreamEntry(const char *path, const char *needle, archivesink sink, void *arg, u64 *size)
++{
++	const char *ext = archiveExt(path);
++
++	*size = 0;
++
++	if (!strcasecmp(ext, ".zip") || !strcasecmp(ext, ".pk3")) {
++		return archiveStreamZip(path, needle, sink, arg, size);
++	}
++
++	if (!strcasecmp(ext, ".7z")) {
++		return archiveStream7z(path, needle, sink, arg, size);
++	}
++
++	sysLogPrintf(LOG_ERROR, "archive: %s is not an archive this can stream from", path);
++
++	return -1;
++}
++
+ s32 archiveExtractMatching(const char *path, const char *destDir, archivefilter filter, void *arg)
+ {
+ 	if (strcasecmp(archiveExt(path), ".zip") == 0) {
+diff --git a/port/src/gebean.c b/port/src/gebean.c
+index 28b93c88f..722121d90 100644
+--- a/port/src/gebean.c
++++ b/port/src/gebean.c
+@@ -23,6 +23,11 @@
+ #include <strings.h>
+ #include <math.h>
+ #include <sys/stat.h>
++#if !defined(PLATFORM_IOS) && !defined(PLATFORM_WIN32)
++#include <sys/statvfs.h>
++#endif
++#include <unistd.h>
++#include <dirent.h>
+ #include <ultra64.h>
+ #include <PR/ultratypes.h>
+ #include "constants.h"
+@@ -73,7 +78,16 @@
+ // ammunition pictures, the fourteenth the monitors' pictures, the bullet holes
+ // and the hit puffs.
+ #define GEBEAN_DONE_FILE ".extracted14"
+-#define GEBEAN_SCAN_DEPTH 2
++// Four, not two (iOS port overlay 0046): the release in its Xbox 360 package
++// form keeps the console's own folders, and a folder of it as it comes out of
++// its archive has the package four names down
++// (GoldenEye 007 XBLA/0000000000000000/584108A9/000D0000/<package>).
++#define GEBEAN_SCAN_DEPTH 4
++// Written into the cache instead of the marker when the package form could not
++// be unpacked for want of room: "<MB needed> <MB free>", for the settings page
++// to say so. And how long the notice saying it stays up.
++#define GEBEAN_NOSPACE_FILE ".needs-space"
++#define GEBEAN_NOSPACE_MS 5000
+ 
+ // What says a folder is Bean's, and which of an archive's entries are wanted:
+ // the characters and heads, where Rare put them - the HD ones in new/, and in
+@@ -2546,6 +2560,14 @@ static void gebeanScanEntry(const char *name, void *arg)
+ 	// release sits in the same folder, as an archive of its own.
+ 	if (scan->archives && archiveIsSupported(path) && archiveFindEntry(path, GEBEAN_WANT_CHARS)) {
+ 		snprintf(scan->found, sizeof(scan->found), "%s", path);
++		return;
++	}
++
++	// Or the release in its Xbox 360 package form: the package, known by its
++	// title id and never by its name (Perfect Dark's is a package too), or an
++	// archive holding it.
++	if (scan->archives && (archiveIsSupported(path) ? gebeanArchiveHoldsPackage(path) : gebeanIsPackageFile(path))) {
++		snprintf(scan->found, sizeof(scan->found), "%s", path);
+ 	}
+ }
+ 
+@@ -2645,6 +2667,828 @@ static s32 gebeanWantEntry(const char *name, void *arg)
+ 		|| strstr(lower, GEBEAN_WANT_HITPUFFS) != NULL;
+ }
+ 
++/* -------------------------------------------------------------------------
++ * The release in its Xbox 360 package form (iOS port overlay 0046)
++ *
++ * The same release also comes as the console's own download: one STFS package,
++ * title 584108A9, 740MB, which is the loose files above packed whole (every
++ * file but default.xex, which the package keeps compressed, is byte for byte
++ * the same). It is found as the bare package, a folder holding it, or a .7z or
++ * .zip holding it, and its wanted files land in the same cache as an archive's
++ * - files/ at the cache's top - so everything after the unpack is unchanged.
++ *
++ * An archive holding it is one solid block, so the package cannot be read in
++ * place. It is not spooled to disk either: the block is decoded as a stream
++ * (archiveStreamEntry()) and the package's own layout is followed as it goes
++ * by. Its file table comes first; from it every wanted file's 4KB blocks are
++ * known by their offsets in the package, and each is written where it belongs
++ * as the stream passes it. What is on disk at the end is the 400MB the game
++ * reads and nothing else; what is held at once is the decoder's dictionary,
++ * a 1MB piece and the block list. A package whose wanted files are not stored
++ * in consecutive blocks needs its hash tables to be followed, which a stream
++ * cannot do, so then (and only then) the whole package is spooled into the
++ * cache first and read from there.
++ * ------------------------------------------------------------------------- */
++
++// The STFS title id at 0x360 of GoldenEye XBLA's package (Perfect Dark's is
++// 584109C2), and what an archive holding the package names it: the console's
++// own content folder, or the package's own name with no folder.
++#define GEBEAN_PKG_TITLE 0x584108a9u
++#define GEBEAN_PKG_ENTRY "584108a9/000d0000/"
++#define GEBEAN_PKG_NAME "30ba92710985645ef623d4a6ba9e8effaec62617"
++// A package is hundreds of MB; nothing smaller is opened to look.
++#define GEBEAN_PKG_MIN_SIZE (64ll << 20)
++// Spooled here when a package cannot be followed as a stream. A dot name, so
++// no scan of the cache (this file's or xblaimport.c's) ever looks at it.
++#define GEBEAN_PKG_SPOOL ".package.part"
++// Free space kept over what the unpack writes.
++#define GEBEAN_PKG_MARGIN (64ull << 20)
++
++// STFS's layout, as x360.c reads it.
++#define GEBEAN_STFS_DATA_START 0xc000
++#define GEBEAN_STFS_BLOCK      0x1000
++
++#define GEBEAN_FORM_TREE        0 // a folder or archive of the loose files
++#define GEBEAN_FORM_PKG_FILE    1 // the package itself (or in a folder)
++#define GEBEAN_FORM_PKG_ARCHIVE 2 // a .7z or .zip holding it
++
++static s32 releaseForm;
++
++// The package unpack's progress, for the notice: plain ints read without a
++// lock, as archive.c's are.
++static volatile s32 pkgFilesDone;
++static volatile s32 pkgFilesTotal;
++static volatile s32 pkgMbDone;
++static volatile s32 pkgMbTotal;
++// MB of free space the unpack needed and did not find, or 0
++static s32 pkgSpaceNeededMb;
++static s32 pkgSpaceFreeMb;
++
++s32 gebeanIsPackageFile(const char *path)
++{
++	u8 head[0x364];
++	struct stat st;
++	FILE *fp;
++	s32 ok;
++
++	if (stat(path, &st) != 0 || !S_ISREG(st.st_mode) || (long long)st.st_size < GEBEAN_PKG_MIN_SIZE) {
++		return 0;
++	}
++
++	fp = fopen(path, "rb");
++
++	if (!fp) {
++		return 0;
++	}
++
++	ok = fread(head, 1, sizeof(head), fp) == sizeof(head)
++		&& (!memcmp(head, "LIVE", 4) || !memcmp(head, "CON ", 4) || !memcmp(head, "PIRS", 4))
++		&& gebeanBE32(head + 0x360) == GEBEAN_PKG_TITLE;
++	fclose(fp);
++
++	return ok;
++}
++
++s32 gebeanArchiveHoldsPackage(const char *path)
++{
++	return archiveIsSupported(path)
++		&& (archiveFindEntry(path, GEBEAN_PKG_ENTRY) || archiveFindEntry(path, GEBEAN_PKG_NAME));
++}
++
++/** Free bytes where the cache is, or -1 when that cannot be told. */
++#ifdef PLATFORM_IOS
++// app/ios/PDXbla.m: the volume's capacity for important use, which is what the
++// system will actually make room for (it purges other apps' caches to do it).
++extern long long pdIosAvailableBytes(const char *path);
++#endif
++
++static long long gebeanFreeBytes(const char *dir)
++{
++#if defined(PLATFORM_IOS)
++	return pdIosAvailableBytes(dir);
++#elif defined(PLATFORM_WIN32)
++	(void)dir;
++	return -1;
++#else
++	struct statvfs vfs;
++
++	if (statvfs(dir, &vfs) != 0) {
++		return -1;
++	}
++
++	return (long long)vfs.f_bavail * (long long)vfs.f_frsize;
++#endif
++}
++
++/** Whether need bytes fit under dir; when not, the numbers go to the notice. */
++static s32 gebeanRoomFor(const char *dir, unsigned long long need)
++{
++	const long long have = gebeanFreeBytes(dir);
++
++	if (have < 0 || (unsigned long long)have >= need) {
++		return 1;
++	}
++
++	pkgSpaceNeededMb = (s32)((need + (1 << 20) - 1) >> 20);
++	pkgSpaceFreeMb = (s32)(have >> 20);
++	sysLogPrintf(LOG_ERROR, "gebean: unpacking GoldenEye XBLA needs %d MB free, there are %d MB",
++			pkgSpaceNeededMb, pkgSpaceFreeMb);
++
++	return 0;
++}
++
++/** A path out of the package that stays inside the cache. */
++static s32 gebeanPkgPathIsSafe(const char *path)
++{
++	const char *p = path;
++
++	if (!path[0] || path[0] == '/' || strchr(path, '\\') || strchr(path, ':')) {
++		return 0;
++	}
++
++	while (*p) {
++		const char *end = strchr(p, '/');
++		const size_t len = end ? (size_t)(end - p) : strlen(p);
++
++		if (len == 0 || (len == 1 && p[0] == '.') || (len == 2 && p[0] == '.' && p[1] == '.')) {
++			return 0;
++		}
++
++		p += len;
++
++		if (*p == '/') {
++			p++;
++		}
++	}
++
++	return 1;
++}
++
++/** Opens cache/rel for writing, making its folders. */
++static FILE *gebeanPkgCreate(const char *cache, const char *rel, const char *mode)
++{
++	char path[FS_MAXPATH + 1];
++
++	snprintf(path, sizeof(path), "%s/%s", cache, rel);
++
++	for (char *p = path + strlen(cache) + 1; *p; p++) {
++		if (*p == '/') {
++			*p = '\0';
++			fsCreateDir(path);
++			*p = '/';
++		}
++	}
++
++	return fopen(path, mode);
++}
++
++/**
++ * Every wanted file of a package on disk, read where it lies (the bare package,
++ * or the spool). Returns the files written, -1 on a fault, -2 for no room.
++ */
++static s32 gebeanPkgExtractFile(const char *pkg, const char *cache, s32 checkRoom)
++{
++	struct x360stfs stfs;
++	char name[512];
++	u8 *buf;
++	unsigned long long bytes = 0, done = 0;
++	s32 wanted = 0;
++	s32 written = 0;
++
++	if (!x360StfsOpen(&stfs, pkg)) {
++		sysLogPrintf(LOG_ERROR, "gebean: %s is not a package this can read", pkg);
++		return -1;
++	}
++
++	for (u32 i = 0; i < stfs.numFiles; i++) {
++		if (!stfs.files[i].isDir && gebeanWantEntry(x360StfsPath(&stfs, i, name, sizeof(name)), NULL)) {
++			wanted++;
++			bytes += stfs.files[i].size;
++		}
++	}
++
++	pkgFilesDone = 0;
++	pkgFilesTotal = wanted;
++	pkgMbDone = 0;
++	pkgMbTotal = (s32)(bytes >> 20);
++
++	if (checkRoom && !gebeanRoomFor(cache, bytes + GEBEAN_PKG_MARGIN)) {
++		x360StfsClose(&stfs);
++		return -2;
++	}
++
++	buf = malloc(1 << 18);
++
++	if (!buf) {
++		x360StfsClose(&stfs);
++		return -1;
++	}
++
++	for (u32 i = 0; i < stfs.numFiles && written >= 0; i++) {
++		struct x360stfsstream stream;
++		FILE *fp;
++		const u32 size = stfs.files[i].size;
++
++		if (stfs.files[i].isDir || !gebeanWantEntry(x360StfsPath(&stfs, i, name, sizeof(name)), NULL)) {
++			continue;
++		}
++
++		if (!gebeanPkgPathIsSafe(name)) {
++			sysLogPrintf(LOG_WARNING, "gebean: skipping %s in %s", name, pkg);
++			continue;
++		}
++
++		fp = gebeanPkgCreate(cache, name, "wb");
++
++		if (!fp) {
++			sysLogPrintf(LOG_ERROR, "gebean: could not write %s/%s", cache, name);
++			written = -1;
++			break;
++		}
++
++		if (size > 0) {
++			if (!x360StfsStreamOpen(&stfs, i, &stream)) {
++				written = -1;
++			}
++
++			for (u32 at = 0; written >= 0 && at < size; ) {
++				const u32 n = size - at < (1u << 18) ? size - at : (1u << 18);
++
++				if (!x360StfsStreamRead(&stream, at, n, buf) || fwrite(buf, 1, n, fp) != n) {
++					written = -1;
++					break;
++				}
++
++				at += n;
++				done += n;
++				pkgMbDone = (s32)(done >> 20);
++			}
++
++			x360StfsStreamClose(&stream);
++		}
++
++		if (fclose(fp) != 0 || written < 0) {
++			sysLogPrintf(LOG_ERROR, "gebean: could not read or write %s out of %s", name, pkg);
++			written = -1;
++			break;
++		}
++
++		written++;
++		pkgFilesDone = written;
++	}
++
++	free(buf);
++	x360StfsClose(&stfs);
++
++	return written;
++}
++
++// One 4KB block of a wanted file: where it is in the package, and where in its file.
++struct gebeanpkgblock {
++	unsigned long long ofs;
++	u32 len;
++	u32 file;
++	u32 fileOfs;
++};
++
++struct gebeanpkgfile {
++	char *path;
++	u32 size;
++	u32 got;
++	FILE *fp;
++	s32 opened;
++};
++
++struct gebeanpkgsink {
++	const char *cache;
++	char spool[FS_MAXPATH + 1];
++	FILE *spoolFp;
++	s32 spooling;               // 1 until the file table is in, 2 spooling the whole package
++	unsigned long long pos;     // package bytes seen
++	unsigned long long size;    // the package's length
++	unsigned long long tableEnd;
++	u8 head[GEBEAN_STFS_BLOCK];
++	u32 headLen;
++	u32 tableShift;
++	struct gebeanpkgblock *blocks;
++	u32 numBlocks;
++	u32 next;
++	struct gebeanpkgfile *files;
++	u32 numFiles;
++	u32 cur;                    // the file the last block went to, or ~0
++	s32 written;
++	s32 failed;                 // 1 a fault, 2 no room
++};
++
++static unsigned long long gebeanPkgBlockOffset(u32 tableShift, u32 block)
++{
++	// x360.c stfsBackingBlock(): a hash table before every 0xaa blocks, and a
++	// second level's before every 0x70e4
++	u32 adjust = 0;
++
++	if (block >= 0xaa) {
++		adjust += ((block / 0xaa) + 1) << tableShift;
++	}
++
++	if (block >= 0x70e4) {
++		adjust += ((block / 0x70e4) + 1) << tableShift;
++	}
++
++	return GEBEAN_STFS_DATA_START + (unsigned long long)(block + adjust) * GEBEAN_STFS_BLOCK;
++}
++
++static s32 gebeanPkgCompareBlocks(const void *a, const void *b)
++{
++	const struct gebeanpkgblock *x = a, *y = b;
++
++	return x->ofs < y->ofs ? -1 : x->ofs > y->ofs;
++}
++
++static void gebeanPkgFileDone(struct gebeanpkgsink *s, u32 f)
++{
++	struct gebeanpkgfile *file = &s->files[f];
++
++	if (file->fp) {
++		if (fclose(file->fp) != 0) {
++			s->failed = 1;
++		}
++
++		file->fp = NULL;
++	}
++
++	if (file->got == file->size) {
++		s->written++;
++		pkgFilesDone = s->written;
++	}
++}
++
++/** Bytes [ofs, ofs + len) of the package, as they go by, to the wanted files. */
++static void gebeanPkgFeed(struct gebeanpkgsink *s, unsigned long long ofs, const u8 *data, u32 len)
++{
++	const unsigned long long end = ofs + len;
++
++	while (!s->failed && s->next < s->numBlocks && s->blocks[s->next].ofs < end) {
++		struct gebeanpkgblock *b = &s->blocks[s->next];
++		struct gebeanpkgfile *file = &s->files[b->file];
++		const unsigned long long from = b->ofs > ofs ? b->ofs : ofs;
++		const unsigned long long to = b->ofs + b->len < end ? b->ofs + b->len : end;
++
++		if (b->file != s->cur) {
++			if (s->cur != ~0u && s->files[s->cur].fp) {
++				gebeanPkgFileDone(s, s->cur);
++			}
++
++			s->cur = b->file;
++			file->fp = gebeanPkgCreate(s->cache, file->path, file->opened ? "r+b" : "wb");
++			file->opened = 1;
++
++			if (!file->fp) {
++				sysLogPrintf(LOG_ERROR, "gebean: could not write %s/%s", s->cache, file->path);
++				s->failed = 1;
++				break;
++			}
++		}
++
++		if (from < to) {
++			const u32 n = (u32)(to - from);
++			const u32 at = b->fileOfs + (u32)(from - b->ofs);
++
++			if ((ftell(file->fp) != (long)at && fseek(file->fp, (long)at, SEEK_SET) != 0)
++					|| fwrite(data + (from - ofs), 1, n, file->fp) != n) {
++				sysLogPrintf(LOG_ERROR, "gebean: a write failed unpacking %s", file->path);
++				s->failed = 1;
++				break;
++			}
++
++			file->got += n;
++		}
++
++		if (b->ofs + b->len > end) {
++			break; // the rest of this block is in the next piece
++		}
++
++		s->next++;
++
++		if (file->got == file->size) {
++			gebeanPkgFileDone(s, b->file);
++			s->cur = ~0u;
++		}
++	}
++}
++
++/**
++ * The file table is in: which blocks are wanted and where they go. The bytes
++ * already seen are on disk in the spool, and the blocks among them are
++ * written from there. 0 on a fault (s->failed says which).
++ */
++static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
++{
++	struct x360stfs stfs;
++	char name[512];
++	unsigned long long bytes = 0;
++	u32 numBlocks = 0;
++	s32 consecutive = 1;
++	u8 *buf;
++
++	fflush(s->spoolFp);
++
++	if (!x360StfsOpen(&stfs, s->spool)) {
++		sysLogPrintf(LOG_ERROR, "gebean: the package's file table did not read");
++		s->failed = 1;
++		return 0;
++	}
++
++	s->files = calloc(stfs.numFiles ? stfs.numFiles : 1, sizeof(*s->files));
++
++	if (!s->files) {
++		x360StfsClose(&stfs);
++		s->failed = 1;
++		return 0;
++	}
++
++	for (u32 i = 0; i < stfs.numFiles; i++) {
++		const struct x360stfsfile *f = &stfs.files[i];
++
++		if (f->isDir || !gebeanWantEntry(x360StfsPath(&stfs, i, name, sizeof(name)), NULL)) {
++			continue;
++		}
++
++		if (!gebeanPkgPathIsSafe(name)) {
++			sysLogPrintf(LOG_WARNING, "gebean: skipping %s in the package", name);
++			continue;
++		}
++
++		if (!f->consecutive && f->numBlocks > 1) {
++			consecutive = 0;
++		}
++
++		s->files[s->numFiles].path = malloc(strlen(name) + 1);
++
++		if (!s->files[s->numFiles].path) {
++			x360StfsClose(&stfs);
++			s->failed = 1;
++			return 0;
++		}
++
++		strcpy(s->files[s->numFiles].path, name);
++		s->files[s->numFiles].size = f->size;
++		s->numFiles++;
++		bytes += f->size;
++		numBlocks += (f->size + GEBEAN_STFS_BLOCK - 1) / GEBEAN_STFS_BLOCK;
++	}
++
++	pkgFilesTotal = (s32)s->numFiles;
++
++	if (!consecutive) {
++		// Followed by its hash tables, which a stream cannot do: the whole
++		// package goes into the spool and is read from there afterwards.
++		x360StfsClose(&stfs);
++		sysLogPrintf(LOG_NOTE, "gebean: the package's files are not stored in order; spooling it whole");
++
++		if (!gebeanRoomFor(s->cache, s->size - s->pos + bytes + GEBEAN_PKG_MARGIN)) {
++			s->failed = 2;
++			return 0;
++		}
++
++		s->spooling = 2;
++		return 1;
++	}
++
++	if (!gebeanRoomFor(s->cache, bytes + GEBEAN_PKG_MARGIN)) {
++		x360StfsClose(&stfs);
++		s->failed = 2;
++		return 0;
++	}
++
++	s->blocks = malloc((numBlocks ? numBlocks : 1) * sizeof(*s->blocks));
++
++	if (!s->blocks) {
++		x360StfsClose(&stfs);
++		s->failed = 1;
++		return 0;
++	}
++
++	for (u32 i = 0, w = 0; i < stfs.numFiles; i++) {
++		const struct x360stfsfile *f = &stfs.files[i];
++
++		if (w >= s->numFiles) {
++			break;
++		}
++
++		if (f->isDir || strcmp(x360StfsPath(&stfs, i, name, sizeof(name)), s->files[w].path) != 0) {
++			continue;
++		}
++
++		for (u32 b = 0; b * GEBEAN_STFS_BLOCK < f->size; b++) {
++			struct gebeanpkgblock *blk = &s->blocks[s->numBlocks++];
++			const u32 at = b * GEBEAN_STFS_BLOCK;
++
++			blk->ofs = gebeanPkgBlockOffset(s->tableShift, f->startBlock + b);
++			blk->len = f->size - at < GEBEAN_STFS_BLOCK ? f->size - at : GEBEAN_STFS_BLOCK;
++			blk->file = w;
++			blk->fileOfs = at;
++		}
++
++		w++;
++	}
++
++	x360StfsClose(&stfs);
++	qsort(s->blocks, s->numBlocks, sizeof(*s->blocks), gebeanPkgCompareBlocks);
++
++	// the empty ones have no blocks to wait for
++	for (u32 f = 0; f < s->numFiles; f++) {
++		if (s->files[f].size == 0) {
++			FILE *fp = gebeanPkgCreate(s->cache, s->files[f].path, "wb");
++
++			if (!fp) {
++				s->failed = 1;
++				return 0;
++			}
++
++			fclose(fp);
++			s->written++;
++		}
++	}
++
++	// what went by while the table was read in
++	buf = malloc(1 << 20);
++
++	if (!buf) {
++		s->failed = 1;
++		return 0;
++	}
++
++	for (unsigned long long at = 0; at < s->pos && !s->failed; ) {
++		const u32 n = s->pos - at < (1u << 20) ? (u32)(s->pos - at) : (1u << 20);
++
++		if (fseek(s->spoolFp, (long)at, SEEK_SET) != 0 || fread(buf, 1, n, s->spoolFp) != n) {
++			s->failed = 1;
++			break;
++		}
++
++		gebeanPkgFeed(s, at, buf, n);
++		at += n;
++	}
++
++	free(buf);
++	fclose(s->spoolFp);
++	s->spoolFp = NULL;
++	remove(s->spool);
++	s->spooling = 0;
++
++	return !s->failed;
++}
++
++static s32 gebeanPkgSink(const u8 *data, u32 len, void *arg)
++{
++	struct gebeanpkgsink *s = arg;
++	const unsigned long long at = s->pos;
++
++	s->pos += len;
++	pkgMbDone = (s32)(s->pos >> 20);
++	pkgMbTotal = (s32)(s->size >> 20);
++
++	if (!s->spooling) {
++		gebeanPkgFeed(s, at, data, len);
++		return !s->failed;
++	}
++
++	if (fwrite(data, 1, len, s->spoolFp) != len) {
++		sysLogPrintf(LOG_ERROR, "gebean: a write failed spooling the package");
++		s->failed = 1;
++		return 0;
++	}
++
++	if (s->spooling == 2) {
++		return 1;
++	}
++
++	if (s->headLen < GEBEAN_STFS_BLOCK) {
++		const u32 n = GEBEAN_STFS_BLOCK - s->headLen < len ? GEBEAN_STFS_BLOCK - s->headLen : len;
++
++		memcpy(s->head + s->headLen, data, n);
++		s->headLen += n;
++
++		if (s->headLen == GEBEAN_STFS_BLOCK) {
++			const u8 *h = s->head;
++			// the volume descriptor, as x360StfsOpen() reads it
++			const u32 headerSize = gebeanBE32(h + 0x340);
++			const u32 tableBlocks = h[0x37c] | ((u32)h[0x37d] << 8);
++			const u32 tableBlock = h[0x37e] | ((u32)h[0x37f] << 8) | ((u32)h[0x380] << 16);
++
++			if ((memcmp(h, "LIVE", 4) && memcmp(h, "CON ", 4) && memcmp(h, "PIRS", 4))
++					|| gebeanBE32(h + 0x360) != GEBEAN_PKG_TITLE || tableBlocks == 0 || tableBlocks > 0x400) {
++				sysLogPrintf(LOG_ERROR, "gebean: what the archive holds is not GoldenEye XBLA's package");
++				s->failed = 1;
++				return 0;
++			}
++
++			s->tableShift = (((headerSize + 0xfff) & 0xf000) >> 12) == 0xb ? 0 : 1;
++			s->tableEnd = gebeanPkgBlockOffset(s->tableShift, tableBlock + tableBlocks - 1) + GEBEAN_STFS_BLOCK;
++		}
++	}
++
++	if (s->tableEnd && s->pos >= s->tableEnd) {
++		return gebeanPkgPlan(s);
++	}
++
++	return 1;
++}
++
++/** The wanted files of the package form at src into cache. As gebeanPkgExtractFile(). */
++static s32 gebeanPkgUnpack(const char *src, const char *cache)
++{
++	struct gebeanpkgsink s;
++	s32 streamed;
++	s32 result;
++
++	pkgFilesDone = pkgFilesTotal = pkgMbDone = pkgMbTotal = 0;
++	pkgSpaceNeededMb = pkgSpaceFreeMb = 0;
++
++	if (releaseForm == GEBEAN_FORM_PKG_FILE) {
++		return gebeanPkgExtractFile(src, cache, 1);
++	}
++
++	memset(&s, 0, sizeof(s));
++	s.cache = cache;
++	s.spooling = 1;
++	s.cur = ~0u;
++	snprintf(s.spool, sizeof(s.spool), "%s/" GEBEAN_PKG_SPOOL, cache);
++	s.spoolFp = fopen(s.spool, "w+b");
++
++	if (!s.spoolFp) {
++		sysLogPrintf(LOG_ERROR, "gebean: could not write %s", s.spool);
++		return -1;
++	}
++
++	streamed = archiveStreamEntry(src, GEBEAN_PKG_ENTRY, gebeanPkgSink, &s, &s.size);
++
++	if (streamed < 0 && s.pos == 0) {
++		// no content folder in the archive: the package under its own name
++		streamed = archiveStreamEntry(src, GEBEAN_PKG_NAME, gebeanPkgSink, &s, &s.size);
++	}
++
++	pkgMbTotal = (s32)(s.size >> 20);
++
++	if (s.cur != ~0u && s.files[s.cur].fp) {
++		gebeanPkgFileDone(&s, s.cur);
++	}
++
++	for (u32 f = 0; f < s.numFiles; f++) {
++		if (s.files[f].fp) {
++			fclose(s.files[f].fp);
++		}
++	}
++
++	if (s.failed == 2) {
++		result = -2;
++	} else if (streamed != 1 || s.failed || s.spooling == 1) {
++		sysLogPrintf(LOG_ERROR, "gebean: the package in %s did not unpack (%d, %d)", src, streamed, s.failed);
++		result = -1;
++	} else if (s.spooling == 2) {
++		fclose(s.spoolFp);
++		s.spoolFp = NULL;
++		result = gebeanPkgExtractFile(s.spool, cache, 0);
++	} else if (s.written != (s32)s.numFiles || s.next != s.numBlocks) {
++		sysLogPrintf(LOG_ERROR, "gebean: the package ended with %d of %u files written", s.written, s.numFiles);
++		result = -1;
++	} else {
++		result = s.written;
++	}
++
++	if (s.spoolFp) {
++		fclose(s.spoolFp);
++	}
++
++	remove(s.spool);
++
++	for (u32 f = 0; f < s.numFiles; f++) {
++		free(s.files[f].path);
++	}
++
++	free(s.files);
++	free(s.blocks);
++
++	return result;
++}
++
++/**
++ * Removes everything under dir but its entry named keep, without following a
++ * link out of it - dot files included (fsScanDir() skips them, and the marker,
++ * the spool and the no-room note are all dot files). For the cache only: what
++ * is there is the game's own and can be made again.
++ */
++static void gebeanRemoveTree(const char *dir, const char *keep)
++{
++	DIR *d = opendir(dir);
++	struct dirent *e;
++	char **names = NULL;
++	s32 count = 0, max = 0;
++
++	if (!d) {
++		return;
++	}
++
++	// the names first, the removing after: nothing is taken out from under readdir()
++	while ((e = readdir(d))) {
++		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || (keep && !strcmp(e->d_name, keep))) {
++			continue;
++		}
++
++		if (count == max) {
++			char **grown = realloc(names, (max = max ? max * 2 : 32) * sizeof(*names));
++
++			if (!grown) {
++				break;
++			}
++
++			names = grown;
++		}
++
++		names[count] = malloc(strlen(e->d_name) + 1);
++
++		if (names[count]) {
++			strcpy(names[count++], e->d_name);
++		}
++	}
++
++	closedir(d);
++
++	for (s32 i = 0; i < count; i++) {
++		char path[FS_MAXPATH + 1];
++		struct stat st;
++
++		snprintf(path, sizeof(path), "%s/%s", dir, names[i]);
++
++		if (lstat(path, &st) == 0) {
++			if (S_ISDIR(st.st_mode)) {
++				gebeanRemoveTree(path, NULL);
++				rmdir(path);
++			} else {
++				remove(path);
++			}
++		}
++
++		free(names[i]);
++	}
++
++	free(names);
++}
++
++/** What the cache's marker says it was unpacked from: the file's name and size. */
++static void gebeanSourceId(char *dst, u32 len)
++{
++	const char *base = strrchr(archivePath, '/');
++	struct stat st;
++
++	snprintf(dst, len, "%s %lld", base ? base + 1 : archivePath,
++			stat(archivePath, &st) == 0 ? (long long)st.st_size : -1ll);
++}
++
++/**
++ * Whether the cache was unpacked from what is there now. A marker written
++ * before this patch is empty; it is still good for an archive of the loose
++ * files, which is all it could have come from.
++ */
++static s32 gebeanMarkerMatches(const char *marker)
++{
++	char have[FS_MAXPATH + 32] = "";
++	char want[FS_MAXPATH + 32];
++	FILE *fp = fopen(fsFullPath(marker), "rb");
++	size_t n;
++
++	if (!fp) {
++		return 0;
++	}
++
++	n = fread(have, 1, sizeof(have) - 1, fp);
++	fclose(fp);
++	have[n] = '\0';
++
++	while (n > 0 && (have[n - 1] == '\n' || have[n - 1] == '\r')) {
++		have[--n] = '\0';
++	}
++
++	if (n == 0) {
++		return releaseForm == GEBEAN_FORM_TREE;
++	}
++
++	gebeanSourceId(want, sizeof(want));
++
++	return strcmp(have, want) == 0;
++}
++
++/** Which form archivePath is, once it is known. */
++static s32 gebeanFormOf(const char *path)
++{
++	if (!archiveIsSupported(path)) {
++		return gebeanIsPackageFile(path) ? GEBEAN_FORM_PKG_FILE : GEBEAN_FORM_TREE;
++	}
++
++	return archiveFindEntry(path, GEBEAN_WANT_CHARS) ? GEBEAN_FORM_TREE
++		: gebeanArchiveHoldsPackage(path) ? GEBEAN_FORM_PKG_ARCHIVE : GEBEAN_FORM_TREE;
++}
++
+ static void gebeanSetRoot(const char *tree)
+ {
+ 	snprintf(rootPath, sizeof(rootPath), "%s/files", tree);
+@@ -2701,7 +3545,10 @@ static s32 gebeanLocate(s32 mayUnpack)
+ 		}
+ 
+ 		if (archivePath[0]) {
+-			sysLogPrintf(LOG_NOTE, "gebean: the GoldenEye XBLA release is %s", archivePath);
++			releaseForm = gebeanFormOf(archivePath);
++			sysLogPrintf(LOG_NOTE, "gebean: the GoldenEye XBLA release is %s%s", archivePath,
++					releaseForm == GEBEAN_FORM_PKG_FILE ? " (the Xbox 360 package)"
++					: releaseForm == GEBEAN_FORM_PKG_ARCHIVE ? " (an archive holding the Xbox 360 package)" : "");
+ 		}
+ 	}
+ 
+@@ -2711,7 +3558,10 @@ static s32 gebeanLocate(s32 mayUnpack)
+ 
+ 	snprintf(marker, sizeof(marker), "%s/" GEBEAN_DONE_FILE, cache);
+ 
+-	if (fsFileSize(marker) >= 0 && gebeanScanCache(cache, found, sizeof(found))) {
++	// The marker names what the cache came from (overlay 0046), so a release
++	// replaced by another file - the other form, another copy - is unpacked
++	// again rather than drawn from what the old one left.
++	if (fsFileSize(marker) >= 0 && gebeanMarkerMatches(marker) && gebeanScanCache(cache, found, sizeof(found))) {
+ 		gebeanSetRoot(found);
+ 		return 1;
+ 	}
+@@ -2720,20 +3570,47 @@ static s32 gebeanLocate(s32 mayUnpack)
+ 		return 0;
+ 	}
+ 
++	// Nothing an earlier unpack left - finished from another file, or cut off
++	// half way when the app was killed - is kept to be mistaken for this one's.
++	// The marker goes last, after every file is written. The Community
++	// Edition's overlay beside it is its own business (gebeance.c).
++	gebeanRemoveTree(cache, GEBEAN_CE_DIR);
++
+ 	sysLogPrintf(LOG_NOTE, "gebean: unpacking the characters from %s into %s, this happens once",
+ 			archivePath, cache);
+ 
+-	written = archiveExtractMatching(archivePath, cache, gebeanWantEntry, NULL);
++	written = releaseForm == GEBEAN_FORM_TREE
++		? archiveExtractMatching(archivePath, cache, gebeanWantEntry, NULL)
++		: gebeanPkgUnpack(archivePath, cache);
+ 
+ 	if (written <= 0 || !gebeanScanCache(cache, found, sizeof(found))) {
+ 		sysLogPrintf(LOG_ERROR, "gebean: no GoldenEye characters came out of %s", archivePath);
+ 		unpackFailed = 1;
++
++		// a refusal for room is said where the settings page can read it
++		if (pkgSpaceNeededMb) {
++			char path[FS_MAXPATH + 1];
++
++			gebeanRemoveTree(cache, GEBEAN_CE_DIR);
++			snprintf(path, sizeof(path), "%s/" GEBEAN_NOSPACE_FILE, cache);
++			fp = fopen(fsFullPath(path), "wb");
++
++			if (fp) {
++				fprintf(fp, "%d %d\n", pkgSpaceNeededMb, pkgSpaceFreeMb);
++				fclose(fp);
++			}
++		}
++
+ 		return 0;
+ 	}
+ 
+ 	fp = fopen(fsFullPath(marker), "wb");
+ 
+ 	if (fp) {
++		char id[FS_MAXPATH + 32];
++
++		gebeanSourceId(id, sizeof(id));
++		fprintf(fp, "%s\n", id);
+ 		fclose(fp);
+ 	}
+ 
+@@ -2765,7 +3642,8 @@ s32 gebeanTreeInfo(char *root, u32 rootLen, char *archive, u32 archiveLen, char
+ 	}
+ 
+ 	snprintf(root, rootLen, "%s", rootPath);
+-	snprintf(archive, archiveLen, "%s", archivePath);
++	// the package form is no archive of loose files to take more of
++	snprintf(archive, archiveLen, "%s", releaseForm == GEBEAN_FORM_TREE ? archivePath : "");
+ 
+ 	return 1;
+ }
+@@ -2817,7 +3695,20 @@ void gebeanUnpackAtStartup(void)
+ 
+ 		archiveGetProgress(&done, &total);
+ 
+-		if (total > 0) {
++		if (releaseForm != GEBEAN_FORM_TREE) {
++			// the package form (overlay 0046): MB through the package, and files
++			done = pkgMbDone;
++			total = pkgMbTotal;
++
++			if (total <= 0) {
++				snprintf(line, sizeof(line), "ONCE ONLY - READING THE ARCHIVE");
++			} else if (releaseForm == GEBEAN_FORM_PKG_ARCHIVE) {
++				snprintf(line, sizeof(line), "ONCE ONLY - %d/%d MB - %d/%d FILES",
++						done, total, pkgFilesDone, pkgFilesTotal);
++			} else {
++				snprintf(line, sizeof(line), "ONCE ONLY - %d/%d FILES", pkgFilesDone, pkgFilesTotal);
++			}
++		} else if (total > 0) {
+ 			snprintf(line, sizeof(line), "ONCE ONLY - %d/%d FILES", done, total);
+ 		} else {
+ 			snprintf(line, sizeof(line), "ONCE ONLY - READING THE ARCHIVE");
+@@ -2828,6 +3719,20 @@ void gebeanUnpackAtStartup(void)
+ 	}
+ 
+ 	SDL_WaitThread(thread, NULL);
++
++	// Not enough room: said on the screen for long enough to read, and the game
++	// goes on in the N64 look. Tried again at the next start.
++	if (pkgSpaceNeededMb) {
++		char line[64];
++		const u32 until = SDL_GetTicks() + GEBEAN_NOSPACE_MS;
++
++		snprintf(line, sizeof(line), "NEEDS %d MB FREE - THERE IS %d MB", pkgSpaceNeededMb, pkgSpaceFreeMb);
++
++		while ((s32)(until - SDL_GetTicks()) > 0) {
++			gexPlusRomNotice("NOT ENOUGH SPACE TO UNPACK GOLDENEYE XBLA", line, 0, 0);
++			SDL_Delay(16);
++		}
++	}
+ }
+ 
+ /* -------------------------------------------------------------------------

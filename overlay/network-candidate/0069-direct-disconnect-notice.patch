@@ -1,0 +1,30 @@
+Subject: Preserve unseen Direct LAN failures during menu teardown
+
+--- a/port/src/net/netsession.c
++++ b/port/src/net/netsession.c
+@@ -5399,10 +5399,12 @@
+ {
+ 	// Loading a stage also closes menus: that is not cancellation.
+ 	if (!s_DirectMenuSession || s_MatchActive) return;
++	s32 failurePending = s_ClientState == NETCS_GONE && g_NetNoticePending;
+ 	if (s_ClientState != NETCS_GONE) netClientLeave();
+ 	netSessionStopMenuSession();
+-	// Consume failures and the notice queued by an intentional leave.
+-	g_NetNoticePending = 0;
++	// A stage transition can close the dialog before its failure tick.
++	// Keep that reason for the main menu; intentional leaves stay quiet.
++	g_NetNoticePending = failurePending;
+ }
+ 
+ // 1 host, 2 client, 0 none (a lobby room's session only)
+--- a/port/src/netlobbymenu.c
++++ b/port/src/netlobbymenu.c
+@@ -1589,6 +1589,8 @@
+ 			const char *why = netSessionNoticeText();
+ 			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "%s", why && why[0] ? why : "Connection ended. You can try again.");
+ 			netSessionDirectCancel();
++			// The reason is now visible inline; do not show it again on Back.
++			g_NetNoticePending = 0;
+ 		} else if (state == 2) {
+ 			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Connected. Waiting for the host to start.");
+ 		}

@@ -1,0 +1,80 @@
+Subject: gfx_opengl: load the ES entry points, and know the context is ES, under ANGLE
+
+Audit patch P1 (docs/substrate-audit.md 1.4), in the form the ANGLE seam needs.
+
+Two facts the file cannot work out for itself once the context comes from EGL
+instead of SDL:
+
+1. `SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK)` reports what was last
+   *requested* of SDL, and under PD_GL_ANGLE nothing ever was - so gl_es would
+   come out false and the generated GLSL would be desktop GLSL 1.30 with
+   `#version 130`, which ANGLE's translator rejects outright. gl_es is set
+   here instead of guessed. (gfx_opengl.cpp:1043 upstream.)
+2. The bundled glad is generated for gl=4.1 AND gles2=3.0 but only
+   `gladLoadGLLoader` is ever called (:1035). Under an ES context that
+   resolves every desktop-only name to NULL, logging one LOG_ERROR each
+   through gl_load_proc, and leaves GLAD_GL_ES_VERSION_3_0 at 0.
+   `gladLoadGLES2Loader` is the right one and the ES 3.0 names it wants are
+   spelled identically to the ones the renderer calls.
+
+The proc loader also has to come from `eglGetProcAddress`: SDL_GL_GetProcAddress
+has no context to answer for.
+
+diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
+index 943741620..ccc08fa02 100644
+--- a/port/fast3d/gfx_opengl.cpp
++++ b/port/fast3d/gfx_opengl.cpp
+@@ -1731,8 +1731,15 @@ static void gfx_opengl_log_info(void) {
+     sysLogPrintf(LOG_NOTE, "GL: ARB_texture_mirror_clamp_to_edge: %s", GLAD_GL_ARB_texture_mirror_clamp_to_edge ? "yes" : "no");
+ }
+ 
++#ifdef PD_GL_ANGLE
++extern "C" void *pdAngleGetProcAddress(const char *name);
++#define PD_GET_PROC(n) pdAngleGetProcAddress(n)
++#else
++#define PD_GET_PROC(n) SDL_GL_GetProcAddress(n)
++#endif
++
+ static void *gl_load_proc(const char *name) {
+-    void *ret = SDL_GL_GetProcAddress(name);
++    void *ret = PD_GET_PROC(name);
+     if (ret) {
+         return ret;
+     }
+@@ -1742,7 +1749,7 @@ static void *gl_load_proc(const char *name) {
+     char tmp[256] = { 0 };
+     for (size_t i = 0; i < sizeof(post) / sizeof(*post); ++i) {
+         snprintf(tmp, sizeof(tmp), "%s%s", name, post[i]);
+-        ret = SDL_GL_GetProcAddress(tmp);
++        ret = PD_GET_PROC(tmp);
+         if (ret) {
+             return ret;
+         }
+@@ -1787,6 +1794,19 @@ static void gfx_opengl_init_extensions(void) {
+ }
+ 
+ static void gfx_opengl_init(void) {
++#ifdef PD_GL_ANGLE
++    // The context came from EGL, not from SDL: SDL_GL_GetAttribute would report
++    // whatever was last *requested*, which is nothing, so the profile is known
++    // here rather than asked for. It is always ES 3.0 (ANGLE-Metal caps there),
++    // and the ES loader is the one that must run: the desktop loader resolves
++    // every desktop-only name to NULL and buries a real failure in the log
++    // noise, and it leaves GLAD_GL_ES_VERSION_3_0 at 0.
++    if (!gladLoadGLES2Loader(gl_load_proc) || glGetString == NULL || glEnable == NULL) {
++        sysFatalSetupError("Could not load OpenGL ES 3.0 through ANGLE.");
++    }
++    gl_core_profile = false;
++    gl_es = true;
++#else
+     if (!gladLoadGLLoader(gl_load_proc) || glGetString == NULL || glEnable == NULL) {
+         sysFatalSetupError("Could not load OpenGL.\nReported SDL error: %s", SDL_GetError());
+     }
+@@ -1796,6 +1816,7 @@ static void gfx_opengl_init(void) {
+     SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &val);
+     gl_core_profile = (val == SDL_GL_CONTEXT_PROFILE_CORE);
+     gl_es = (val == SDL_GL_CONTEXT_PROFILE_ES);
++#endif
+ 
+     gfx_opengl_init_extensions();
+ 

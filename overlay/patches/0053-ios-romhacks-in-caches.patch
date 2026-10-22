@@ -1,0 +1,70 @@
+Subject: iOS: a GoldenEye ROM hack's conversion lives in Caches, as GE Plus's does
+
+Upstream v3.14.0 converts a GoldenEye ROM hack it knows (Goldfinger 64) into
+a folder of its own name in the first writable of $E/mods and $H/mods - on
+iOS both are Documents (patch 0009). That is the game's own output, made
+again from the player's file in added-content/ in a few seconds, so it goes
+where overlay 0043 already sends GE Plus's arenas: $C/mods (Caches/mods)
+first. modListRefresh() already mounts $C/mods on iOS (0043), and the "done
+once per source" test (variantConvertedFrom) walks the same list, so a purged
+Caches converts again behind the same notice at the next start. A conversion
+an earlier build left in Documents/mods is still found and used where it is.
+
+The patch (or zip) form's unpack goes to cache/romhacks/ through
+fsChooseOutputDir("cache"), which patch 0009 already sends to Caches.
+
+And the stamp names its source from $E. A conversion is "done once per
+source": CONVERT.txt says "Converted from <realpath of the file>" and a later
+start converts again when no stamp names the file it finds. On iOS the app's
+data container moves on every install and update (a new UUID in the path,
+Documents carried over), so every update made the hack's ~4 s, ~1 GB
+conversion run again. variantCanonical() now names a file under Documents
+as "$E/added-content/<name>" on iOS; the shell's settings row (PDXbla) reads
+the stamp the same way. A stamp an earlier build wrote converts once more.
+
+Every other platform is unchanged.
+
+diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
+index a922b5e29..91649df0d 100644
+--- a/port/src/gexplusrom.c
++++ b/port/src/gexplusrom.c
+@@ -716,7 +716,15 @@ static void variantReady(const char *name)
+ 	}
+ }
+ 
++#ifdef PLATFORM_IOS
++// $C (Caches) first, as GE Plus's own arenas (iOS port overlay 0043): a hack's
++// conversion is the game's own output, made again from the player's file in
++// added-content/ if the system purges it. One an earlier build left in
++// Documents/mods is still found and used where it is.
++static const char *const g_VariantContainers[] = { "$C/mods", "$E/mods", "$H/mods" };
++#else
+ static const char *const g_VariantContainers[] = { "$E/mods", "$H/mods" };
++#endif
+ 
+ // the second line of a conversion's CONVERT.txt: the file it was made from
+ static s32 variantStampFrom(const char *dir, char *from, u32 fromlen)
+@@ -1015,6 +1023,23 @@ static void variantCanonical(const char *path, char *out, u32 outlen)
+ 	char *full = realpath(fsFullPath(path), NULL);
+ 
+ 	if (full) {
++#ifdef PLATFORM_IOS
++		// The app's container moves on every install and update (a new UUID
++		// in the path, Documents carried over), so a stamp naming the file by
++		// its absolute path would be stale after each one and the hack
++		// converted again. Under Documents it is named from $E instead.
++		char *home = realpath(fsFullPath("$E"), NULL);
++		const size_t homelen = home ? strlen(home) : 0;
++
++		if (home && !strncmp(full, home, homelen) && full[homelen] == '/') {
++			snprintf(out, outlen, "$E%s", full + homelen);
++			free(home);
++			free(full);
++			return;
++		}
++
++		free(home);
++#endif
+ 		snprintf(out, outlen, "%s", full);
+ 		free(full);
+ 		return;

@@ -1,0 +1,59 @@
+Subject: Keep a failed session notice pending until explicit acknowledgement
+
+--- a/port/src/net/netsession.c
++++ b/port/src/net/netsession.c
+@@ -6039,6 +6039,12 @@
+ 	return s_NoticeText;
+ }
+ 
++static MenuItemHandlerResult netNoticeAcknowledge(s32 op, struct menuitem *item, union handlerdata *data)
++{
++	if (op == MENUOP_SET) g_NetNoticePending = 0;
++	return 0;
++}
++
+ static struct menuitem s_NetNoticeItems[] = {
+ 	{
+ 		MENUITEMTYPE_LABEL,
+@@ -6062,7 +6068,7 @@
+ 		MENUITEMFLAG_SELECTABLE_CLOSESDIALOG | MENUITEMFLAG_LITERAL_TEXT,
+ 		(uintptr_t)"OK\n",
+ 		0,
+-		NULL,
++		netNoticeAcknowledge,
+ 	},
+ 	{ MENUITEMTYPE_END },
+ };
+@@ -6072,7 +6078,7 @@
+ 	(uintptr_t)"Net Game",
+ 	s_NetNoticeItems,
+ 	NULL,
+-	MENUDIALOGFLAG_LITERAL_TEXT,
++	MENUDIALOGFLAG_LITERAL_TEXT | MENUDIALOGFLAG_IGNOREBACK,
+ 	NULL,
+ };
+ 
+@@ -6146,7 +6152,7 @@
+ 		return;
+ 	}
+ 
+-	g_NetNoticePending = 0;
++	// Keep the reason until OK: a stage transition can discard this dialog.
+ 	menuPushDialog(&s_NetNoticeDialog);
+ }
+ 
+--- a/port/src/netlobbymenu.c
++++ b/port/src/netlobbymenu.c
+@@ -1591,7 +1591,11 @@
+ 			netSessionDirectCancel();
+ 			// A match teardown can still tick this old dialog. Cancel refuses
+ 			// cleanup while the match is active, so retain the notice then.
+-			if (!netSessionDirectState()) g_NetNoticePending = 0;
++			// The main menu owns acknowledgement, not this transient dialog.
++			if (!netSessionDirectState() && g_Menus[g_MpPlayerNum].curdialog
++					&& g_Menus[g_MpPlayerNum].curdialog->definition == dialogdef) {
++				menuPopDialog();
++			}
+ 		} else if (state == 2) {
+ 			snprintf(s_DirectMessage, sizeof(s_DirectMessage), "Connected. Waiting for the host to start.");
+ 		}

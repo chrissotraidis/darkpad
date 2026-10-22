@@ -1,0 +1,19 @@
+Subject: ios: report the local network player position
+
+Keep passive diagnostics independent of the last player processed by the
+network tick. No local slot means no position; never fall back to a peer.
+Offline behavior remains unchanged.
+
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -9387,7 +9387,9 @@
+  */
+ s32 playerIosGetPos(f32 *x, f32 *y, f32 *z)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	/* Network ticks may leave currentplayer on a remote slot. */
++	struct player *p = g_NetMode != NETMODE_NONE
++		? netLocalPlayer(NULL) : g_Vars.currentplayer;
+ 
+ 	if (!p || !p->prop) {
+ 		return 0;

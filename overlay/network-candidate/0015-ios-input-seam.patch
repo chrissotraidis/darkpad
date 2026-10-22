@@ -1,0 +1,702 @@
+Subject: candidate-only iOS input seam; network touch look remains pending
+
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -239,6 +239,18 @@
+ 
+ // returns changes in mouse position since last frame, scaled by sensitivity
+ // returns 0, 0 when the mouse is not locked into the window
++#ifdef PLATFORM_IOS
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy);
++// The iOS shell's two ways in (app/ios/): absolute view-angle DEGREES for the
++// touch/gyro look, added to whatever the mouse contributed and never scaled by
++// the mouse sensitivity, and one button mask + stick the touch layer and the
++// :8775 bridge share. See the definitions in port/src/input.c.
++void inputIosLookAddDegrees(f32 degx, f32 degy);
++void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
++void inputIosPadSetButton(u32 button, s32 down);
++u32 inputIosPadGetButtons(void);
++#endif
++
+ void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
+ 
+ // returns changes in mouse position since last frame, scaled by absolute sensitivity
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -1222,6 +1225,101 @@
+ 	return sens;
+ }
+ 
++#ifdef PLATFORM_IOS
++/**
++ * The iOS shell's two ways into this file, and the only ones.
++ *
++ * A phone has no mouse and, most of the time, no pad, so the shell's touch
++ * layer has to become both. It does NOT do that by synthesising SDL events:
++ * the look seam is a deliberate one (docs/frame-map.md), because the mouse
++ * chain here scales by Game.PlayerN.MouseSpeedX/Y, and a touch drag whose
++ * degrees changed when the player edited a mouse setting they cannot reach
++ * would be a bug nobody could find.
++ *
++ * So the shell writes DEGREES. bondwalk.c:1456 turns freelookdx into
++ * `freelookdx * 3.5` degrees of yaw per frame whatever the frame rate, so
++ * degrees / 3.5 is what belongs in the delta, added after - and independently
++ * of - the mouse's own contribution. Neither mouseSensX/Y nor mouseLocked is
++ * consulted: a finger on the screen is always locked to the view.
++ *
++ * The pad injection is the same idea for buttons: the shell's touch buttons,
++ * an on-screen chip and the :8775 bridge's `pad` command all set bits in one
++ * mask that is OR-ed into whatever a real controller reported, so a physical
++ * pad and the overlay can be held at once (which is what a bridge-driven test
++ * on a device with no pad needs).
++ *
++ * Both are latched once per frame by inputIosLatchFrame(), called from
++ * inputUpdate(), so a value is read exactly once by exactly one frame however
++ * many times the consumer asks for it - the same contract mouseDX/DY have.
++ */
++static f32 iosLookPendingX = 0.f, iosLookPendingY = 0.f;
++static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
++static u32 iosPadButtons = 0;
++static s32 iosPadStickX = 0, iosPadStickY = 0;
++
++void inputIosLookAddDegrees(f32 degx, f32 degy)
++{
++	iosLookPendingX += degx;
++	iosLookPendingY += degy;
++}
++
++// Read-only: repeated consumers must see the same latched frame.
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy)
++{
++	*degx = iosLookFrameX;
++	*degy = iosLookFrameY;
++}
++
++void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
++{
++	iosPadButtons = buttons;
++	iosPadStickX = (stickx < -128) ? -128 : ((stickx > 127) ? 127 : stickx);
++	iosPadStickY = (sticky < -128) ? -128 : ((sticky > 127) ? 127 : sticky);
++}
++
++void inputIosPadSetButton(u32 button, s32 down)
++{
++	if (down) {
++		iosPadButtons |= button;
++	} else {
++		iosPadButtons &= ~button;
++	}
++}
++
++u32 inputIosPadGetButtons(void)
++{
++	return iosPadButtons;
++}
++
++/**
++ * The shell's buttons and stick, over whatever the pad (if any) reported.
++ *
++ * OR for the buttons and "only if the pad is not already pushing" for the
++ * stick, so that holding a real stick always wins over a stale touch value and
++ * the two are never averaged into a direction neither of them asked for.
++ */
++static void inputIosMergePad(OSContPad *npad)
++{
++	npad->button |= iosPadButtons;
++
++	if (!npad->stick_x && iosPadStickX) {
++		npad->stick_x = iosPadStickX;
++	}
++
++	if (!npad->stick_y && iosPadStickY) {
++		npad->stick_y = iosPadStickY;
++	}
++}
++
++static void inputIosLatchFrame(void)
++{
++	iosLookFrameX = iosLookPendingX;
++	iosLookFrameY = iosLookPendingY;
++	iosLookPendingX = 0.f;
++	iosLookPendingY = 0.f;
++}
++#endif
++
+ s32 inputReadController(s32 idx, OSContPad *npad)
+ {
+ 	if (idx < 0 || idx >= INPUT_MAX_CONTROLLERS  || !npad) {
+@@ -1272,6 +1363,9 @@
+ 	}
+ 
+ 	if (!pads[idx]) {
++#ifdef PLATFORM_IOS
++		if (idx == 0) inputIosMergePad(npad);
++#endif
+ 		return 0;
+ 	}
+ 
+@@ -1313,6 +1407,10 @@
+ 		}
+ 	}
+ 
++#ifdef PLATFORM_IOS
++	if (idx == 0) inputIosMergePad(npad);
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -1371,8 +1467,11 @@
+ void inputUpdate(void)
+ {
+ 	if (g_NetDedicated) return;
+ 
+ 	SDL_GameControllerUpdate();
++#ifdef PLATFORM_IOS
++	inputIosLatchFrame();
++#endif
+ 
+ 	if (mouseEnabled) {
+ 		inputUpdateMouse();
+@@ -1795,6 +1893,14 @@
+ 		mdx = rawdx * (0.022f / 3.5f) * mouseSensX;
+ 		mdy = rawdy * (0.022f / 3.5f) * mouseSensY;
+ 	}
++#ifdef PLATFORM_IOS
++	// Network look must enter the command stream, never every simulated slot.
++	// Candidate integration: only the solo path is supported by this seam.
++	if (g_NetMode == NETMODE_NONE) {
++		mdx += iosLookFrameX * (1.f / 3.5f);
++		mdy += iosLookFrameY * (1.f / 3.5f);
++	}
++#endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+ }
+@@ -1808,6 +1914,14 @@
+ 		mdx = rawdx * (0.022f / 3.5f) * fabsf(mouseSensX);
+ 		mdy = rawdy * (0.022f / 3.5f) * fabsf(mouseSensY);
+ 	}
++#ifdef PLATFORM_IOS
++	// Network look must enter the command stream, never every simulated slot.
++	// Candidate integration: only the solo path is supported by this seam.
++	if (g_NetMode == NETMODE_NONE) {
++		mdx += iosLookFrameX * (1.f / 3.5f);
++		mdy += iosLookFrameY * (1.f / 3.5f);
++	}
++#endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+ }
+--- a/port/src/net/net.c
++++ b/port/src/net/net.c
+@@ -49,6 +49,22 @@
+ static s32 s_NetMouseDX = 0;
+ static s32 s_NetMouseDY = 0;
+ 
++#ifdef PLATFORM_IOS
++// Preserve fractional degrees independently of integer mouse counts/sensitivity.
++static f32 s_NetTouchDegreesX = 0.f;
++static f32 s_NetTouchDegreesY = 0.f;
++#endif
++
++static void netInputClearMotion(void)
++{
++	s_NetMouseDX = 0;
++	s_NetMouseDY = 0;
++#ifdef PLATFORM_IOS
++	s_NetTouchDegreesX = 0.f;
++	s_NetTouchDegreesY = 0.f;
++#endif
++}
++
+ static s32 s_NetSignalsInstalled = 0;
+ s32 g_NetPlayersPassThrough = 0;
+ 
+@@ -179,8 +195,7 @@
+ {
+ 	g_NetTick = 0;
+ 	g_NetInStageLoop = 0;
+-	s_NetMouseDX = 0;
+-	s_NetMouseDY = 0;
++	netInputClearMotion();
+ 	frametimeNetReset();
+ 
+ 	// The host's last tick rate is a client's tick rate (lvTick), and only
+@@ -344,8 +359,7 @@
+ 	}
+ 
+ 	// the tick has spent the frame's mouse; any further tick sees none
+-	s_NetMouseDX = 0;
+-	s_NetMouseDY = 0;
++	netInputClearMotion();
+ }
+ 
+ void netPosePuppets(f32 alpha)
+@@ -389,6 +403,12 @@
+ 	inputMouseGetRawDelta(&dx, &dy);
+ 	s_NetMouseDX += dx;
+ 	s_NetMouseDY += dy;
++#ifdef PLATFORM_IOS
++	f32 touchx, touchy;
++	inputIosLookGetFrameDegrees(&touchx, &touchy);
++	s_NetTouchDegreesX += touchx;
++	s_NetTouchDegreesY += touchy;
++#endif
+ }
+ 
+ /**
+@@ -411,6 +431,23 @@
+ 	}
+ }
+ 
++#ifdef PLATFORM_IOS
++// Tick reads are repeatable and never spend motion during presentation.
++void netInputTouchDegrees(f32 *dx, f32 *dy)
++{
++	const s32 active = g_NetInStageLoop && g_NetPass != NETPASS_PRESENT_ONLY;
++	*dx = active ? s_NetTouchDegreesX : 0.f;
++	*dy = active ? s_NetTouchDegreesY : 0.f;
++}
++
++// The presentation predictor must be able to see the unspent motion.
++void netPendingTouchDegrees(f32 *dx, f32 *dy)
++{
++	*dx = g_NetInStageLoop ? s_NetTouchDegreesX : 0.f;
++	*dy = g_NetInStageLoop ? s_NetTouchDegreesY : 0.f;
++}
++#endif
++
+ // The mouse summed since the last tick and not yet spent (netpredict.c's view)
+ void netPendingMouse(s32 *dx, s32 *dy)
+ {
+--- a/port/include/net/net.h
++++ b/port/include/net/net.h
+@@ -265,6 +265,11 @@
+ // Mouse: summed over a presented frame's inputUpdate(), spent by one tick
+ void netInputAccumulateMouse(void);
+ void netInputMouseRaw(s32 *dx, s32 *dy);
++#ifdef PLATFORM_IOS
++// Floating-point touch/gyro degrees awaiting the next simulation tick.
++void netInputTouchDegrees(f32 *dx, f32 *dy);
++void netPendingTouchDegrees(f32 *dx, f32 *dy);
++#endif
+ 
+ // gfxReset: the player-count row the display list pools are sized by
+ s32 netGfxSizeIndex(s32 index);
+--- a/port/src/net/netplayers.c
++++ b/port/src/net/netplayers.c
+@@ -105,7 +105,9 @@
+ 	struct netcmd held;      // ... that command, no mouse
+ 	s32 numcatchup;          // the folded commands before the tick's own, to walk first
+ 	f32 catchupmdx;          // ... their mouse, summed (the fold's, should they not be walked)
++	f32 catchuptdx;          // ... their mouse, summed (the fold's, should they not be walked)
+ 	f32 catchupmdy;
++	f32 catchuptdy;
+ 	struct netcmd catchup[NET_CATCHUP_MAX];
+ 	u32 waited;              // counts: ticks the walk waited, commands walked folded
+ 	u32 caughtup;
+@@ -1273,7 +1275,9 @@
+ 		// walked as one: the fold's whole turn
+ 		if (q->numcatchup > 0) {
+ 			q->cur.mdx += q->catchupmdx;
++			q->cur.tdx += q->catchuptdx;
+ 			q->cur.mdy += q->catchupmdy;
++			q->cur.tdy += q->catchuptdy;
+ 			q->numcatchup = 0;
+ 		}
+ 
+@@ -1326,7 +1330,9 @@
+ 
+ 		if (!s_WalkJoySave) {
+ 			q->cur.mdx += q->catchupmdx;
++			q->cur.tdx += q->catchuptdx;
+ 			q->cur.mdy += q->catchupmdy;
++			q->cur.tdy += q->catchuptdy;
+ 			q->numcatchup = 0;
+ 			q->numheld = 0;
+ 			return 0;
+@@ -1403,8 +1409,8 @@
+ 		}
+ 
+ 		if (s_Pads[pad].cur.flags & NETCMD_MOUSELOCKED) {
+-			*dx = s_Pads[pad].cur.mdx;
+-			*dy = s_Pads[pad].cur.mdy;
++			*dx = s_Pads[pad].cur.mdx + s_Pads[pad].cur.tdx;
++			*dy = s_Pads[pad].cur.mdy + s_Pads[pad].cur.tdy;
+ 		}
+ 
+ 		return;
+@@ -1437,12 +1443,19 @@
+ {
+ 	const s32 pad = netPadOfPlayer(playernum);
+ 
++	if (g_NetReplaying && netIsLocalSlot(playernum)) {
++		netPredictReplayMouseAbs(dx, dy);
++		return;
++	}
++
+ 	if (netPadIsRemote(pad)) {
+ 		// the delta came scaled by the client's signed speed: |speed| is
+ 		// speed * its sign
+-		netMouseDelta(playernum, dx, dy);
+-		*dx *= s_Pads[pad].cfg.sensxsign;
+-		*dy *= s_Pads[pad].cfg.sensysign;
++		*dx = *dy = 0.f;
++		if (g_NetPass != NETPASS_PRESENT_ONLY && (s_Pads[pad].cur.flags & NETCMD_MOUSELOCKED)) {
++			*dx = s_Pads[pad].cur.mdx * s_Pads[pad].cfg.sensxsign + s_Pads[pad].cur.tdx;
++			*dy = s_Pads[pad].cur.mdy * s_Pads[pad].cfg.sensysign + s_Pads[pad].cur.tdy;
++		}
+ 		return;
+ 	}
+ 
+@@ -1476,6 +1489,11 @@
+ 		return 1;
+ 	}
+ 
++#ifdef PLATFORM_IOS
++	f32 tx, ty;
++	netInputTouchDegrees(&tx, &ty);
++	if (tx != 0.f || ty != 0.f) return 1;
++#endif
+ 	return inputMouseIsLocked();
+ }
+ 
+@@ -1838,6 +1856,12 @@
+ 		if (!(cmds[i].mdy >= -1000.f && cmds[i].mdy <= 1000.f)) {
+ 			cmds[i].mdy = 0;
+ 		}
++		if (!(cmds[i].tdx >= -1000.f && cmds[i].tdx <= 1000.f)) {
++			cmds[i].tdx = 0;
++		}
++		if (!(cmds[i].tdy >= -1000.f && cmds[i].tdy <= 1000.f)) {
++			cmds[i].tdy = 0;
++		}
+ 
+ 	}
+ 
+@@ -1908,7 +1932,9 @@
+ 	into->rsx = c->rsx;
+ 	into->rsy = c->rsy;
+ 	into->mdx += c->mdx;
++	into->tdx += c->tdx;
+ 	into->mdy += c->mdy;
++	into->tdy += c->tdy;
+ 	into->flags |= c->flags;
+ 
+ 	// a menu's choices: the later one's
+@@ -1959,7 +1985,9 @@
+ 		q->numheld = 0;
+ 		q->numcatchup = 0;
+ 		q->catchupmdx = 0;
++		q->catchuptdx = 0;
+ 		q->catchupmdy = 0;
++		q->catchuptdy = 0;
+ 
+ 		// what never came is lost: only the ring can hold one, so past a
+ 		// ring of empty ticks the rest are skipped at once
+@@ -1983,7 +2011,9 @@
+ 			q->numheld = lost < NET_CATCHUP_MAX ? (s32)lost : NET_CATCHUP_MAX;
+ 			q->held = q->cur;
+ 			q->held.mdx = 0;
++			q->held.tdx = 0;
+ 			q->held.mdy = 0;
++			q->held.tdy = 0;
+ 		}
+ 
+ 		if (netQHas(q, q->next)) {
+@@ -2021,7 +2051,9 @@
+ 					if (walkeach && c->buttons == own.buttons && q->numcatchup < NET_CATCHUP_MAX) {
+ 						q->catchup[q->numcatchup++] = own;
+ 						q->catchupmdx += own.mdx;
++						q->catchuptdx += own.tdx;
+ 						q->catchupmdy += own.mdy;
++						q->catchuptdy += own.tdy;
+ 					} else {
+ 						walkeach = 0;
+ 					}
+@@ -2038,21 +2070,27 @@
+ 
+ 				if (walkeach && q->numcatchup > 0) {
+ 					q->cur.mdx = own.mdx;
++					q->cur.tdx = own.tdx;
+ 					q->cur.mdy = own.mdy;
++					q->cur.tdy = own.tdy;
+ 				} else {
+ 					q->numcatchup = 0;
+ 				}
+ 
+ 				if (q->numcatchup == 0) {
+ 					q->catchupmdx = 0;
++					q->catchuptdx = 0;
+ 					q->catchupmdy = 0;
++					q->catchuptdy = 0;
+ 				}
+ 			}
+ 		} else {
+ 			// dry: hold what was held, no mouse, nothing new pressed; and
+ 			// the walk waits for the command (netPlayersHostWalk)
+ 			q->cur.mdx = 0;
++			q->cur.tdx = 0;
+ 			q->cur.mdy = 0;
++			q->cur.tdy = 0;
+ 			q->dry++;
+ 			q->nowalk = 1;
+ 		}
+@@ -2060,7 +2098,7 @@
+ 		q->depthsum += netQDepth(q);
+ 		q->pressed = q->cur.buttons & ~prevbuttons;
+ 		q->presses += (q->cur.buttons & ~prevbuttons & Z_TRIG) ? 1 : 0;
+-		q->busy += q->cur.buttons || q->cur.sx || q->cur.sy || q->cur.rsx || q->cur.rsy || q->cur.mdx != 0 || q->cur.mdy != 0;
++		q->busy += q->cur.buttons || q->cur.sx || q->cur.sy || q->cur.rsx || q->cur.rsy || q->cur.mdx != 0 || q->cur.mdy != 0 || q->cur.tdx != 0 || q->cur.tdy != 0;
+ 
+ 		memset(&pad, 0, sizeof(pad));
+ 		pad.button = q->cur.buttons;
+@@ -2296,6 +2334,7 @@
+ 	OSContPad pad;
+ 	f32 mdx;
+ 	f32 mdy;
++	f32 tdx = 0.f, tdy = 0.f;
+ 
+ 	if (g_NetDedicated) {
+ 		return;
+@@ -2308,6 +2347,15 @@
+ 	}
+ 
+ 	netMouseDelta(g_NetLocalSlot, &mdx, &mdy);
++#ifdef PLATFORM_IOS
++	if (!(s_ScriptLen && netInMatch())) {
++		netInputTouchDegrees(&tdx, &tdy);
++		tdx /= 3.5f;
++		tdy /= 3.5f;
++		mdx -= tdx;
++		mdy -= tdy;
++	}
++#endif
+ 
+ 	// --net-test-equip: the pick a pause menu's inventory makes, and the hand
+ 	// three seconds on (still the pick once the host's block has it)
+@@ -2339,6 +2387,7 @@
+ 			memset(&pad, 0, sizeof(pad));
+ 			mdx = 0;
+ 			mdy = 0;
++			tdx = tdy = 0.f;
+ 		}
+ 
+ 		// said in the log for the gates (nettwelvetest opens the pause menu
+@@ -2386,10 +2435,12 @@
+ 	c->rsy = pad.rstick_y;
+ 	c->mdx = mdx;
+ 	c->mdy = mdy;
++	c->tdx = tdx;
++	c->tdy = tdy;
+ 
+ 	if (s_MenuUp) {
+ 		s_MenuCmds++;
+-		s_MenuBusy += c->buttons || c->sx || c->sy || c->rsx || c->rsy || c->mdx != 0 || c->mdy != 0;
++		s_MenuBusy += c->buttons || c->sx || c->sy || c->rsx || c->rsy || c->mdx != 0 || c->mdy != 0 || c->tdx != 0 || c->tdy != 0;
+ 	}
+ 	c->flags = netMouseLocked(g_NetLocalSlot) ? NETCMD_MOUSELOCKED : 0;
+ 
+@@ -2456,7 +2507,7 @@
+ 	s_PrevButtons = c->buttons;
+ 
+ 	// and kept for a replay of this tick (netpredict.c)
+-	netPredictRecordCmd(g_NetTick, c->buttons, c->sx, c->sy, c->rsx, c->rsy, c->mdx, c->mdy, c->flags);
++	netPredictRecordCmd(g_NetTick, c->buttons, c->sx, c->sy, c->rsx, c->rsy, c->mdx, c->mdy, c->tdx, c->tdy, c->flags);
+ }
+ 
+ s32 netPlayersLocalPad(void)
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -2042,12 +2042,10 @@
+ 		mdy = rawdy * (0.022f / 3.5f) * mouseSensY;
+ 	}
+ #ifdef PLATFORM_IOS
+-	// Network look must enter the command stream, never every simulated slot.
+-	// Candidate integration: only the solo path is supported by this seam.
+-	if (g_NetMode == NETMODE_NONE) {
+-		mdx += iosLookFrameX * (1.f / 3.5f);
+-		mdy += iosLookFrameY * (1.f / 3.5f);
+-	}
++	f32 tx = iosLookFrameX, ty = iosLookFrameY;
++	if (g_NetMode != NETMODE_NONE) netInputTouchDegrees(&tx, &ty);
++	mdx += tx * (1.f / 3.5f);
++	mdy += ty * (1.f / 3.5f);
+ #endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+@@ -2063,12 +2061,10 @@
+ 		mdy = rawdy * (0.022f / 3.5f) * fabsf(mouseSensY);
+ 	}
+ #ifdef PLATFORM_IOS
+-	// Network look must enter the command stream, never every simulated slot.
+-	// Candidate integration: only the solo path is supported by this seam.
+-	if (g_NetMode == NETMODE_NONE) {
+-		mdx += iosLookFrameX * (1.f / 3.5f);
+-		mdy += iosLookFrameY * (1.f / 3.5f);
+-	}
++	f32 tx = iosLookFrameX, ty = iosLookFrameY;
++	if (g_NetMode != NETMODE_NONE) netInputTouchDegrees(&tx, &ty);
++	mdx += tx * (1.f / 3.5f);
++	mdy += ty * (1.f / 3.5f);
+ #endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+--- a/port/include/net/netcmd.h
++++ b/port/include/net/netcmd.h
+@@ -18,6 +18,8 @@
+ 	s8 rsy;
+ 	f32 mdx;
+ 	f32 mdy;
++	f32 tdx; // touch/gyro degrees divided by 3.5, independent of mouse signs
++	f32 tdy;
+ 	u8 flags;
+ 	u32 viewtick;            // the host tick the client's puppets were drawn at
+ 	u8 viewfrac;             // ... and the fraction past it, in 1/256ths (NETCMD_NOVIEW: none)
+@@ -31,7 +33,7 @@
+ };
+ 
+ #define NETCMD_NOVIEW 0xffffffff
+-#define NETCMD_PACKED 36 // (protocol 31: 32 before the order, one byte spare)
++#define NETCMD_PACKED 44 // Darkpad protocol: 36-byte command plus two touch floats
+ 
+ void netCmdPack(const struct netcmd *c, u32 tick, u8 *p);
+ void netCmdUnpack(const u8 *p, u32 tick, struct netcmd *c);
+--- a/port/src/net/netcmd.c
++++ b/port/src/net/netcmd.c
+@@ -25,6 +25,8 @@
+ 	PUT8(c->body[0]); PUT8(c->body[0] >> 8); PUT8(c->body[1]); PUT8(c->body[1] >> 8);
+ 	PUT8(c->bodyflags);
+ 	PUT8(c->order[0]); PUT8(c->order[1]); PUT8(c->order[2]);
++	memcpy(&v, &c->tdx, 4); PUT32(v);
++	memcpy(&v, &c->tdy, 4); PUT32(v);
+ #undef PUT8
+ #undef PUT32
+ }
+@@ -51,6 +53,8 @@
+ 	c->body[1] = (u16)(p[i] | (p[i + 1] << 8)); i += 2;
+ 	c->bodyflags = GET8();
+ 	c->order[0] = GET8(); c->order[1] = GET8(); c->order[2] = GET8();
++	v = GET32(); memcpy(&c->tdx, &v, 4);
++	v = GET32(); memcpy(&c->tdy, &v, 4);
+ #undef GET8
+ #undef GET32
+ 
+--- a/port/include/net/netproto.h
++++ b/port/include/net/netproto.h
+@@ -200,7 +200,9 @@
+ //    join in progress takes its room team's), u8 antispawns[12] (each
+ //    counter-op's guards taken), u8 antiradius[12] (the guard's radius),
+ //    s16 antibody[12], s16 antihead[12] (the guard's body and head it wears)
+-#define NET_PROTOCOL_VERSION 32
++// Experimental Darkpad wire format: two separate touch components in CMD.
++// Deliberately distinct from upstream protocol 32; both peers need this overlay.
++#define NET_PROTOCOL_VERSION 0x4431
+ 
+ #define NETMSG_CONNECT    1
+ #define NETMSG_ACCEPT     2
+@@ -685,7 +687,7 @@
+  *     first against basetick's): u32 buttons, s8 x4, f32 mdx, mdy, u8 flags, u32
+  *     tick - viewtick (0xffffffff none), u8 viewfrac, viewdelay, u8
+  *     equip[2], u8 device[2], u16 body[2], u8 bodyflags, (protocol 31) u8
+- *     order[3], u8 0 - 36 bytes (0 where the flag is clear); before 30 each
++ *     order[3], f32 tdx, tdy, u8 0 - 44 bytes (0 where the flag is clear); before 30 each
+  *     command's fields as follows, whole:
+  *     u32 buttons                 OSContPad.button (protocol 11: START too;
+  *                                 the host clears it unless the player is
+--- a/port/src/net/netint.h
++++ b/port/src/net/netint.h
+@@ -168,8 +168,9 @@
+ void netPredictArgs(void);
+ void netPredictStageStart(void);
+ void netPredictMatchStopped(void);
+-void netPredictRecordCmd(u32 tick, u32 buttons, s8 sx, s8 sy, s8 rsx, s8 rsy, f32 mdx, f32 mdy, u8 flags);
++void netPredictRecordCmd(u32 tick, u32 buttons, s8 sx, s8 sy, s8 rsx, s8 rsy, f32 mdx, f32 mdy, f32 tdx, f32 tdy, u8 flags);
+ void netPredictReplayMouse(f32 *dx, f32 *dy);
++void netPredictReplayMouseAbs(f32 *dx, f32 *dy);
+ u32 netPlayersClientNewest(void);     // netplayers.c: the newest command the client made, 0 none
+ void netPredictTickEnd(void);         // the client's tick has run: its player's state for the tick
+ void netPredictCaptureMove(struct player *p, struct netmove *mv); // host: the block's movement state
+--- a/port/src/net/netpredict.c
++++ b/port/src/net/netpredict.c
+@@ -129,6 +129,8 @@
+ 	s8 rsy;
+ 	f32 mdx;
+ 	f32 mdy;
++	f32 tdx;
++	f32 tdy;
+ 	u8 flags;
+ };
+ 
+@@ -1028,7 +1030,7 @@
+  * The tick
+  */
+ 
+-void netPredictRecordCmd(u32 tick, u32 buttons, s8 sx, s8 sy, s8 rsx, s8 rsy, f32 mdx, f32 mdy, u8 flags)
++void netPredictRecordCmd(u32 tick, u32 buttons, s8 sx, s8 sy, s8 rsx, s8 rsy, f32 mdx, f32 mdy, f32 tdx, f32 tdy, u8 flags)
+ {
+ 	struct netpredtick *e = netPredSlot(tick);
+ 
+@@ -1043,6 +1045,8 @@
+ 	e->cmd.rsy = rsy;
+ 	e->cmd.mdx = mdx;
+ 	e->cmd.mdy = mdy;
++	e->cmd.tdx = tdx;
++	e->cmd.tdy = tdy;
+ 	e->cmd.flags = flags;
+ 	e->hascmd = 1;
+ }
+@@ -1052,8 +1056,17 @@
+ 	// as the host takes it: only with the mouse locked (netMouseDelta)
+ 	const s32 locked = s_ReplayCmd && (s_ReplayCmd->flags & NETCMD_MOUSELOCKED);
+ 
+-	*dx = locked ? s_ReplayCmd->mdx : 0;
+-	*dy = locked ? s_ReplayCmd->mdy : 0;
++	*dx = locked ? s_ReplayCmd->mdx + s_ReplayCmd->tdx : 0;
++	*dy = locked ? s_ReplayCmd->mdy + s_ReplayCmd->tdy : 0;
++}
++
++void netPredictReplayMouseAbs(f32 *dx, f32 *dy)
++{
++	f32 sx, sy;
++	inputMouseGetSpeed(&sx, &sy);
++	const s32 locked = s_ReplayCmd && (s_ReplayCmd->flags & NETCMD_MOUSELOCKED);
++	*dx = locked ? s_ReplayCmd->mdx * (sx < 0.f ? -1.f : 1.f) + s_ReplayCmd->tdx : 0.f;
++	*dy = locked ? s_ReplayCmd->mdy * (sy < 0.f ? -1.f : 1.f) + s_ReplayCmd->tdy : 0.f;
+ }
+ 
+ /**
+@@ -2117,13 +2130,17 @@
+ 	// will turn it (bmoveProcessInput: the scaled delta times 3.5 degrees,
+ 	// by the fov) - on a frame drawn between ticks only, and not while
+ 	// aiming, where the mouse moves the crosshair instead
+-	if (g_NetPass != NETPASS_PRESENT_ONLY || !inputMouseIsLocked() || p->insightaimmode) {
++	f32 tx = 0.f, ty = 0.f;
++#ifdef PLATFORM_IOS
++	netPendingTouchDegrees(&tx, &ty);
++#endif
++	if (g_NetPass != NETPASS_PRESENT_ONLY || p->insightaimmode) {
+ 		return;
+ 	}
+ 
+-	netPendingMouse(&rdx, &rdy);
+-
+-	if (rdx || rdy) {
++	if (inputMouseIsLocked()) netPendingMouse(&rdx, &rdy);
++
++	if (rdx || rdy || tx != 0.f || ty != 0.f) {
+ 		f32 sx;
+ 		f32 sy;
+ 		f32 fovscale = viGetFovY() / PLAYER_DEFAULT_FOV;
+@@ -2131,8 +2148,8 @@
+ 		f32 dverta;
+ 
+ 		inputMouseGetSpeed(&sx, &sy);
+-		dtheta = rdx * 0.022f * sx * fovscale;
+-		dverta = -rdy * 0.022f * sy * fovscale * (optionsGetForwardPitch(g_Vars.currentplayerstats->mpindex) ? 1.f : -1.f);
++		dtheta = (rdx * 0.022f * sx + tx) * fovscale;
++		dverta = -(rdy * 0.022f * sy + ty) * fovscale * (optionsGetForwardPitch(g_Vars.currentplayerstats->mpindex) ? 1.f : -1.f);
+ 
+ 		if (dverta + p->vv_verta > 90.f) {
+ 			dverta = 90.f - p->vv_verta;

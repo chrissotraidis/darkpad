@@ -1,0 +1,27 @@
+Subject: Bound clipboard paste and retain its storage until copied
+
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -2164,12 +2164,17 @@
+ 		// CTRL+V; paste from clipboard
+ 		const char *clip = inputGetClipboard();
+ 		if (clip) {
+-			const s32 remain = outSize - *curCol - 1;
++			// Copy before releasing SDL's clipboard buffer, and advance only
++			// by bytes actually written (snprintf reports the untruncated size).
++			if (outSize && *curCol >= 0 && (u32)*curCol < outSize) {
++				size_t count = strlen(clip);
++				const size_t remain = outSize - (u32)*curCol - 1;
++				if (count > remain) count = remain;
++				memcpy(out + *curCol, clip, count);
++				*curCol += (s32)count;
++				out[*curCol] = '\0';
++			}
+ 			inputClearClipboard();
+-			*curCol += snprintf(out + *curCol, remain, "%s", clip);
+-			if (*curCol > outSize) {
+-				*curCol = outSize;
+-			}
+ 		}
+ 	} else if (key == VK_BACKSPACE) {
+ 		if (*curCol) {

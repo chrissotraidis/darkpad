@@ -1,0 +1,110 @@
+Subject: ios: read local-player shell state during network sessions
+
+Pause, aim, secondary availability, weapon and cinematic chrome must follow
+the local slot, independent of whichever player the network tick last visited.
+Weapon readers retain upstream semantics with a scoped pointer context.
+
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -9385,11 +9385,15 @@
+  * cover about half the ground of a full one. Read-only, iOS-only, and the
+  * bridge calls it from the frame hook like everything else.
+  */
++static struct player *playerIosLocalPlayer(void)
++{
++	return g_NetMode != NETMODE_NONE ? netLocalPlayer(NULL) : g_Vars.currentplayer;
++}
++
+ s32 playerIosGetPos(f32 *x, f32 *y, f32 *z)
+ {
+ 	/* Network ticks may leave currentplayer on a remote slot. */
+-	struct player *p = g_NetMode != NETMODE_NONE
+-		? netLocalPlayer(NULL) : g_Vars.currentplayer;
++	struct player *p = playerIosLocalPlayer();
+ 
+ 	if (!p || !p->prop) {
+ 		return 0;
+@@ -9419,7 +9423,7 @@
+  */
+ s32 playerIosIsPaused(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocalPlayer();
+ 
+ 	if (!p) {
+ 		return 1;
+@@ -9441,7 +9445,7 @@
+  */
+ s32 playerIosGetAimMode(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocalPlayer();
+ 
+ 	if (!p) {
+ 		return 0;
+@@ -9477,7 +9481,7 @@
+  */
+ s32 playerIosGunHasSecondary(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocalPlayer();
+ 
+ 	if (!p) {
+ 		return 0;
+@@ -9493,13 +9497,25 @@
+  */
+ s32 playerIosGunState(s32 *function)
+ {
+-	struct player *p = g_Vars.currentplayer;
+-
+-	if (function) {
+-		*function = (p && bgunIsUsingSecondaryFunction()) ? 1 : 0;
+-	}
+-
+-	return p ? bgunGetWeaponNum(HAND_RIGHT) : -1;
++	struct player *p = playerIosLocalPlayer();
++	s32 gun;
++	struct player *previous = g_Vars.currentplayer;
++	struct playerstats *previousstats = g_Vars.currentplayerstats;
++
++	if (function) *function = 0;
++	if (!p) return -1;
++
++	/* Existing gun readers require these two pointers. Scope them to this
++	 * synchronous read and restore exactly, without changing player order. */
++	g_Vars.currentplayer = p;
++	if (g_NetMode != NETMODE_NONE) {
++		g_Vars.currentplayerstats = &g_Vars.playerstats[g_NetLocalSlot];
++	}
++	if (function) *function = bgunIsUsingSecondaryFunction() ? 1 : 0;
++	gun = bgunGetWeaponNum(HAND_RIGHT);
++	g_Vars.currentplayer = previous;
++	g_Vars.currentplayerstats = previousstats;
++	return gun;
+ }
+ 
+ /**
+@@ -9508,10 +9524,10 @@
+  */
+ s32 playerIosActiveMenu(s32 *slot)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocalPlayer();
+ 
+ 	if (slot) {
+-		*slot = g_AmMenus[g_AmIndex].slotnum;
++		*slot = p ? g_AmMenus[g_NetMode != NETMODE_NONE ? g_NetLocalSlot : g_AmIndex].slotnum : 4;
+ 	}
+ 
+ 	return p && p->activemenumode != AMMODE_CLOSED;
+@@ -9520,6 +9536,7 @@
+ /** Shell chrome only: retain Start/menu while no playable camera exists. */
+ s32 playerIosIsCinematic(void)
+ {
+-	return g_InCutscene || !g_Vars.currentplayer || !g_Vars.currentplayer->prop;
+-}
+-#endif
++	struct player *p = playerIosLocalPlayer();
++	return g_InCutscene || !p || !p->prop;
++}
++#endif

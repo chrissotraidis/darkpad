@@ -1,0 +1,28 @@
+Subject: Expose session action availability without ending the session
+
+--- a/port/src/pdmain.c
++++ b/port/src/pdmain.c
+@@ -839,7 +839,7 @@
+  * Menu, training, cutscene and already-ended states are not active sessions.
+  * A dead Combat Simulator player is still in a live match (awaiting respawn).
+  */
+-s32 mainIosEndSession(void)
++s32 mainIosCanEndSession(void)
+ {
+ 	if (!g_Vars.currentplayer || !g_Vars.currentplayer->prop
+ 			|| g_Vars.stagenum == STAGE_CITRAINING || g_MainIsEndscreen
+@@ -848,6 +848,14 @@
+ 				&& !g_Vars.normmplayerisrunning)) {
+ 		return 0;
+ 	}
++	return 1;
++}
++
++s32 mainIosEndSession(void)
++{
++	if (!mainIosCanEndSession()) {
++		return 0;
++	}
+ 	g_Vars.currentplayer->aborted = true;
+ 	mainEndStage();
+ 	return 1;

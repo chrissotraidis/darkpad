@@ -1,0 +1,147 @@
+Subject: gfx_sdl2: create the GL ES 3.0 context through ANGLE when PD_GL_ANGLE is on
+
+SDL2 on Apple cannot hand us an ANGLE context: SDL_GL_CreateContext makes
+either a desktop CGL context (macOS) or an EAGL one (iOS), and visionOS has
+neither. So under PD_GL_ANGLE the window is created with SDL_WINDOW_METAL
+instead of SDL_WINDOW_OPENGL - SDL must not make a context of its own - and
+app/gfx/gfx_angle_egl.mm takes the window's CAMetalLayer and builds the EGL
+display/config/surface/context on it.
+
+Everything else in this file stays SDL's: the window, the events, the
+fullscreen and maximise state, the frame limiter. Only five things move:
+context creation (the 3.0/4.1core/3.2core/3.0es/2.1 ladder is skipped whole),
+the drawable size, the resize hook (the CAMetalLayer does not follow the
+window on its own), the present (eglSwapBuffers), and the swap interval.
+
+With PD_GL_ANGLE off every line here is preprocessed away.
+
+diff --git a/port/fast3d/gfx_sdl2.cpp b/port/fast3d/gfx_sdl2.cpp
+index ef19bdac8..4738da8a9 100644
+--- a/port/fast3d/gfx_sdl2.cpp
++++ b/port/fast3d/gfx_sdl2.cpp
+@@ -11,6 +11,18 @@
+ #include "gfx_window_manager_api.h"
+ #include "gfx_screen_config.h"
+ 
++#ifdef PD_GL_ANGLE
++// The ANGLE/EGL context glue (app/gfx/gfx_angle_egl.mm). SDL owns the window
++// and the events; ANGLE owns the context and the present. See that file.
++extern "C" int pdAngleInit(SDL_Window *wnd, char *errbuf, int errlen);
++extern "C" const char *pdAngleGetVendorString(void);
++extern "C" void pdAngleGetDrawableSize(int *w, int *h);
++extern "C" void pdAngleResized(SDL_Window *wnd);
++extern "C" void pdAngleSwapBuffers(void);
++extern "C" int pdAngleSetSwapInterval(int interval);
++extern "C" int pdAngleGetSwapInterval(void);
++#endif
++
+ static SDL_Window* wnd;
+ static SDL_GLContext ctx;
+ static SDL_Renderer* renderer;
+@@ -186,7 +198,13 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+         return;
+     }
+ 
++#ifdef PD_GL_ANGLE
++    // ANGLE draws into the window's CAMetalLayer; SDL must not make a GL
++    // context of its own, so SDL_WINDOW_OPENGL must NOT be set here.
++    flags |= SDL_WINDOW_METAL;
++#else
+     flags |= SDL_WINDOW_OPENGL;
++#endif
+ 
+     // ideally we need 3.0 compat
+     // if that doesn't work, try 3.2 core in case we're on mac, 2.1 compat as a last resort
+@@ -213,6 +231,23 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+         }
+     }
+ 
++#ifdef PD_GL_ANGLE
++    (void)verstart; (void)verend;
++    wnd = SDL_CreateWindow(set->title, posX, posY, window_width, window_height, flags);
++    if (!wnd) {
++        sysFatalError("Could not open SDL window for ANGLE:\n%s", SDL_GetError());
++    }
++    char angleerr[256] = { 0 };
++    if (!pdAngleInit(wnd, angleerr, sizeof(angleerr))) {
++        sysFatalError("Could not create an ANGLE GL ES 3.0 context:\n%s", angleerr);
++    }
++    sysLogPrintf(LOG_NOTE, "SDL: created GL3.0es context through ANGLE (%s)", pdAngleGetVendorString());
++    pdAngleGetDrawableSize(&window_width, &window_height);
++    pdAngleSetSwapInterval(1);
++    SDL_ShowWindow(wnd);
++    qpc_freq = SDL_GetPerformanceFrequency();
++    return;
++#else
+     ctx = NULL;
+     u32 vmin = 0, vmaj = 0, vprof = SDL_GL_CONTEXT_PROFILE_COMPATIBILITY;
+     const char *vprofstr = "";
+@@ -253,6 +288,7 @@ static void gfx_sdl_init(const struct GfxWindowInitSettings *set) {
+     SDL_ShowWindow(wnd);
+ 
+     qpc_freq = SDL_GetPerformanceFrequency();
++#endif
+ }
+ 
+ static void gfx_sdl_close(void) {
+@@ -347,7 +383,11 @@ static void gfx_sdl_set_dimensions(uint32_t width, uint32_t height, int32_t posX
+ }
+ 
+ static void gfx_sdl_get_dimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
++#ifdef PD_GL_ANGLE
++    pdAngleGetDrawableSize(static_cast<int*>((void*)width), static_cast<int*>((void*)height));
++#else
+     get_drawable_size(static_cast<int*>((void*)width), static_cast<int*>((void*)height));
++#endif
+     SDL_GetWindowPosition(wnd, static_cast<int*>(posX), static_cast<int*>(posY));
+ }
+ 
+@@ -363,7 +403,12 @@ static void gfx_sdl_handle_events(void) {
+                 break;
+             case SDL_WINDOWEVENT:
+                 if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
++#ifdef PD_GL_ANGLE
++                    pdAngleResized(wnd);
++                    pdAngleGetDrawableSize(&window_width, &window_height);
++#else
+                     get_drawable_size(&window_width, &window_height);
++#endif
+                     if (!fullscreen_state) {
+                         maximized_state = SDL_GetWindowFlags(wnd) & SDL_WINDOW_MAXIMIZED ? true : false;
+                     }
+@@ -425,7 +470,11 @@ static void gfx_sdl_swap_buffers_begin(void) {
+             vk_present_hook();
+         }
+     } else {
++#ifdef PD_GL_ANGLE
++        pdAngleSwapBuffers();
++#else
+         SDL_GL_SwapWindow(wnd);
++#endif
+     }
+ }
+ 
+@@ -461,7 +510,11 @@ static int gfx_sdl_get_swap_interval(void) {
+     if (use_vulkan) {
+         return vk_get_interval_hook ? vk_get_interval_hook() : 1;
+     }
++#ifdef PD_GL_ANGLE
++    return pdAngleGetSwapInterval();
++#else
+     return SDL_GL_GetSwapInterval();
++#endif
+ }
+ 
+ static bool gfx_sdl_set_swap_interval(int interval) {
+@@ -470,7 +523,11 @@ static bool gfx_sdl_set_swap_interval(int interval) {
+         vsync_enabled = ok && (interval != 0);
+         return ok;
+     }
++#ifdef PD_GL_ANGLE
++    const bool success = pdAngleSetSwapInterval(interval) != 0;
++#else
+     const bool success = SDL_GL_SetSwapInterval(interval) >= 0;
++#endif
+     vsync_enabled = success && (interval != 0);
+     if (!success) {
+         sysLogPrintf(LOG_WARNING, "SDL: failed to set vsync %d: %s", interval, SDL_GetError());

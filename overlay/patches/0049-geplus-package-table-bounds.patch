@@ -1,0 +1,126 @@
+Subject: GE Plus: the package form's file table is checked against the package
+
+The streaming unpack of the Xbox 360 package (overlay 0046) sized its block
+list from what the package's own file table said: a 32-bit sum of every
+wanted file's blocks. The table is read from the user's file, so a file made
+to say 0x8000 wanted entries of 4GB each overflowed the sum, the list came out
+small, and filling it wrote past it. The free-space check in front happened
+to refuse such a table on iOS (it asks for the sum in bytes), but not where
+free space cannot be told, and a guard that holds by accident is no guard.
+Found by the 1.0.1.3 review; the user's real package never trips any of it.
+
+Every wanted entry is now held to the package it is in before the list is
+sized: its blocks must lie inside the package (the last one's offset, under
+the same hash-table spacing the unpack uses, before the package's end), be as
+many as its size needs, and name a path no earlier entry named (a second
+entry for one path would be written over the first's bytes and counted as
+done); the sizes must add up to no more than the package; and the block
+count is a 64-bit sum capped at 2^24 (64GB) before it sizes anything. A table
+said to begin past the package's end is refused as soon as the header is in,
+instead of spooling the whole package to disk waiting for it. Any of these
+ends the unpack as a fault, with a log line naming which, exactly as an
+unreadable package does: nothing is written, the game goes on in the N64
+look, and the cache stays empty.
+
+The bare package read in place (gebeanPkgExtractFile) goes through x360.c's
+own reader, which bounds every block it reads, so it is unchanged.
+
+diff --git a/port/src/gebean.c b/port/src/gebean.c
+index 722121d90..e93f9d462 100644
+--- a/port/src/gebean.c
++++ b/port/src/gebean.c
+@@ -3086,7 +3086,7 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+ 	struct x360stfs stfs;
+ 	char name[512];
+ 	unsigned long long bytes = 0;
+-	u32 numBlocks = 0;
++	unsigned long long numBlocks = 0;
+ 	s32 consecutive = 1;
+ 	u8 *buf;
+ 
+@@ -3108,6 +3108,8 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+ 
+ 	for (u32 i = 0; i < stfs.numFiles; i++) {
+ 		const struct x360stfsfile *f = &stfs.files[i];
++		// in 64 bits: a size near 4GB wraps the sum in 32
++		const unsigned long long need = ((unsigned long long)f->size + GEBEAN_STFS_BLOCK - 1) / GEBEAN_STFS_BLOCK;
+ 
+ 		if (f->isDir || !gebeanWantEntry(x360StfsPath(&stfs, i, name, sizeof(name)), NULL)) {
+ 			continue;
+@@ -3118,6 +3120,28 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+ 			continue;
+ 		}
+ 
++		// The table is read from the file, so nothing in it is taken on trust
++		// (iOS port overlay 0049): a file's blocks must lie inside the package
++		// it is in, be as many as its size needs, and name a path no earlier
++		// entry has. Else the block list is sized from what the table says
++		// (a sum that overflows), and what is written would be anyone's.
++		if (need > f->numBlocks
++				|| (need > 0 && gebeanPkgBlockOffset(s->tableShift, f->startBlock + need - 1) + GEBEAN_STFS_BLOCK > s->size)) {
++			sysLogPrintf(LOG_ERROR, "gebean: the package's file table does not fit the package (%s)", name);
++			x360StfsClose(&stfs);
++			s->failed = 1;
++			return 0;
++		}
++
++		for (u32 w = 0; w < s->numFiles; w++) {
++			if (!strcmp(s->files[w].path, name)) {
++				sysLogPrintf(LOG_ERROR, "gebean: the package's file table names %s twice", name);
++				x360StfsClose(&stfs);
++				s->failed = 1;
++				return 0;
++			}
++		}
++
+ 		if (!f->consecutive && f->numBlocks > 1) {
+ 			consecutive = 0;
+ 		}
+@@ -3134,7 +3158,15 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+ 		s->files[s->numFiles].size = f->size;
+ 		s->numFiles++;
+ 		bytes += f->size;
+-		numBlocks += (f->size + GEBEAN_STFS_BLOCK - 1) / GEBEAN_STFS_BLOCK;
++		numBlocks += need;
++	}
++
++	// files that lie inside the package cannot add up to more than it
++	if (bytes > s->size) {
++		sysLogPrintf(LOG_ERROR, "gebean: the package's file table holds more than the package");
++		x360StfsClose(&stfs);
++		s->failed = 1;
++		return 0;
+ 	}
+ 
+ 	pkgFilesTotal = (s32)s->numFiles;
+@@ -3160,7 +3192,14 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+ 		return 0;
+ 	}
+ 
+-	s->blocks = malloc((numBlocks ? numBlocks : 1) * sizeof(*s->blocks));
++	// 2^24 blocks is 64GB; the release's wanted files are 400MB
++	if (numBlocks > (1u << 24)) {
++		x360StfsClose(&stfs);
++		s->failed = 1;
++		return 0;
++	}
++
++	s->blocks = malloc((size_t)(numBlocks ? numBlocks : 1) * sizeof(*s->blocks));
+ 
+ 	if (!s->blocks) {
+ 		x360StfsClose(&stfs);
+@@ -3285,6 +3324,14 @@ static s32 gebeanPkgSink(const u8 *data, u32 len, void *arg)
+ 
+ 			s->tableShift = (((headerSize + 0xfff) & 0xf000) >> 12) == 0xb ? 0 : 1;
+ 			s->tableEnd = gebeanPkgBlockOffset(s->tableShift, tableBlock + tableBlocks - 1) + GEBEAN_STFS_BLOCK;
++
++			// A table said to lie past the package's end would never come,
++			// and everything before it would be spooled waiting (overlay 0049).
++			if (s->tableEnd > s->size) {
++				sysLogPrintf(LOG_ERROR, "gebean: the package's file table lies past its end");
++				s->failed = 1;
++				return 0;
++			}
+ 		}
+ 	}
+ 

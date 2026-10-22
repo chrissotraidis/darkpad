@@ -1,0 +1,84 @@
+Subject: player: GoldenEye level, the gun's second function, the active menu (iOS only)
+
+Four read-only accessors for the touch layer's two new chips (D-085). The
+secondary-function chip is hidden on a GoldenEye level when the gun in hand has
+no second function (every GoldenEye gun - geguns.c strips them - but Perfect
+Dark's own guns can be listed in a GE Plus arena and keep theirs). The weapon
+wheel chip and the bridge read the active menu's state and the gun's function
+as evidence. Entirely inside PLATFORM_IOS, called from the shell's frame hook.
+
+diff --git a/src/game/player.c b/src/game/player.c
+index a451d9f84..e0bfbb0cc 100644
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -8834,3 +8834,70 @@ s32 playerIosGetAimMode(void)
+ 	return p->insightaimmode ? 1 : 0;
+ }
+ #endif
++
++#ifdef PLATFORM_IOS
++#include "modloader.h"
++
++/**
++ * Is a GoldenEye level being played - a converted GoldenEye mission, or one of
++ * GE Plus's arenas while GE Plus is on? The same test gehud.c's
++ * geHudStageStart() uses to give the level GoldenEye's HUD, so the shell and
++ * the HUD can never disagree about which world the player is in. The on-screen
++ * secondary-function chip (D-085) is hidden here: GoldenEye's guns have one
++ * function each (geguns.c strips the hosts' second ones). Read-only, iOS-only.
++ */
++s32 playerIosOnGoldenEyeLevel(void)
++{
++	const s32 stagenum = g_Vars.stagenum;
++
++	return modloaderStageIsMission(stagenum)
++		|| (g_GexPlusMode && modloaderStageIsRemake(stagenum));
++}
++
++/**
++ * Does the gun in the right hand have a second function to toggle to? A
++ * GoldenEye gun never does, but Mod.GePlusPdGuns (or a mod's weapon set) can
++ * put Perfect Dark's own guns in a GoldenEye arena, and those keep theirs.
++ */
++s32 playerIosGunHasSecondary(void)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (!p) {
++		return 0;
++	}
++
++	return weaponGetFunction(&p->hands[HAND_RIGHT].gset, FUNC_SECONDARY) != NULL;
++}
++
++/**
++ * The right hand's weapon number and which function it is on (0 primary, 1
++ * secondary): the bridge's evidence that the secondary-function chip toggled
++ * the gun (D-085). -1 with no player.
++ */
++s32 playerIosGunState(s32 *function)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (function) {
++		*function = (p && bgunIsUsingSecondaryFunction()) ? 1 : 0;
++	}
++
++	return p ? bgunGetWeaponNum(HAND_RIGHT) : -1;
++}
++
++/**
++ * Is the active menu (the weapon wheel) open, and which slot is highlighted
++ * (0-8, 4 = the centre)? The weapon-wheel chip's evidence (D-085).
++ */
++s32 playerIosActiveMenu(s32 *slot)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (slot) {
++		*slot = g_AmMenus[g_AmIndex].slotnum;
++	}
++
++	return p && p->activemenumode != AMMODE_CLOSED;
++}
++#endif

@@ -1,0 +1,219 @@
+Subject: input/menu: an absolute touch pointer, so a tap picks the menu item under it
+
+D-014 shipped "drag moves the highlight, tap is Accept" and recorded
+tap-at-point selection as a Phase 2 item needing "the engine's own menu
+geometry". It turns out the engine already has it and already exposes it: PD's
+menus take a MOUSE. menu.c:4873-4887 reads a cursor position through
+inputMouseGetPosition() and the left button through
+inputKeyPressed(VK_MOUSE_LEFT), and dialogChangeItemFocusWithMouse()
+(menu.c:1434) walks the open dialog's own columns and rows - the same
+menu->cols/menu->rows layout the renderer uses - to find the focusable item
+under that point.
+
+So this is not a new navigation model. It is the existing one fed from a
+finger:
+
+  - inputIosPointerSet(nx, ny, down) takes NORMALISED coordinates, 0..1 across
+    the drawable. The shell knows points; the engine knows the native viewport
+    menu.c measures dialogs in; the conversion belongs on the side that owns
+    the units it converts to.
+  - inputMouseGetPosition() answers from the pointer when one is active, and
+    its "moved" return - which is what sets g_MenuUsingMouse and therefore what
+    makes dialogChangeItemFocusWithMouse() do anything at all - is latched once
+    a frame in inputIosLatchFrame(), the same read-once-per-frame contract
+    mouseDX/DY already have.
+  - inputKeyPressed(VK_MOUSE_LEFT) answers from the pointer's down flag.
+
+  - inputIosPointerAddWheel() feeds the two wheel keys, which is
+    inputs.mousescroll and therefore menuUpdateScroll() (menu.c:4706) - a flick
+    on a mission list that is longer than the dialog has somewhere to go
+    without the touch layer knowing anything about dialog geometry.
+
+That first one is why the pointer has an "active" flag at all rather than just a
+position. VK_MOUSE_LEFT is also the default bind for CK_ZTRIG (input.c:198), so
+a pointer left live during gameplay would fire the gun on every tap. The shell
+makes it active only while a menu dialog is open and clears it the moment one
+closes, and menuIosDialogIsOpen() is what it asks - `curdialog`, the same field
+menuProcessInput() tests before touching the mouse at all.
+
+Nothing here is reachable off iOS: every hunk is inside PLATFORM_IOS.
+
+diff --git a/port/include/input.h b/port/include/input.h
+index 90915c648..043b1dd13 100644
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -244,6 +244,13 @@ void inputIosLookAddDegrees(f32 degx, f32 degy);
+ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
+ void inputIosPadSetButton(u32 button, s32 down);
+ u32 inputIosPadGetButtons(void);
++// The absolute touch pointer that drives PD's own menu-mouse path. nx/ny are
++// 0..1 across the drawable. The shell makes it active only while a menu dialog
++// is open (menuIosDialogIsOpen()) and clears it as soon as one closes.
++void inputIosPointerSet(f32 nx, f32 ny, s32 down);
++void inputIosPointerClear(void);
++void inputIosPointerAddWheel(s32 ticks);
++s32 inputIosPointerIsActive(void);
+ #endif
+ 
+ void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
+diff --git a/port/src/input.c b/port/src/input.c
+index 2255b2149..21dc7d8d9 100644
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -1195,6 +1195,10 @@ static inline s32 inputAxisScale(s32 x, const s32 deadzone, const f32 scale)
+  * many times the consumer asks for it - the same contract mouseDX/DY have.
+  */
+ static f32 iosLookPendingX = 0.f, iosLookPendingY = 0.f;
++static f32 iosPointerX = -1.f, iosPointerY = -1.f;
++static s32 iosPointerDown = 0, iosPointerActive = 0;
++static s32 iosPointerMoved = 0, iosPointerMovedFrame = 0;
++static s32 iosPointerWheel = 0, iosPointerWheelFrame = 0;
+ static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
+ static u32 iosPadButtons = 0;
+ static s32 iosPadStickX = 0, iosPadStickY = 0;
+@@ -1244,6 +1248,7 @@ static void inputIosMergePad(OSContPad *npad)
+ 	if (!npad->stick_y && iosPadStickY) {
+ 		npad->stick_y = iosPadStickY;
+ 	}
++
+ }
+ 
+ static void inputIosLatchFrame(void)
+@@ -1252,6 +1257,70 @@ static void inputIosLatchFrame(void)
+ 	iosLookFrameY = iosLookPendingY;
+ 	iosLookPendingX = 0.f;
+ 	iosLookPendingY = 0.f;
++
++	iosPointerMovedFrame = iosPointerMoved;
++	iosPointerMoved = 0;
++	iosPointerWheelFrame = iosPointerWheel;
++	iosPointerWheel = 0;
++}
++
++/**
++ * The absolute pointer, which is how a finger presses a MENU ITEM.
++ *
++ * PD's menus already take a mouse: menu.c:4874-4886 reads the cursor position
++ * through inputMouseGetPosition(), the left button through
++ * inputKeyPressed(VK_MOUSE_LEFT), and dialogChangeItemFocusWithMouse()
++ * (menu.c:1434) walks the dialog's own columns and rows to find the item under
++ * it. That is the engine's own menu geometry, which is exactly what
++ * tap-at-point selection needs and what D-014 said it did not have.
++ *
++ * So the iOS pointer is not a new navigation model, it is the existing one fed
++ * from a finger. The shell hands over NORMALISED coordinates (0..1 across the
++ * drawable) because it knows points and the engine knows the native viewport,
++ * and the conversion belongs on the side that owns the number it converts to.
++ *
++ * It is gated by the shell on a menu being open (menuIosDialogIsOpen()), which
++ * is why the left-button answer below can be unconditional: VK_MOUSE_LEFT is
++ * also the default bind for CK_ZTRIG (input.c:198), and a pointer left active
++ * in gameplay would fire the gun on every tap.
++ */
++void inputIosPointerSet(f32 nx, f32 ny, s32 down)
++{
++	if (nx != iosPointerX || ny != iosPointerY || !iosPointerActive) {
++		iosPointerMoved = 1;
++	}
++
++	iosPointerX = (nx < 0.f) ? 0.f : ((nx > 1.f) ? 1.f : nx);
++	iosPointerY = (ny < 0.f) ? 0.f : ((ny > 1.f) ? 1.f : ny);
++	iosPointerDown = !!down;
++	iosPointerActive = 1;
++}
++
++void inputIosPointerClear(void)
++{
++	iosPointerActive = 0;
++	iosPointerDown = 0;
++	iosPointerMoved = 0;
++	iosPointerMovedFrame = 0;
++}
++
++/**
++ * A flick that scrolls a long list.
++ *
++ * menu.c:4882 builds inputs.mousescroll out of the two wheel keys, and
++ * menuUpdateScroll() (menu.c:4706) moves the dialog by LINEHEIGHT per tick. A
++ * drag past the bottom of a mission list therefore has somewhere to go without
++ * the touch layer knowing anything about dialog geometry. Ticks accumulate
++ * between frames and are latched like everything else here.
++ */
++void inputIosPointerAddWheel(s32 ticks)
++{
++	iosPointerWheel += ticks;
++}
++
++s32 inputIosPointerIsActive(void)
++{
++	return iosPointerActive;
+ }
+ #endif
+ 
+@@ -1718,6 +1787,22 @@ s32 inputKeyPressed(u32 vk)
+ 	}
+ 
+ 	if (vk >= VK_MOUSE_BEGIN && vk < VK_JOY_BEGIN) {
++#ifdef PLATFORM_IOS
++		// A finger held on a menu item is the left button held. Safe to answer
++		// unconditionally because the shell only makes the pointer active
++		// while a menu dialog is open - see inputIosPointerSet().
++		if (iosPointerActive) {
++			if (vk == VK_MOUSE_LEFT && iosPointerDown) {
++				return 1;
++			}
++			if (vk == VK_MOUSE_WHEEL_DN && iosPointerWheelFrame > 0) {
++				return 1;
++			}
++			if (vk == VK_MOUSE_WHEEL_UP && iosPointerWheelFrame < 0) {
++				return 1;
++			}
++		}
++#endif
+ 		return (mouseButtons & SDL_BUTTON(vk - VK_MOUSE_BEGIN + 1)) != 0;
+ 	}
+ 
+@@ -1787,6 +1872,16 @@ s32 inputMouseIsLocked(void)
+ 
+ s32 inputMouseGetPosition(s32 *x, s32 *y)
+ {
++#ifdef PLATFORM_IOS
++	// The touch pointer, in the units this function promises: the native
++	// viewport menu.c measures its dialogs in. "Moved" is latched once a frame
++	// like mouseDX/DY, so a menu tick that asks twice gets one answer.
++	if (iosPointerActive) {
++		if (x) *x = (s32)(iosPointerX * (f32)videoGetNativeWidth());
++		if (y) *y = (s32)(iosPointerY * (f32)videoGetNativeHeight());
++		return iosPointerMovedFrame;
++	}
++#endif
+ 	if (x) *x = mouseX * videoGetNativeWidth() / videoGetWindowWidth();
+ 	if (y) *y = mouseY * videoGetNativeHeight() / videoGetWindowHeight();
+ 	return (mouseDX != 0 || mouseDY != 0);
+diff --git a/src/game/menu.c b/src/game/menu.c
+index 74ae59a46..e71abb17e 100644
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -1518,6 +1518,22 @@ bool dialogChangeItemFocusWithMouse(struct menudialog *dialog, s32 mx, s32 my)
+ 	return false;
+ }
+ 
++#ifdef PLATFORM_IOS
++/**
++ * Is a menu dialog up?
++ *
++ * The iOS shell asks once a frame, because the touch layer's absolute pointer
++ * (inputIosPointerSet(), port/src/input.c) must exist only inside a menu:
++ * VK_MOUSE_LEFT is also the default bind for CK_ZTRIG, so a pointer left live
++ * in gameplay would fire the gun on every tap. `curdialog` is the same field
++ * menuProcessInput() itself tests before doing anything with the mouse.
++ */
++s32 menuIosDialogIsOpen(void)
++{
++	return g_Menus[0].curdialog != NULL;
++}
++#endif
++
+ #endif
+ 
+ s32 dialogChangeItemFocus(struct menudialog *dialog, struct menuinputs *inputs)

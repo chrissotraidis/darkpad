@@ -1,0 +1,56 @@
+Subject: xbla: look two folders deeper for the package inside a dropped archive
+
+the user's own XBLA archive ("Perfect Dark.rar", the copy this port is built
+around) stores the STFS package as
+
+    Perfect Dark/584109C2/000D0000/35C1CDD22DD0D4E54B858859C0052124FFFAD17958
+
+which is four names deep. XBLAIMPORT_SCAN_DEPTH is 2 and xblaScanDir()
+examines the directory it is given plus `depth` more levels, so it reaches
+three names and no further. The .rar IS accepted and IS unpacked correctly -
+248 MB into cache/xbla/ - and then:
+
+    ERROR: xbla: no Xbox 360 package inside .../xbla/Perfect Dark.rar
+
+unpackFailed is latched, so nothing of the release ever draws. And because
+the .extracted marker is only written after that scan succeeds, and
+xblaFindExtractedIn() uses the same depth, every later boot unpacks the same
+248 MB again and fails again.
+
+Proven on the clang oracle 2026-09-12: with the unpacked package moved by
+hand to cache/xbla/<hash> and .extracted touched, the same binary logs
+"xblamesh: 2616 slots", "xblatex: 5747 texture records" and "xblastage:
+bgdata/bg_pete.seg from the release", and Chicago draws 2880 triangles at the
+comparison frame against 477 with the release off
+(artifacts/oracle/baseline/chicago-{n64,xbla}.jpg).
+
+4 rather than 3 so that a player who unpacked the archive by hand INTO xbla/
+- which puts the same tree one level lower - is found too. The scan stops at
+the first package, and every level it walks is the player's own xbla/ or our
+own cache, so depth costs nothing here.
+
+Worth sending upstream: it is a one-line fix for a real archive layout.
+
+NOT YET APPLIED TO A BUILD - scripts/apply-overlay.sh does not exist yet
+(Phase 1). The 0.3 oracles are stock upstream; the XBLA verification above
+was done by flattening cache/xbla/ by hand.
+
+diff --git a/port/src/xblaimport.c b/port/src/xblaimport.c
+index f999704d9..15902a1ca 100644
+--- a/port/src/xblaimport.c
++++ b/port/src/xblaimport.c
+@@ -53,7 +53,13 @@
+ // How far into that folder to look. An archive in the wild wraps the package
+ // in a folder of its own ("Perfect Dark/<content id>"), and a player who
+ // unpacked one by hand has that folder sitting in xbla/.
+-#define XBLAIMPORT_SCAN_DEPTH 2
++//
++// Four, not two: the common .rar wraps it deeper still - "Perfect Dark/<title
++// id>/<type>/<content id>", which is four names - and a copy unpacked by hand
++// into xbla/ puts that whole tree one level lower again. At two the archive
++// unpacks and the package is then not found, which latches unpackFailed and
++// re-unpacks 248MB on every boot.
++#define XBLAIMPORT_SCAN_DEPTH 4
+ 
+ // Where an archive dropped in xbla/ comes apart: cache/xbla/ beside the
+ // executable (or in the save directory), so that xbla/ itself holds nothing

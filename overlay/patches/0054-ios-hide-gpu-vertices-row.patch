@@ -1,0 +1,30 @@
+Subject: iOS: hide GPU Vertex Shading, which needs desktop GL
+
+Upstream v3.13.0 added Video.GpuVertices ("GPU Vertex Shading" on the Video
+page): meshes, rooms and models posed and transformed on the GPU. Its
+renderer test, gfx_opengl_mesh_supported(), is false on gl_es, so on ANGLE's
+OpenGL ES 3.0 the path never runs and the checkbox would change nothing. The
+row is hidden on iOS the way overlay 0041 hides SMAA, FSR and supersampling.
+The setting itself is untouched (pd.ini keeps it), and the replay/gate
+comparison is unaffected: the oracle references are recorded with
+Video.GpuVertices=0, which is the path iOS takes.
+
+Every other platform is unchanged.
+
+diff --git a/port/src/optionsmenu.c b/port/src/optionsmenu.c
+index af4b39916..1d6b49c72 100644
+--- a/port/src/optionsmenu.c
++++ b/port/src/optionsmenu.c
+@@ -874,6 +874,12 @@ static MenuItemHandlerResult menuhandlerFramerateLimit(s32 operation, struct men
+ static MenuItemHandlerResult menuhandlerGpuVertices(s32 operation, struct menuitem *item, union handlerdata *data)
+ {
+ 	switch (operation) {
++#ifdef PLATFORM_IOS
++	case MENUOP_CHECKHIDDEN:
++		// The GPU vertex path needs desktop GL: gfx_opengl_mesh_supported()
++		// says no on gl_es, so on ANGLE's ES 3.0 the box would change nothing.
++		return true;
++#endif
+ 	case MENUOP_GET:
+ 		return videoGetGpuVertices();
+ 	case MENUOP_SET:

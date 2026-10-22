@@ -1,0 +1,96 @@
+Subject: iOS audio: say when a burst drop has lasted too long; drop a log line that could not fire
+
+Review of D-078 (overlay 0023). When the device stops consuming - an audio
+interruption (a call, Siri, an alarm, another app taking a non-mixable
+session) pauses SDL's AudioQueue - the game thread keeps pushing. The queue
+then climbs past the high mark, the burst drop starts, and every push is
+dropped until the device has played the queue down to the setpoint. That
+keeps the queue bounded and costs one resync on resume, which is right. But
+SDL restarts its queue only on the interruption's end notification or on the
+app becoming active, and an AudioQueueStart that fails then (the session not
+active again yet) is never retried: the device stays paused, the drop never
+ends, and the game is silent until the next time the app becomes active.
+
+This patch only makes that visible: g_PdAudioDropping and the tick it began
+(g_PdAudioDroppingSinceMs). A healthy burst drop lasts a few hundred ms; the
+shell (app/ios/PDAudio.m) treats one past two seconds, with the app in the
+foreground, as a stalled device and asks SDL to restart it. Nothing in the
+loop's arithmetic changes.
+
+Also: audioInit()'s "Audio.RateMatchMaxPct=N is above the ceiling" line could
+never fire - configRegisterInt() clamps the value to its maximum as pd.ini is
+read - so it is removed and the comment says where the clamp really is.
+
+diff --git a/port/src/audio.c b/port/src/audio.c
+index 0b456cf27..74d53077e 100644
+--- a/port/src/audio.c
++++ b/port/src/audio.c
+@@ -213,6 +213,17 @@ static float rateStep = 1.0f;     /* input frames per output frame */
+ static float rateInteg = 0.0f;
+ static float rateLevel = -1.0f;   /* filtered queue level; <0 = not yet seeded */
+ static s32 rateDropping = 0;      /* a burst is being dropped back to the setpoint */
++/**
++ * Overlay 0048: the same, for the shell, and when it began. A burst drop lasts
++ * only until the device has played the queue down to the setpoint - a few
++ * hundred ms. One that lasts seconds means the device is not playing at all:
++ * an audio interruption whose end SDL never acted on. The shell watches this
++ * and restarts the device (app/ios/PDAudio.m); the drop itself keeps the queue
++ * bounded meanwhile, and the first push after the device drains is the one
++ * resync that brings the sound back.
++ */
++s32 g_PdAudioDropping = 0;
++u32 g_PdAudioDroppingSinceMs = 0;
+ static s16 *fadeBuf = NULL;
+ static u32 fadeBufSize = 0;
+ /** Resyncs (D-078): re-primes after an underrun, burst drops, samples dropped. */
+@@ -440,12 +451,10 @@ s32 audioInit(void)
+ 	}
+ 	// The rate matcher's authority has a hard ceiling (D-078). A pd.ini from
+ 	// 1.0.1.1 or earlier carries 10, which is what let a hitch be heard as
+-	// seconds of high, fast sound; it is clamped here and saved back as 1.
+-	if (rateMatchMaxPct > PD_AUDIO_RATE_MAX_PCT) {
+-		sysLogPrintf(LOG_NOTE, "audio: Audio.RateMatchMaxPct=%d is above the %d %% ceiling; using %d",
+-			rateMatchMaxPct, PD_AUDIO_RATE_MAX_PCT, PD_AUDIO_RATE_MAX_PCT);
+-		rateMatchMaxPct = PD_AUDIO_RATE_MAX_PCT;
+-	}
++	// seconds of high, fast sound. configRegisterInt() below clamps it to
++	// PD_AUDIO_RATE_MAX_PCT as the file is read, and the clamped value is what
++	// is saved back, so there is nothing left to do here (overlay 0048: a log
++	// line that stood here could never fire).
+ #endif
+ 
+ 	SDL_AudioSpec want, have;
+@@ -563,6 +572,7 @@ void audioEndFrame(void)
+ 				audioIosQueueSilence(setpoint - inSamples);
+ 				rateLevel = (float)setpoint;
+ 				rateDropping = 0;
++				g_PdAudioDropping = 0;
+ 				memset(ratePrev, 0, sizeof(ratePrev));
+ 				ratePhase = 0.0f;
+ 				fade = 1;
+@@ -578,6 +588,7 @@ void audioEndFrame(void)
+ 					return;
+ 				}
+ 				rateDropping = 0;
++				g_PdAudioDropping = 0;
+ 				audioIosQueueSilence(setpoint - queued - inSamples);
+ 				rateLevel = (float)setpoint;
+ 				memset(ratePrev, 0, sizeof(ratePrev));
+@@ -586,6 +597,8 @@ void audioEndFrame(void)
+ 			} else if (g_PdAudioPushes > 0 && queued + inSamples > PD_AUDIO_HIGHMARK) {
+ 				g_PdAudioResyncOver++;
+ 				rateDropping = 1;
++				g_PdAudioDroppingSinceMs = SDL_GetTicks();
++				g_PdAudioDropping = 1;
+ 				fade = -1;
+ 			}
+ 
+
+--- a/port/src/audio.c
++++ b/port/src/audio.c
+@@ -1,3 +1,5 @@
+ 	rateDropping = 0;
++	g_PdAudioDropping = 0;
++	g_PdAudioDroppingSinceMs = 0;
+ 	memset(ratePrev, 0, sizeof(ratePrev));
+ #else

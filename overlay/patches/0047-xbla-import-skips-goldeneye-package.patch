@@ -1,0 +1,39 @@
+Subject: XBLA import: never take GoldenEye XBLA's package for Perfect Dark's
+
+xblaimport.c takes any STFS package it finds in added-content/ for Perfect
+Dark's release (it reads only the magic), and any .7z/.zip it does not
+recognise as GoldenEye's loose release or the Community Edition updater. The
+GoldenEye XBLA release in its Xbox 360 package form (overlay 0046) is both: a
+bare STFS package, and a .7z/.zip holding one - and "GoldenEye 007 XBLA.7z"
+sorts before "Perfect Dark.rar", so it was taken first and unpacked as if it
+were Perfect Dark's. Both are now passed over by the same tests gebean.c uses
+(title id 584108A9 at 0x360; an archive entry under 584108A9/000D0000/ or named
+as the package). Perfect Dark's own package (584109C2) and archives are found
+exactly as before.
+
+diff --git a/port/src/xblaimport.c b/port/src/xblaimport.c
+index 15902a1ca..12d713639 100644
+--- a/port/src/xblaimport.c
++++ b/port/src/xblaimport.c
+@@ -227,7 +227,10 @@ static s32 xblaLooksLikePackage(const char *path)
+ 			 !memcmp(magic, "PIRS", 4));
+ 	fclose(fp);
+ 
+-	return ok;
++	// Not GoldenEye XBLA's package (iOS port overlay 0046): the GoldenEye
++	// release in its Xbox 360 form is a package too, and goes in the same
++	// folder. Told apart by its title id.
++	return ok && !gebeanIsPackageFile(path);
+ }
+ 
+ static s32 xblaPathIsDir(const char *path)
+@@ -280,7 +283,8 @@ static void xblaScanForPackage(const char *name, void *arg)
+ 			 !archiveFindEntry(path, "files/new/char/") &&
+ 			 !archiveFindEntry(path, GEBEANCE_DIFF_ENTRY) &&
+ 			 !archiveFindEntry(path, ".xdelta") && !archiveFindEntry(path, ".vcdiff") &&
+-			 !archiveFindEntry(path, ".bps") && !archiveFindEntry(path, ".ips"))) {
++			 !archiveFindEntry(path, ".bps") && !archiveFindEntry(path, ".ips") &&
++			 !gebeanArchiveHoldsPackage(path))) {
+ 		strncpy(scan->found, path, sizeof(scan->found) - 1);
+ 		return;
+ 	}

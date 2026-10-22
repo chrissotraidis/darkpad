@@ -1,0 +1,55 @@
+Subject: iOS: GE Plus's converted arenas live in Caches, not Documents
+
+gexPlusRomConvert() writes the GoldenEye conversion into the first writable
+of $E/mods and $H/mods, which on iOS are both Documents (patch 0009). That is
+20 MB the game made itself, regenerated from the player's ROM in under two
+seconds, sitting in the Files-visible, backed-up folder as a "GoldenEye
+Arenas" folder the player never put there - the same reason 0009 sends
+cache/ to Caches.
+
+So on iOS $C/mods (Caches/mods) is tried first, both by the converter and by
+the mod list that mounts the result (modListRefresh). If the system purges
+Caches, the next launch converts again from the ROM behind the same notice;
+if the ROM is gone by then, GE Plus says it needs one, as upstream does. A
+conversion an earlier build left in Documents/mods is still found and used
+where it is - nothing is moved or deleted.
+
+Every other platform is unchanged.
+
+diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
+index dc6763d2e..a922b5e29 100644
+--- a/port/src/gexplusrom.c
++++ b/port/src/gexplusrom.c
+@@ -505,7 +505,15 @@ static s32 gexPlusRomConvertInto(u8 *rom, u32 romlen, const char *dest, const ch
+ 
+ static void gexPlusRomConvertGoldenEye(void)
+ {
++#ifdef PLATFORM_IOS
++	// $C (Caches) first: the arenas are 20 MB the game made itself and can make
++	// again in two seconds from the ROM, so they belong with cache/ and not in
++	// the player's Files-visible, backed-up Documents. A copy an earlier build
++	// left in Documents/mods is still found and used where it is.
++	static const char *const containers[] = { "$C/mods", "$E/mods", "$H/mods" };
++#else
+ 	static const char *const containers[] = { "$E/mods", "$H/mods" };
++#endif
+ 	// data/ is where the ROM went before added-content/ existed
+ 	static const char *const romdirs[] = { FS_ADDED_CONTENT_SEARCH, "$B" };
+ 	struct romsearch search = { "" };
+diff --git a/port/src/mod.c b/port/src/mod.c
+index 81b614826..8f90f82d6 100644
+--- a/port/src/mod.c
++++ b/port/src/mod.c
+@@ -3482,7 +3482,12 @@ static bool modListRootIsRepeat(const char *const dirs[], s32 index)
+ 
+ void modListRefresh(void)
+ {
++#ifdef PLATFORM_IOS
++	// Caches/mods holds GE Plus's converted arenas on iOS (gexplusrom.c)
++	static const char *const containers[] = { "$C/" MOD_MODS_DIR, "$E/" MOD_MODS_DIR, "$H/" MOD_MODS_DIR, "./" MOD_MODS_DIR };
++#else
+ 	static const char *const containers[] = { "$E/" MOD_MODS_DIR, "$H/" MOD_MODS_DIR, "./" MOD_MODS_DIR };
++#endif
+ 	static const char *const loose[] = { "$E", "." };
+ 
+ 	numModsListed = 0;

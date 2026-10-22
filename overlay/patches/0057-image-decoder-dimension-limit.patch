@@ -1,0 +1,14 @@
+Subject: Match fallback PNG and JPEG dimension limits to the primary PNG decoder
+
+--- a/port/src/jpegread.c
++++ b/port/src/jpegread.c
+@@ -23,6 +23,9 @@
+ 
+ #define STBI_ONLY_JPEG
+ #define STBI_ONLY_PNG
++/* Match PNG_MAX_DIMENSION in pngread.c: a rejected oversized PNG must not
++ * bypass that guard through this fallback. This is not a total memory cap. */
++#define STBI_MAX_DIMENSIONS 16384
+ #define STBI_NO_STDIO_WRITE
+ #define STBI_ASSERT(x) ((void)0)
+ #define STB_IMAGE_IMPLEMENTATION

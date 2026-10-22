@@ -1,0 +1,17 @@
+Subject: ios: detect menus belonging to the local network player
+
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -1584,7 +1584,11 @@
+  */
+ s32 menuIosDialogIsOpen(void)
+ {
+-	return g_Menus[0].curdialog != NULL;
++	// Network clients own their assigned slot, including pause/results menus.
++	// The session layer resets the local slot to zero when returning to lobby.
++	const s32 slot = g_NetMode != NETMODE_NONE ? g_NetLocalSlot : 0;
++	return slot >= 0 && slot < (s32)ARRAYCOUNT(g_Menus)
++		&& g_Menus[slot].curdialog != NULL;
+ }
+ 
+ /**

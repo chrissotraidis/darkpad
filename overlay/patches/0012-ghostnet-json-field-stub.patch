@@ -1,0 +1,44 @@
+Subject: ghostnet: define ghostnetJsonField() in the no-transport build too
+
+A build without libcurl (which is every iOS build — the SDK has none, and
+PD_HAVE_CURL is off by the charter's 0.7 default) does not link:
+
+  Undefined symbols: _ghostnetJsonField, referenced from _communityResolve
+
+ghostnetJsonField() is defined at ghostnet.c:350, inside `#ifdef PD_GHOST_NET`,
+but community.c calls it at :457/:481-483/:515 and is not guarded on anything.
+Nothing has noticed because every desktop packager has libcurl installed.
+
+The stub finds nothing, which is the honest answer when nothing can be fetched
+in the first place, and matches the other stubs in that block. Worth sending
+upstream — it is a real bug in a configuration upstream supports.
+
+diff --git a/port/src/ghostnet.c b/port/src/ghostnet.c
+index 1666c3210..55cbe5ccf 100644
+--- a/port/src/ghostnet.c
++++ b/port/src/ghostnet.c
+@@ -1878,6 +1878,24 @@ const char *ghostnetGetMessage(void)
+ // would clear is only ever the idle one.
+ void ghostnetClearState(void) { }
+ 
++/**
++ * The JSON scanner, which lives above the #else and so is not compiled here.
++ *
++ * community.c calls it to read GitHub's release JSON and is NOT itself guarded
++ * on PD_GHOST_NET, so a build with no transport does not link without this -
++ * which is why nothing has noticed: every desktop packager has libcurl. There
++ * is nothing to parse when nothing can be fetched, so it finds nothing.
++ */
++bool ghostnetJsonField(const char *json, const char *end, const char *key,
++		char *out, u32 outsize)
++{
++	if (out && outsize) {
++		out[0] = '\0';
++	}
++
++	return false;
++}
++
+ /**
+  * The one seam every caller goes through, answered here so that none of them
+  * has to know whether a transport was built in.

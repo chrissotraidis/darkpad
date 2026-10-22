@@ -1,0 +1,82 @@
+--- a/src/game/bondgun.c
++++ b/src/game/bondgun.c
+@@ -1,4 +1,9 @@
+ #include <ultra64.h>
++#ifndef PLATFORM_N64
++// Fraction of the drawable height occupied by the platform's side cutout.
++// Desktop and other shells retain the original margins.
++__attribute__((weak)) float pdPlatformHudSideInset(int right) { return 0.0f; }
++#endif
+ #include "constants.h"
+ #include "game/modrules.h"
+ #include "../lib/naudio/n_sndp.h"
+@@ -15210,6 +15215,7 @@
+ 	s32 speedpilltime;
+ 	s32 ammoindex = 0;
+ 	s32 barwidth = 9;
++	s32 leftmargin = 24, rightmargin = 24;
+ 	s32 reserveheight = 36;
+ 	s32 clipheight = 57;
+ 	s32 xpos;
+@@ -15268,6 +15274,18 @@
+ 	g_ScaleX = 1;
+ #else
+ 	g_ScaleX = g_ViRes == VIRES_HI ? 2 : 1;
++#endif
++
++#ifndef PLATFORM_N64
++	// Side-aligned HUD coordinates use the renderer's 320 x 240 reference
++	// plane, even when the game viewport is letterboxed. Only move edge HUDs;
++	// centered/wide HUDs and split-screen keep their existing positioning.
++	if (playercount == 1) {
++		if (g_HudAlignModeL == G_ASPECT_LEFT_EXT)
++			leftmargin = MAX(leftmargin, (s32)(pdPlatformHudSideInset(0) * 240.0f + 4.999f));
++		if (g_HudAlignModeR == G_ASPECT_RIGHT_EXT)
++			rightmargin = MAX(rightmargin, (s32)(pdPlatformHudSideInset(1) * 240.0f + 4.999f));
++	}
+ #endif
+ 
+ 	gdl = text0f153628(gdl);
+@@ -15313,7 +15331,7 @@
+ 	}
+ #endif
+ 
+-	xpos = (viGetViewLeft() + viGetViewWidth()) / g_ScaleX - barwidth - 24;
++	xpos = (viGetViewLeft() + viGetViewWidth()) / g_ScaleX - barwidth - rightmargin;
+ 
+ 	if (playercount == 2 && (optionsGetScreenSplit() == SCREENSPLIT_VERTICAL || IS4MB()) && playernum == 0) {
+ 		xpos += 15;
+@@ -15539,7 +15557,7 @@
+ 		}
+ 	}
+ 
+-	xposleft = viGetViewLeft() / g_ScaleX + 24;
++	xposleft = viGetViewLeft() / g_ScaleX + leftmargin;
+ 
+ 	if (playercount == 2 && (optionsGetScreenSplit() == SCREENSPLIT_VERTICAL || IS4MB()) && playernum == 1) {
+ 		xposleft -= 14;
+@@ -15733,7 +15751,7 @@
+ 	if (lefthand->inuse
+ 			&& weapon->ammos[ammoindex] != NULL
+ 			&& !weaponHasFlag2(lefthand->gset.weaponnum, WEAPONFLAG2_DETONATORHAND)) {
+-		xpos = viGetViewLeft() / g_ScaleX + 24;
++		xpos = viGetViewLeft() / g_ScaleX + leftmargin;
+ 
+ 		if (playercount == 2 && (optionsGetScreenSplit() == SCREENSPLIT_VERTICAL || IS4MB()) && playernum == 1) {
+ 			xpos -= 14;
+@@ -15766,13 +15784,13 @@
+ 		ammotype = player->gunctrl.ammotypes[ammoindex];
+ 
+ #if VERSION >= VERSION_NTSC_1_0
+-		xpos = (viGetViewLeft() + viGetViewWidth()) / g_ScaleX - barwidth - 24;
++		xpos = (viGetViewLeft() + viGetViewWidth()) / g_ScaleX - barwidth - rightmargin;
+ #else
+ 		// NTSC Beta omits the brackets here. This would normally cause the
+ 		// ammo info to be misaligned for players on the right side of the
+ 		// screen and when using hi-res, but I'm not sure if hi-res can even be
+ 		// active when using multiple players...
+-		xpos = viGetViewLeft() + viGetViewWidth() / g_ScaleX - barwidth - 24;
++		xpos = viGetViewLeft() + viGetViewWidth() / g_ScaleX - barwidth - rightmargin;
+ #endif
+ 
+ 		if (playercount == 2 && (optionsGetScreenSplit() == SCREENSPLIT_VERTICAL || IS4MB()) && playernum == 0) {

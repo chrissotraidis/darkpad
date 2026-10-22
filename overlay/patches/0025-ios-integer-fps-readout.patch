@@ -1,0 +1,27 @@
+Subject: lv: draw the FPS readout as a whole number
+
+Upstream's Show FPS draws "59.83" — two decimals of a one-second average, in
+the N64 numeric font, in the top-left corner of a phone screen. The user, on
+device (2026-09-14): "the fps shows 2 decimal points. whole numbers only."
+
+Two decimals are noise at any refresh rate a panel can show, and on a 390-point
+screen the extra three glyphs are a third of the readout's width. The value
+itself is unchanged (videoGetAverageFPS() still averages over
+Video.DisplayFPSInterval); only the format is.
+
+Not PLATFORM_IOS-guarded: a whole number is the right readout everywhere, and
+this is on the list to offer upstream (Q-002).
+
+diff --git a/src/game/lv.c b/src/game/lv.c
+index 2bc30ed46..6c1591263 100644
+--- a/src/game/lv.c
++++ b/src/game/lv.c
+@@ -1128,7 +1128,7 @@ Gfx *lvRenderFPS(Gfx *gdl)
+ 	}
+ 
+ 	if (g_CharsNumeric && g_FontNumeric) {
+-		snprintf(buffer, sizeof buffer, "%.2f", fps);
++		snprintf(buffer, sizeof buffer, "%.0f", fps);
+ 
+ 		gSPSetExtraGeometryModeEXT(gdl++, g_HudAlignModeL);
+ 

@@ -1,0 +1,328 @@
+Subject: the crosshair gets the depth of what it points at (D-064)
+
+the user: "why can't the crosshair just have dynamic depth? like we do in the
+quakes. instead of a fixed distance. it adjusts depending on where it points?"
+
+THE PROBLEM. The crosshair is a 2D rectangle at a screen position PD computed
+itself (sight.c, a dozen gDPHudRectangle calls), so the stereo fold never sees
+it and both eyes draw it in the same pixels: zero disparity, ON the panel, at
+the convergence plane, whatever it is pointing at. Aim at a wall a metre away
+and the reticle is eight metres behind that wall; aim down a corridor and it is
+in front of the far end. The only way to LOOK at it is to un-fuse whatever it
+is sitting on, which is what "fuses at no distance" means in the family's own
+notes (quake3e: "A crosshair on a flat overlay sits at the near plane in both
+eyes and fuses at no distance"; q2repro L-25: "A flat crosshair fuses at no
+distance").
+
+THE FAMILY'S ANSWER, followed here. q2repro's CL_VR_AddAimDot and quake3e's aim
+marker both take an ENGINE-SIDE COLLISION TRACE along the aim ray, every frame,
+and place the marker at the hit point - a client trace against the collision
+model, never a GPU depth readback (which is not even available to us: ES 3.0
+does not accept GL_DEPTH_COMPONENT in glReadPixels). PD has the same trace:
+cdExamLos08 + cdGetPos is how player.c pulls the third-person camera in past a
+wall and how chraction.c places a bullet hole. And it has the same
+screen-to-view-ray helper the sky uses, cam0f0b4c3c, whose vector has a view z
+of exactly -arg2 - so the hit's FRACTION along the ray times arg2 is the VIEW
+DEPTH, which is the number the fold wants, for a centred reticle and for the
+off-centre one PD's aim mode produces alike. One LOS trace per frame.
+
+Sky, or no hit at all: SIGHT_RETICLE_FAR (4000 units), which the fold turns
+into the far asymptote - the sky's own disparity, where it belongs.
+
+SMOOTHING, which the siblings do NOT do. Theirs is world GEOMETRY: it is at the
+hit point because it is drawn there, so it cannot jitter. Ours is a flat
+rectangle being SHIFTED by a disparity we compute, and a disparity that steps
+when the aim sweeps past a doorway is a reticle that jumps. So it is smoothed
+with a 100 ms time constant, frame-rate independent off g_Vars.lvupdate60, and
+smoothed in 1/d rather than d - which is the space the disparity is LINEAR in,
+so the ease is even across a near edge and a far one instead of crawling across
+one and snapping across the other.
+
+THE NEAR CLAMP APPLIES TO IT. The shift runs through the same clamped disparity
+law as the world (D-061, gfx_draw_rectangle's depth-tag path), so the reticle
+cannot land in front of the viewmodel's plane: it sits on the surface it points
+at until that surface reaches the clamp, and then it stops with it.
+
+THE MECHANISM is patch 0033's light-glare tag, made STICKY. PD_DLTAG_DEPTH is
+consumed by ONE rectangle, which is right for a glare (artifact.c draws one per
+light) and wrong for a crosshair (sight.c draws a dozen), so a new span pair
+PD_DLSPAN_DEPTH_BEGIN/END holds the tag across all of them. One trace, one tag,
+every piece of the reticle.
+
+Everywhere but visionOS the trace and the tags are removed by the preprocessor
+- the trace by TARGET_OS_VISION, and there is no cost anywhere else, not even
+the G_NOOP.
+
+ONE MORE THING, WHICH COST A GATE RUN.  This file is compiled into every
+visionOS build, 2D included, and in 2D none of it may happen: cdExamLos08
+touches the collision module's own static state, so a trace running under a 2D
+--fixed-step replay is a determinism input the macOS oracle does not have, and
+the M-001 gate is exactly the assertion that no such thing exists.  The first
+run of it said "the replay never reached frame 2000".  TARGET_OS_VISION is a
+BUILD, not a MODE: the trace and both tags are behind a runtime
+pdVisionStereoIsActive() as well, so in 2D the display list is byte-identical
+to the one the oracle walks.
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index d7ae451d1..0817237a8 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -2377,6 +2377,7 @@ struct PDStereoState {
+     int flat_span;      // inside menuRender: flatten everything
+     float bg_scale;     // bgGetScaleBg2Gfx() for this frame (PD_DLTAG_SCALE)
+     float depth_tag;    // the view depth of the next 2D rect, 0 = none
++    int depth_span;     // D-064: the tag is STICKY, for the crosshair's dozen rects
+     float world_a;      // P[0][0] of the last PLAIN perspective load
+     // D-061, the per-vertex near clamp. Set when a WORLD-classed projection is
+     // folded and zero for every other class, so the test in gfx_sp_load_vertex
+@@ -2387,7 +2388,7 @@ struct PDStereoState {
+     float near_qm;      // the asymptote: 1/(D_min in view units)
+     float near_dq;      // near_qm - near_q0
+ };
+-static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0, 1.0f, 0.0f, 0.0f,
++static PDStereoState pd_stereo = { PD_DLCLASS_WORLD, PD_DLCLASS_WORLD, 0, 1.0f, 0.0f, 0, 0.0f,
+                                    0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+ 
+ /**
+@@ -2436,6 +2437,11 @@ static void gfx_stereo_dl_tag(uint32_t w1) {
+     switch (payload) {
+         case PD_DLSPAN_FLAT_BEGIN: pd_stereo.flat_span = 1; break;
+         case PD_DLSPAN_FLAT_END:   pd_stereo.flat_span = 0; break;
++        // D-064: hold the depth tag across every rectangle of the crosshair,
++        // instead of the one-rect lifetime a light glare wants.
++        case PD_DLSPAN_DEPTH_BEGIN: pd_stereo.depth_span = 1; break;
++        case PD_DLSPAN_DEPTH_END:   pd_stereo.depth_span = 0;
++                                    pd_stereo.depth_tag = 0.0f; break;
+         case PD_DLCLASS_SKY:       pd_stereo.pending_class = PD_DLCLASS_SKY; break;
+         case PD_DLCLASS_GUN:       pd_stereo.pending_class = PD_DLCLASS_GUN; break;
+         default:                   pd_stereo.pending_class = PD_DLCLASS_WORLD; break;
+@@ -2449,6 +2455,7 @@ static void gfx_stereo_reset_classes(void) {
+     pd_stereo.flat_span = 0;
+     pd_stereo.bg_scale = 1.0f;
+     pd_stereo.depth_tag = 0.0f;
++    pd_stereo.depth_span = 0;
+     pd_stereo.world_a = 0.0f;
+     pd_stereo.near_k = 0.0f;
+     pd_stereo_mul_p = 0;
+@@ -7892,7 +7899,9 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+     // glare lands on its fixture in both eyes.
+     if (pd_stereo.depth_tag > 0.0f) {
+         const float d = pd_stereo.depth_tag;
+-        pd_stereo.depth_tag = 0.0f;   // one tag, one rectangle
++        if (!pd_stereo.depth_span) {
++            pd_stereo.depth_tag = 0.0f;   // one tag, one rectangle (a glare)
++        }
+         float eSigned = 0.0f, conv = 0.0f, gunConv = 0.0f;
+         if (pdVisionStereoFold(&eSigned, &conv, &gunConv) && eSigned != 0.0f &&
+             conv > 0.0f && pd_stereo.world_a != 0.0f) {
+diff --git a/src/game/sight.c b/src/game/sight.c
+index 6bccbf6e2..8fc733a07 100644
+--- a/src/game/sight.c
++++ b/src/game/sight.c
+@@ -24,6 +24,153 @@
+ #include <math.h>
+ #include "video.h"
+ #include "gehud.h"
++#endif
++
++// ---------------------------------------------------------------------------
++// D-064: THE RETICLE'S OWN DEPTH, for the visionOS stereo fold.
++// ---------------------------------------------------------------------------
++//
++// the user: "why can't the crosshair just have dynamic depth? like we do in the
++// quakes. instead of a fixed distance. it adjusts depending on where it
++// points?"
++//
++// It can, and this is where. The crosshair is a 2D rectangle at a screen
++// position PD computed itself, so the stereo fold never sees it and it sits at
++// zero disparity - ON the panel, at the convergence plane, whatever it is
++// pointing at. Aim at a wall a metre away and the reticle is eight metres
++// behind it; aim across a room and it is in front. Both eyes draw it in the
++// same place, so the only way to look at it is to un-fuse the wall.
++//
++// The family's answer (q2repro CL_VR_AddAimDot, quake3e's aim marker) is an
++// ENGINE-SIDE COLLISION TRACE along the aim ray, re-derived every frame and
++// unsmoothed, with the marker placed at the hit point. PD has the same trace -
++// cdExamLos08 + cdGetPos is how player.c pulls the third-person camera in and
++// how chraction.c places a bullet hole - and the same screen-to-view-ray helper
++// the sky uses (cam0f0b4c3c: a view-space direction at depth arg2, view space
++// looking down -z). So the depth is PD's own answer to "what is under the
++// crosshair", not an approximation of it, and it costs one LOS trace a frame.
++//
++// It is the VIEW DEPTH that is wanted and not the distance: cam0f0b4c3c's
++// vector has a view z of exactly -arg2, so the hit's fraction along the ray
++// TIMES arg2 is the view depth, for a centred reticle and an off-centre one
++// alike. That matters because PD's aim mode moves the crosshair to the edges.
++//
++// SMOOTHING. The siblings do not smooth, because their marker is world
++// GEOMETRY: it is at the hit point because it is drawn there. Ours is a flat
++// rectangle being shifted by a disparity we compute, and a disparity that
++// steps when the aim sweeps past a doorway is a reticle that jumps. So it is
++// smoothed in 1/d, which is the space disparity is LINEAR in - smoothing the
++// distance would crawl across a far edge and snap across a near one - with a
++// 100 ms time constant, frame-rate independent.
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++#endif
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++#include "lib/collision.h"
++#include "game/camera.h"
++#include "lib/mtx.h"
++
++// 1 only while the stereo fold is LIVE. This file is compiled into every
++// visionOS build, 2D included, and in 2D none of what follows may happen at
++// all: cdExamLos08 touches the collision module's own static state, so a trace
++// running under a 2D --fixed-step replay is a determinism input the macOS
++// oracle does not have — and the M-001 gate is precisely the assertion that
++// there is no such thing. It cost a gate run to learn.
++extern int pdVisionStereoIsActive(void);
++
++#define SIGHT_RETICLE_FAR   4000.0f   // the ray's length, and the sky's answer
++#define SIGHT_RETICLE_TAU   0.100f    // the smoothing time constant, seconds
++
++/**
++ * The view depth of whatever the crosshair is pointing at, smoothed, in PD
++ * units. Never 0: with no hit, no player or no level it is SIGHT_RETICLE_FAR,
++ * which the fold turns into the sky's own disparity (the far asymptote).
++ */
++static f32 sightReticleDepth(f32 crossx, f32 crossy)
++{
++	static f32 s_recip;      // the smoothed 1/d
++	struct player *player = g_Vars.currentplayer;
++	f32 pos2d[2];
++	struct coord dir;
++	struct coord far;
++	struct coord hit;
++	Mtxf *mtx;
++	f32 depth = SIGHT_RETICLE_FAR;
++	f32 target;
++	f32 k;
++
++	if (!player || !player->prop) {
++		return SIGHT_RETICLE_FAR;
++	}
++
++	// The ray, in the sky's own idiom (skyGetWorldPosFromScreenPos): a
++	// view-space direction at depth SIGHT_RETICLE_FAR, rotated into the world.
++	pos2d[0] = crossx + camGetScreenLeft();
++	pos2d[1] = crossy + camGetScreenTop();
++	cam0f0b4c3c(pos2d, &dir, SIGHT_RETICLE_FAR);
++	mtx = camGetProjectionMtxF();
++
++	if (!mtx) {
++		return SIGHT_RETICLE_FAR;
++	}
++
++	mtx4RotateVecInPlace(mtx, &dir);
++
++	far.x = player->cam_pos.x + dir.x;
++	far.y = player->cam_pos.y + dir.y;
++	far.z = player->cam_pos.z + dir.z;
++
++	if (cdExamLos08(&player->cam_pos, player->prop->rooms, &far,
++			CDTYPE_ALL, GEOFLAG_BLOCK_SIGHT) == CDRESULT_COLLISION) {
++		f32 rlen;
++		f32 hlen;
++
++		cdGetPos(&hit, __LINE__, "sight.c");
++
++		rlen = sqrtf(dir.f[0] * dir.f[0] + dir.f[1] * dir.f[1] + dir.f[2] * dir.f[2]);
++		hlen = sqrtf((hit.x - player->cam_pos.x) * (hit.x - player->cam_pos.x)
++				+ (hit.y - player->cam_pos.y) * (hit.y - player->cam_pos.y)
++				+ (hit.z - player->cam_pos.z) * (hit.z - player->cam_pos.z));
++
++		// The fraction along the ray IS the fraction of its view depth, because
++		// the ray's own view z is -SIGHT_RETICLE_FAR by construction.
++		if (rlen > 0.0001f) {
++			depth = SIGHT_RETICLE_FAR * (hlen / rlen);
++		}
++	}
++
++	if (depth < 1.0f) {
++		depth = 1.0f;
++	}
++	if (depth > SIGHT_RETICLE_FAR) {
++		depth = SIGHT_RETICLE_FAR;
++	}
++
++	// Smoothed in 1/d, frame-rate independent. g_Vars.lvupdate60 is the number
++	// of 60 Hz ticks this frame, which is the engine's own clock.
++	target = 1.0f / depth;
++
++	if (s_recip <= 0.0f) {
++		s_recip = target;
++	} else {
++		k = ((f32)g_Vars.lvupdate60 / 60.0f) / SIGHT_RETICLE_TAU;
++
++		if (k > 1.0f) {
++			k = 1.0f;
++		}
++
++		s_recip += (target - s_recip) * k;
++	}
++
++	if (s_recip <= 0.0f) {
++		return SIGHT_RETICLE_FAR;
++	}
++
++	return 1.0f / s_recip;
++}
++#endif
++
++#ifndef PLATFORM_N64
+ 
+ #define SIGHT_COLOUR ((PLAYER_EXTCFG().crosshairhealth >= CROSSHAIR_HEALTH_ON_GREEN) ? sightGetCrosshairHealthColor(g_Vars.currentplayer->bondhealth, g_Vars.currentplayer->prop->chr->cshield * 0.125f) : PLAYER_EXTCFG().crosshaircolour)
+ #define SIGHT_SCALE PLAYER_EXTCFG().crosshairsize
+@@ -1721,6 +1868,20 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+ 	}
+ #endif
+ 
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++	// D-064: one trace, one tag, and every rectangle of the reticle inside the
++	// span gets it. The tag is a G_NOOP, so on every other platform this is a
++	// dead branch the preprocessor removes entirely — and in 2D on visionOS the
++	// runtime gate makes the display list byte-identical to the one the oracle
++	// walks, which is what the M-001 replay compares.
++	const bool stereo3d = pdVisionStereoIsActive() != 0;
++
++	if (stereo3d) {
++		gDPPdDlTag(gdl++, PD_DLTAG_DEPTH((s32)sightReticleDepth(crossx, crossy)));
++		gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++	}
++#endif
++
+ 	switch (sight) {
+ 	case SIGHT_DEFAULT:
+ 		gdl = sightDrawDefault(gdl, sighton && optionsGetSightOnScreen(g_Vars.currentplayerstats->mpindex), crossx, crossy);
+@@ -1757,6 +1918,12 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+ 		}
+ 	}
+ 
++#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
++	if (stereo3d) {
++		gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_END);
++	}
++#endif
++
+ 	g_ScaleX = 1;
+ 
+ 	return gdl;
+diff --git a/src/include/gbiex.h b/src/include/gbiex.h
+index e39bc4d38..961951e3d 100644
+--- a/src/include/gbiex.h
++++ b/src/include/gbiex.h
+@@ -256,6 +256,15 @@
+ /* Span markers, sticky between the two: flatten everything drawn inside. */
+ #define PD_DLSPAN_FLAT_BEGIN  8
+ #define PD_DLSPAN_FLAT_END    9
++/*
++ * ...and a STICKY depth span (D-064). PD_DLTAG_DEPTH below is consumed by one
++ * rectangle, which is right for a light glare (artifact.c draws one rect per
++ * glare) and wrong for the CROSSHAIR, which sight.c draws as a dozen
++ * gDPHudRectangle calls. Between these two markers the depth tag is not
++ * consumed, so one trace's answer covers every piece of the reticle.
++ */
++#define PD_DLSPAN_DEPTH_BEGIN 10
++#define PD_DLSPAN_DEPTH_END   11
+ 
+ /*
+  * Two payloads that carry a NUMBER rather than a class (D-060). The class

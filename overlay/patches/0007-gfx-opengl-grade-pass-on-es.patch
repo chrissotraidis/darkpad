@@ -1,0 +1,120 @@
+Subject: gfx_opengl: run Vivid Colours / Black Level on GL ES 3.0 as well
+
+docs/substrate-audit.md 1.4 lists the colour grade pass as the one real
+feature loss on an ES context: gfx_opengl_grade_init() refuses outright when
+gl_es is set, and Vivid Colours and Black Level are both named on the Phase 2
+"verified to render" checklist.
+
+Nothing in the pass is desktop-only except the way it was spelled:
+
+- the two shaders hard-coded "#version 130". They now carry no version line
+  and get the renderer's own (gl_glsl_version_str - "130", "410 core" or
+  "300 es"), plus a fragment `precision highp float;` under ES, which ESSL
+  has no default for. Everything else in them (gl_VertexID, texture(), a
+  single `out vec4`) is legal ESSL 3.00 as written.
+- glBindFragDataLocation does not exist in ES and is not needed: a fragment
+  shader with one output writes to colour attachment 0.
+- the restore at the end set GL_BACK as the read buffer of whatever
+  framebuffer it had just bound. GL_BACK is only legal for the default
+  framebuffer; ES 3.0 raises GL_INVALID_OPERATION where desktop GL quietly
+  allowed it. It now restores GL_COLOR_ATTACHMENT0 for a real FBO.
+
+The refusal is therefore GLVersion.major < 3 alone, and the pass runs on
+ANGLE-Metal. Desktop behaviour is unchanged: same shaders, same version line,
+same glBindFragDataLocation call.
+
+diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
+index 8349def05..58c2f416f 100644
+--- a/port/fast3d/gfx_opengl.cpp
++++ b/port/fast3d/gfx_opengl.cpp
+@@ -1933,7 +1933,11 @@ static void gfx_opengl_start_frame(void) {
+  * space: it is how a television's "brightness", "colour" and "contrast"
+  * knobs work, and what those knobs do is what was asked for.
+  *
+- * Desktop GL 3.0 and up, like the NV12 capture pass, and for the same reasons.
++ * GL 3.0 and up, desktop or ES: the shader pair carries no version line of its
++ * own, the one the rest of the renderer settled on (gl_glsl_version_str) is
++ * prepended at compile time, and the only construct that is not shared is
++ * glBindFragDataLocation, which ESSL 3.00 does not have and does not need -
++ * a fragment shader with one output writes to attachment 0.
+  * Everything it touches is put back, since the renderer resets nothing at the
+  * top of a frame.
+  */
+@@ -1943,7 +1947,6 @@ static int grade_width, grade_height;
+ static bool grade_failed;
+ 
+ static const char *grade_vs =
+-    "#version 130\n"
+     "out vec2 vUV;\n"
+     "void main() {\n"
+     "    vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));\n"
+@@ -1952,7 +1955,6 @@ static const char *grade_vs =
+     "}\n";
+ 
+ static const char *grade_fs =
+-    "#version 130\n"
+     "uniform sampler2D uTex;\n"
+     "uniform float uSaturation;\n"
+     "uniform float uContrast;\n"
+@@ -1972,7 +1974,14 @@ static GLuint gfx_opengl_grade_compile(GLenum type, const char *src) {
+     GLuint sh = glCreateShader(type);
+     GLint ok = 0;
+ 
+-    glShaderSource(sh, 1, &src, NULL);
++    // The version line is the renderer's own ("130", "410 core", "300 es"),
++    // and ES needs a fragment float precision, which it has no default for.
++    char header[64];
++    snprintf(header, sizeof(header), "#version %s\n%s", gl_glsl_version_str,
++        (gl_es && type == GL_FRAGMENT_SHADER) ? "precision highp float;\n" : "");
++    const char *srcs[2] = { header, src };
++
++    glShaderSource(sh, 2, srcs, NULL);
+     glCompileShader(sh);
+     glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
+ 
+@@ -1999,7 +2008,7 @@ static bool gfx_opengl_grade_init(void) {
+     GLuint vs, fs;
+     GLint ok = 0;
+ 
+-    if (gl_es || GLVersion.major < 3 || !glad_glGenFramebuffers || !glad_glBlitFramebuffer ||
++    if (GLVersion.major < 3 || !glad_glGenFramebuffers || !glad_glBlitFramebuffer ||
+         !glad_glGenVertexArrays || !glad_glCreateShader || !glad_glDrawArrays) {
+         return false;
+     }
+@@ -2015,7 +2024,11 @@ static bool gfx_opengl_grade_init(void) {
+     grade_prog = glCreateProgram();
+     glAttachShader(grade_prog, vs);
+     glAttachShader(grade_prog, fs);
+-    glBindFragDataLocation(grade_prog, 0, "oCol");
++    if (!gl_es) {
++        // ESSL 3.00 has no glBindFragDataLocation; a single output goes to
++        // colour attachment 0 on its own.
++        glBindFragDataLocation(grade_prog, 0, "oCol");
++    }
+     glLinkProgram(grade_prog);
+     glGetProgramiv(grade_prog, GL_LINK_STATUS, &ok);
+     glDeleteShader(vs);
+@@ -2078,7 +2091,7 @@ static void gfx_opengl_grade_frame(void) {
+     }
+ 
+     if (!grade_prog && !gfx_opengl_grade_init()) {
+-        sysLogPrintf(LOG_WARNING, "GL: Vivid Colours needs desktop GL 3.0, off");
++        sysLogPrintf(LOG_WARNING, "GL: Vivid Colours needs GL 3.0 or GL ES 3.0, off");
+         grade_failed = true;
+         return;
+     }
+@@ -2130,8 +2143,12 @@ static void gfx_opengl_grade_frame(void) {
+     if (was_scissor) glEnable(GL_SCISSOR_TEST);
+     if (was_cull) glEnable(GL_CULL_FACE);
+ 
+-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[current_framebuffer].fbo);
+-    glReadBuffer(GL_BACK);
++    // GL_BACK is only a legal read buffer for the default framebuffer; a bound
++    // FBO wants its attachment, and ES 3.0 raises GL_INVALID_OPERATION for the
++    // mismatch where desktop GL let it pass unnoticed.
++    const GLuint restore_fbo = framebuffers[current_framebuffer].fbo;
++    glBindFramebuffer(GL_FRAMEBUFFER, restore_fbo);
++    glReadBuffer(restore_fbo ? GL_COLOR_ATTACHMENT0 : GL_BACK);
+     glBindVertexArray((GLuint)prev_vao);
+     glUseProgram((GLuint)prev_prog);
+     glBindTexture(GL_TEXTURE_2D, (GLuint)prev_tex);
