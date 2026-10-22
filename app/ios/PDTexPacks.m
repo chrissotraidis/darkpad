@@ -2,6 +2,7 @@
 #import "PDTexPacks.h"
 #import "PDShell.h"
 #import "PDXbla.h"
+#import <dispatch/dispatch.h>
 
 // upstream's own name for the row-order marker (port/src/texpack.c, and
 // CLAUDE-notes/texture-packs.md). A folder called `ext_tex` says the same
@@ -190,19 +191,17 @@ static BOOL pdNameIsRightWayUpPlusHd(NSString *name)
 		[PDXbla showPreparingNote:[NSString stringWithFormat:@"Unpacking the texture pack\n%@", name]];
 
 		__block BOOL ok = NO;
-		__block BOOL running = YES;
-		NSThread *t = [[NSThread alloc] initWithBlock:^{
+		dispatch_group_t extraction = dispatch_group_create();
+		dispatch_group_async(extraction, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
 			// Absolute paths go through fsFullPath() untouched (fs.c:115), so
 			// this needs no fsInit() - the same property D-020 leans on.
 			ok = archiveExtract(src.fileSystemRepresentation, dir.fileSystemRepresentation) > 0;
-			running = NO;
-		}];
-		t.name = @"pd-texpack-unpack";
-		t.qualityOfService = NSQualityOfServiceUserInitiated;
-		[t start];
+		});
 
 		NSTimeInterval started = NSDate.timeIntervalSinceReferenceDate;
-		while (running) {
+		// Completion synchronizes the worker result before we inspect it. A
+		// plain shared BOOL races and can strand launch during a large import.
+		while (dispatch_group_wait(extraction, DISPATCH_TIME_NOW) != 0) {
 			@autoreleasepool {
 				[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode
 				                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
