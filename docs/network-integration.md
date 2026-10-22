@@ -1,6 +1,6 @@
 # Networking integration experiment
 
-The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; results return and host exit between matches also pass. Menu hosting and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
+The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; results return and host exit between matches also pass. Menu hosting, setup, start, results return and stop have been exercised. Co-op starts through the menu and abort preserves both peers’ offline saves; completed co-op missions remain unverified. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
 
 ## Reproduce the compatibility audit
 
@@ -134,3 +134,14 @@ Next: verify timeout/Back no longer produces a duplicate notice, then launch the
 Build `6901f7d303d97b36` (59 patches) passes menu join, connected cancellation, rejoin and a completed two-minute bot match back to a usable Perfect Menu without the former empty notice. Saved data was preserved on installation. Automatic Direct LAN dialog restoration is still incomplete: the session remains connected but only the main menu appears. Revised0065 defers opening the dialog to the main-menu tick; source `fb4bf2344adf5b5b` audits59/59 and is building, not runtime accepted. See PROGRESS.md for handles/artifacts. Menu hosting and co-op are still open.
 
 The subsequent `fb4bf2344adf5b5b` build passes the deferred-restoration runtime check: UI join, full timed bot match, Game Over → Direct LAN while still connected, graceful host exit displayed inline, then Back to usable Perfect Menu without an extra notice. Evidence: `work/network-timed-match.wi_f7xz2` including host log, restored-direct.png and clean-return.png. Both platform builds and simulator app linking passed; installed saved data is unchanged. This supersedes the restoration gap above, without claiming mid-match host-loss, hosting UI or co-op acceptance.
+
+
+## Menu hosting and co-op save isolation
+
+Candidate patches0066–0068 add Direct LAN hosting, a Combat/Co-op selector and offline-save isolation. The current reconstructed source is `8f71aee25df001e9b4bee2a03adb165c655517a08cee95d119a71532f83b7ab7` (62 patches, audit `work/upstream-audit.Lhzp4D`). Matching simulator and Mac engines plus the simulator application build successfully. The solo engine pin remains unchanged.
+
+Host menus now expose Combat scenario, arena, weapons, limits and simulants, or Perfect Dark co-op mission, difficulty, radar and friendly fire. A simulator-hosted two-player timed Combat match completed and returned to Host LAN Game; Stop Hosting returned to the main menu. An occupied UDP port produces an inline error, Back works, and freeing the port permits hosting without relaunching.
+
+Co-op Defection was started through the menu with a matching Mac peer. Death/spectating and abort were exercised, but no co-op mission was completed. An abort initially altered offline option/weapon-discovery data. Patch0068 guards the remaining endscreen writes and online weapon discoveries. The actual-function sanitizer test preserves offline discovery behavior while preventing host/client mutations. A rebuilt paired abort test left both EEPROM files byte-for-byte unchanged (`work/network-coop-save-check.c8lsxbk2/abort-save-comparison.json`). This is abort isolation evidence, not successful-mission or full progression acceptance.
+
+Remaining checks include completed co-op missions/objectives, successful-result save isolation, repeat matches, mid-match host loss and controlled latency/loss. Original-art networking tests do not qualify HD multiplayer performance. See PROGRESS.md for current runtime state and artifact paths.
