@@ -62,3 +62,18 @@ See [goal](docs/goal.md), [PRD](docs/prd.md), and [progress](PROGRESS.md).
 Build success does not establish campaign completion or phone performance.
 Public distribution is not yet authorized or qualified. Credits and third-party
 notices are in [LICENSE](LICENSE).
+
+## Local simulator package
+
+Package a completed main simulator build (no rebuild, install or simulator boot):
+
+```sh
+python3 scripts/package-simulator-app.py \
+  build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app \
+  build/deliverables/darkpad-simulator
+```
+
+The output directory must be new. The ZIP includes the app, license notices,
+install instructions and SHA-256 file hashes. It excludes the simulator's data
+container; your ROM, imported textures and saves stay there. This is an Apple
+Silicon simulator package, not a signed device IPA or an authorized public release.
