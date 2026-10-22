@@ -83,7 +83,7 @@ Subject: Add menu-driven Direct LAN Combat hosting and setup
 +static char *textDirectHostStatus(struct menuitem *item)
 +{
 +	static char text[96];
-+	snprintf(text, sizeof(text), "UDP %u - %d remote players connected\n",
++	snprintf(text, sizeof(text), "UDP %u - %d remote players ready\n",
 +		netSessionLobbyPort(), netSessionHostNumClients());
 +	return text;
 +}
