@@ -1,0 +1,15 @@
+Subject: Terminate notice label line for menu height measurement
+
+--- a/port/src/net/netsession.c
++++ b/port/src/net/netsession.c
+@@ -6030,7 +6030,9 @@
+ 
+ static char *netMenuTextNotice(struct menuitem *item)
+ {
+-	return s_NoticeText;
++	static char text[sizeof(s_NoticeText) + 1];
++	snprintf(text, sizeof(text), "%s\n", s_NoticeText);
++	return text;
+ }
+ 
+ // Why the last session ended, for the lobby's room page (netlobby.c)
