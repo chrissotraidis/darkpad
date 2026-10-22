@@ -74,10 +74,10 @@ Subject: Add an account-free direct IPv4 LAN join menu
 +{
 +	// Loading a stage also closes menus: that is not cancellation.
 +	if (!s_DirectMenuSession || s_MatchActive) return;
-+	// The direct dialog already displays connection failures inline.
-+	g_NetNoticePending = 0;
 +	if (s_ClientState != NETCS_GONE) netClientLeave();
 +	netSessionStopMenuSession();
++	// Consume failures and the notice queued by an intentional leave.
++	g_NetNoticePending = 0;
  }
  
  // 1 host, 2 client, 0 none (a lobby room's session only)
