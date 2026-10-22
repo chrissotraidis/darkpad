@@ -236,6 +236,14 @@ static const CGPoint kTabletButtonUnits[] = {
 static const PDButtonSpec kLeftFire =
 	{ "FIRE_L", PDPadG, "scope", 0.0, 0.0, 32 };
 
+// Keep editor and accessibility wording independent of stored layout keys.
+static NSString *pdControlName(NSString *label)
+{
+	NSDictionary *names = @{@"FIRE_L": @"Left fire", @"SWAP": @"Next weapon",
+		@"WHEEL": @"Weapon wheel", @"CROUCH": @"Duck", @"ALT": @"Alternate fire"};
+	return names[label] ?: label.capitalizedString;
+}
+
 // In a menu the gameplay chips are in the way - the dialog is centred and they
 // sit on top of it - so they are hidden and this one takes their place. PD's
 // menus are driven by the pointer itself (a tap picks the item under it, D-022),
@@ -1263,6 +1271,8 @@ static const CGFloat kWheelRadius = 32.0;
 	name.layer.cornerRadius = 6;
 	name.clipsToBounds = YES;
 	name.textAlignment = NSTextAlignmentCenter;
+	name.adjustsFontSizeToFitWidth = YES;
+	name.minimumScaleFactor = 0.8;
 	name.translatesAutoresizingMaskIntoConstraints = NO;
 	[bar addSubview:name];
 	_editControlName = name;
@@ -1309,14 +1319,14 @@ static const CGFloat kWheelRadius = 32.0;
 		_editSlider.value = selected ? pdControlValue(_editSelected, @"scale", 1, .55, 1.6) : PDDefFloat(PDDefButtonScale);
 	}
 	_editPct.text = [NSString stringWithFormat:@"%@ size · %.0f%%", selected ? @"Control" : @"Overall", _editSlider.value * 100];
-	_editSlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ size", _editSelected] : @"Overall touch control size";
+	_editSlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ size", pdControlName(_editSelected)] : @"Overall touch control size";
 	_editSlider.accessibilityValue = _editPct.text;
 	if (!_editOpacitySlider.tracking) {
 		_editOpacitySlider.enabled = selected;
 		_editOpacitySlider.value = selected ? pdControlValue(_editSelected, @"opacity", PDDefFloat(PDDefButtonOpacity), .2, 1) : PDDefFloat(PDDefButtonOpacity);
 	}
 	_editOpacityPct.text = selected ? [NSString stringWithFormat:@"Opacity · %.0f%%", _editOpacitySlider.value * 100] : @"Select a control for opacity";
-	_editOpacitySlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ opacity", _editSelected] : @"Control opacity";
+	_editOpacitySlider.accessibilityLabel = selected ? [NSString stringWithFormat:@"%@ opacity", pdControlName(_editSelected)] : @"Control opacity";
 	_editOpacitySlider.accessibilityValue = _editOpacityPct.text;
 }
 
@@ -1523,8 +1533,10 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)placeHideBadge
 {
 	PDTouchButtonView *chip = _editing ? [self editChipForLabel:_editSelected] : nil;
+	NSString *detail = chip && [self userHid:chip] ? @"Hidden" :
+		([chip.label isEqualToString:@"FIRE_L"] ? @"While aiming" : @"Drag to move");
 	_editControlName.text = chip
-		? [NSString stringWithFormat:@"%@ · Drag to move", [chip.label isEqualToString:@"FIRE_L"] ? @"LEFT FIRE" : chip.label]
+		? [NSString stringWithFormat:@"%@ · %@", pdControlName(chip.label), detail]
 		: @"Drag a control to reposition";
 	if (!chip || !pdLabelHideable(chip.label)) {
 		_hideBadge.hidden = YES;
