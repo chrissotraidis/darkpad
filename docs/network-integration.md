@@ -1,6 +1,6 @@
 # Networking integration experiment
 
-The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
+The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; full results return, menu hosting and co-op acceptance remain incomplete. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
 
 ## Reproduce the compatibility audit
 
@@ -128,3 +128,7 @@ Latest reconstructed source: `work/upstream-audit.tWjrhY/src`, all57 patches app
 Private artifacts are `work/network-direct-notice-build/libpd.a`, `work/network-direct-notice-macos/pd.arm64`, and `work/dd-network-touch/Build/Products/Debug-iphonesimulator/perfectdark.app`. Local engine recipes are `work/build-network-direct-notice{,-macos}.sh`; logs use the same prefix. These new binaries have not yet passed paired runtime testing. Never pair the newly installed client with an older host identity.
 
 Next: verify timeout/Back no longer produces a duplicate notice, then launch the matching local host and join using the menu without `--connect`. `work/network-look-merge/direct-menu-match.py` is the bounded local host recipe for that test; it does not provide a product hosting UI. Normal hosting, return from a match, native keyboard completion, hostname/IPv6 entry, co-op progression and controlled latency/loss still need work. UI testing was interrupted by a locked Mac; no additional host was started.
+
+## Latest Direct LAN evidence
+
+Build `6901f7d303d97b36` (59 patches) passes menu join, connected cancellation, rejoin and a completed two-minute bot match back to a usable Perfect Menu without the former empty notice. Saved data was preserved on installation. Automatic Direct LAN dialog restoration is still incomplete: the session remains connected but only the main menu appears. Revised0065 defers opening the dialog to the main-menu tick; source `fb4bf2344adf5b5b` audits59/59 and is building, not runtime accepted. See PROGRESS.md for handles/artifacts. Menu hosting and co-op are still open.

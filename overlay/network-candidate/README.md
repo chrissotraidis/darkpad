@@ -4,7 +4,7 @@ These patches replace same-named solo overlay patches **only** when explicitly p
 
 Target: `3ee8ed0cd549b64350848655c43ae1568e449c6d`.
 
-**Current state:** simulator-to-Mac timed matches, touch aiming, respawn and background/resume have runtime evidence. The latest57-patch build (`8d0f203b8c87579a`) adds Direct LAN menu joining and a duplicate-notice fix; it builds on both platforms and is installed in the isolated simulator candidate, but its paired runtime check remains pending. Menu-driven hosting/join/return and co-op are not accepted. The candidate uses experimental protocol `0x4431`; both peers must use matching source identity, and upstream protocol32 peers are intentionally incompatible. See `docs/network-integration.md` and PROGRESS.md for current evidence. Entries below are historical intermediate states, not current acceptance claims.
+**Current state:** simulator-to-Mac timed matches, touch aiming, respawn and background/resume have runtime evidence. The latest59-patch build (`6901f7d303d97b36`) includes Direct LAN joining, match-menu restoration and cancellation cleanup. Both platform builds pass; the isolated simulator candidate preserves saved data. Menu join → leave → rejoin → leave passes without a duplicate notice. Full results-return regression on this identity is in progress; normal menu hosting and co-op remain incomplete. Experimental protocol `0x4431` requires matching source identity on both peers; upstream protocol32 peers are intentionally incompatible. See `docs/network-integration.md` and PROGRESS.md for evidence. Entries below are historical intermediate states, not current acceptance claims.
 
 ```sh
 scripts/audit-upstream.sh 3ee8ed0cd549b64350848655c43ae1568e449c6d overlay/network-candidate

@@ -11,7 +11,7 @@ Subject: Restore Direct LAN menu after results and disconnection
  		var80087260 = 3;
  	}
  }
-@@ -6056,8 +6056,19 @@
+@@ -6056,8 +6056,18 @@
   * From the Perfect Menu's tick while it is on top: why the last session
   * ended, once
   */
@@ -24,13 +24,25 @@ Subject: Restore Direct LAN menu after results and disconnection
 +	if (s_DirectMenuSession) {
 +		menuPushRootDialog(&g_CiMenuViaPcMenuDialog, MENUROOT_MAINMENU);
 +		playerPause(MENUROOT_MAINMENU);
-+		netDirectMenuAfterMatch();
 +		return 1;
 +	}
 +
  	// a campaign's host: its set's menus for the next mission, with or
  	// without a lobby room (a --host session plays one too); a GoldenEye
  	// mission's report is the folder's first page there
+@@ -6090,6 +6100,12 @@
+ 
+ void netMainMenuTick(void)
+ {
++	// Open after the root menu is ready, as lobby returns do.
++	if (s_DirectMenuSession && !s_MatchActive) {
++		netDirectMenuAfterMatch();
++		return;
++	}
++
+ 	// a client whose match ended under it lands here: back to the room. Not
+ 	// a campaign's host, whose menus these are: it plays the set's missions
+ 	// from them (the Game Lobby pushed over them on the first tick left
 --- a/port/src/netlobbymenu.c
 +++ b/port/src/netlobbymenu.c
 @@ -1499,6 +1499,11 @@
@@ -45,3 +57,14 @@ Subject: Restore Direct LAN menu after results and disconnection
  MenuItemHandlerResult netDirectMenuHandler(s32 op, struct menuitem *item, union handlerdata *data)
  {
  	if (op == MENUOP_SET) menuPushDialog(&s_DirectLanDialog);
+--- a/src/game/mainmenu.c
++++ b/src/game/mainmenu.c
+@@ -5359,7 +5359,7 @@
+ 			// Then, once that is out of the way, whether a newer one is out.
+ 			updatenoticeMainMenuTick(dialogdef, data->dialog2.inputs, true);
+ 			// netplay: why the last net game ended
+-			if (g_NetNoticePending || g_NetLobbyRoom) netMainMenuTick();
++			netMainMenuTick();
+ 		} else {
+ 			updatenoticeMainMenuTick(dialogdef, data->dialog2.inputs, false);
+ #endif
