@@ -217,6 +217,72 @@ static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDeci
 	}
 }
 
+
+// --- controller trace (PD_PAD_TRACE=1 at launch) -----------------------------
+// What iOS reports for each physical control beside what SDL hands the engine
+// and what the player then does, sampled at most every 0.1 s while anything is
+// held. Written to Documents/pad-trace.txt, capped at 2 MB.
+extern int inputIosPadDebug(int cidx, int *axes, int *swapped, int *devidx, const char **name);
+extern int optionsGetControlMode(int mpchrnum);
+extern signed char joyGetStickX(signed char contpadnum);
+extern signed char joyGetStickY(signed char contpadnum);
+extern signed char joyGetRStickX(signed char contpadnum);
+extern signed char joyGetRStickY(signed char contpadnum);
+extern unsigned int joyGetButtons(signed char contpadnum, unsigned int mask);
+extern int SDL_NumJoysticks(void);
+
+static void pdPadTrace(GCExtendedGamepad *gp)
+{
+	static int enabled = -1;
+	static FILE *out;
+	static NSTimeInterval last;
+	static unsigned long long written;
+	if (enabled < 0) {
+		const char *e = getenv("PD_PAD_TRACE");
+		enabled = e && !strcmp(e, "1");
+		if (enabled) {
+			NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+			out = fopen([docs stringByAppendingPathComponent:@"pad-trace.txt"].fileSystemRepresentation, "w");
+			enabled = out != NULL;
+		}
+	}
+	if (!enabled || written > 2000000) return;
+
+	int axes[4] = {0}, swapped = -1, devidx = -1;
+	const char *name = "?";
+	int have = inputIosPadDebug(0, axes, &swapped, &devidx, &name);
+	float lx = gp.leftThumbstick.xAxis.value, ly = gp.leftThumbstick.yAxis.value;
+	float rx = gp.rightThumbstick.xAxis.value, ry = gp.rightThumbstick.yAxis.value;
+	int dpad = (gp.dpad.up.pressed ? 1 : 0) | (gp.dpad.down.pressed ? 2 : 0) | (gp.dpad.left.pressed ? 4 : 0) | (gp.dpad.right.pressed ? 8 : 0);
+	int face = (gp.buttonA.pressed ? 1 : 0) | (gp.buttonB.pressed ? 2 : 0) | (gp.buttonX.pressed ? 4 : 0) | (gp.buttonY.pressed ? 8 : 0)
+		| (gp.leftShoulder.pressed ? 16 : 0) | (gp.rightShoulder.pressed ? 32 : 0)
+		| (gp.leftTrigger.value > 0.25f ? 64 : 0) | (gp.rightTrigger.value > 0.25f ? 128 : 0);
+	BOOL active = fabsf(lx) > 0.2f || fabsf(ly) > 0.2f || fabsf(rx) > 0.2f || fabsf(ry) > 0.2f || dpad || face;
+	if (!active && !gp) return;
+
+	NSTimeInterval now = NSDate.timeIntervalSinceReferenceDate;
+	if (!active || now - last < 0.1) return;
+	last = now;
+
+	static int header;
+	if (!header) {
+		header = 1;
+		NSMutableArray *names = [NSMutableArray array];
+		for (GCController *c in GCController.controllers) [names addObject:c.vendorName ?: @"?"];
+		written += fprintf(out, "# GCControllers=%s SDLjoysticks=%d SDLpad0=%s have=%d devidx=%d SwapSticks=%d\n",
+			[names componentsJoinedByString:@","].UTF8String, SDL_NumJoysticks(), name ? name : "?", have, devidx, swapped);
+		written += fprintf(out, "# t | GC L(x,y) R(x,y) dpad face | SDL leftXY rightXY | mode | engine stick rstick buttons | theta verta pos\n");
+	}
+	float theta = 0, verta = 0, px = 0, py = 0, pz = 0;
+	playerIosGetView(&theta, &verta);
+	playerIosGetPos(&px, &py, &pz);
+	written += fprintf(out, "%.2f | GC %.2f,%.2f %.2f,%.2f d%x f%02x | SDL %d,%d %d,%d | m%d | e %d,%d %d,%d b%08x | %.1f %.1f %.0f,%.0f,%.0f\n",
+		fmod(now, 1000.0), lx, ly, rx, ry, dpad, face, axes[0], axes[1], axes[2], axes[3],
+		optionsGetControlMode(0), joyGetStickX(0), joyGetStickY(0), joyGetRStickX(0), joyGetRStickY(0),
+		joyGetButtons(0, 0xffffffffu), theta, verta, px, py, pz);
+	fflush(out);
+}
+
 - (void)tick
 {
 	if (_applyDefaultLayout) {
@@ -230,6 +296,7 @@ static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDeci
 	// and pitches with, and the left stick to movement. A second shell look
 	// on the right stick doubled the pitch and turned the opposite way.
 	GCExtendedGamepad *gp = GCController.controllers.firstObject.extendedGamepad;
+	pdPadTrace(gp);
 
 	// A double flick of the left stick either way is the combat roll (D-037).
 	if (gp && NSDate.timeIntervalSinceReferenceDate >= _injectUntil) {

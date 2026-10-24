@@ -1,0 +1,46 @@
+Subject: input: player controller as SDL reports it (iOS only)
+
+The shell's controller trace compares what iOS reports for each physical stick
+with what SDL hands the engine. inputIosPadDebug() returns the four raw SDL
+axes, the stick swap, the joystick index and the name. Read-only.
+
+diff --git a/port/src/input.c b/port/src/input.c
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -2279,3 +2279,36 @@ PD_CONSTRUCTOR static void inputConfigInit(void)
+ 		}
+ 	}
+ }
++
++#ifdef PLATFORM_IOS
++/**
++ * Player's SDL controller as SDL reports it, for the shell's controller trace:
++ * the four raw axes (-32768..32767, physical left X/Y then right X/Y), the
++ * stick swap, the joystick index and the controller's name. Read-only.
++ */
++s32 inputIosPadDebug(s32 cidx, s32 *axes, s32 *swapped, s32 *devidx, const char **name)
++{
++	if (cidx < 0 || cidx >= INPUT_MAX_CONTROLLERS) {
++		return 0;
++	}
++
++	if (swapped) *swapped = padsCfg[cidx].swapSticks;
++	if (devidx) *devidx = padsCfg[cidx].deviceIndex;
++
++	if (!pads[cidx]) {
++		if (name) *name = "none";
++		return 0;
++	}
++
++	if (axes) {
++		axes[0] = SDL_GameControllerGetAxis(pads[cidx], SDL_CONTROLLER_AXIS_LEFTX);
++		axes[1] = SDL_GameControllerGetAxis(pads[cidx], SDL_CONTROLLER_AXIS_LEFTY);
++		axes[2] = SDL_GameControllerGetAxis(pads[cidx], SDL_CONTROLLER_AXIS_RIGHTX);
++		axes[3] = SDL_GameControllerGetAxis(pads[cidx], SDL_CONTROLLER_AXIS_RIGHTY);
++	}
++
++	if (name) *name = SDL_GameControllerName(pads[cidx]);
++
++	return 1;
++}
++#endif
