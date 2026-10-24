@@ -56,7 +56,7 @@ it for your own iPhone or iPad.
 | Option | Status | What to do |
 |---|---|---|
 | Local Simulator build | **Verified** | Run `scripts/bootstrap-apple.sh`, then install the app on a Simulator. |
-| Your own iPhone/iPad | **Builds; untested on hardware** | The unsigned device build compiles. Sign it with your Apple ID through Xcode or a sideloading tool such as AltStore Classic, SideStore or Sideloadly. |
+| Your own iPhone/iPad | **Builds and installs; early hardware testing** | Sign it with your own Apple developer team and install it with Xcode tools; see [Build from source](#build-from-source). |
 | PadMint | **Not yet available** | No DarkPad recipe exists yet. |
 | Prebuilt IPA | **Not published** | Build your own. |
 | App Store / TestFlight | **Not planned** | Store distribution needs separate rights and review. |
@@ -347,8 +347,9 @@ ROM, extracted art, saves or signing files.
 
 ## Current limitations
 
-- Testing so far has used iPhone and iPad Simulators. Touch feel, frame rate,
-  heat and battery use on real devices are not yet measured.
+- Most testing has used iPhone and iPad Simulators. DarkPad has launched on a
+  physical iPad Pro at 120 Hz, but touch feel, controllers, frame rate in
+  missions, heat and battery use on real devices are still being tested.
 - Defection, Investigation, Challenge 1 and bot matches have been completed and
   reloaded. The rest of the campaign has not been played through.
 - Gyro aiming is experimental and not yet calibrated on hardware.
@@ -406,6 +407,7 @@ faster, while HD packs and higher frame rates use more memory and power.
 | [docs/goldenpad-reference.md](docs/goldenpad-reference.md) | How GoldenPad's controls and menu were adapted |
 | [docs/network-integration.md](docs/network-integration.md) | The LAN and co-op experiment |
 | [docs/ART.md](docs/ART.md) | App icon provenance |
+| [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) | How to contribute and report vulnerabilities |
 | [docs/goal.md](docs/goal.md), [docs/prd.md](docs/prd.md) | Project goals and requirements |
 
 ## Community and support
@@ -415,7 +417,8 @@ community for DarkPad and its sibling projects, such as GoldenPad, KartPad and
 BlueWake.
 
 Found a bug? [Open an issue](https://github.com/chrissotraidis/darkpad/issues)
-with your device, its OS version, and the steps that led to it.
+with your device, its OS version, and the steps that led to it. Read [Contributing](CONTRIBUTING.md) before proposing a change and
+[Security](SECURITY.md) before reporting a vulnerability.
 
 ## Legal and acknowledgements
 

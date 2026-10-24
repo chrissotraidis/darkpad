@@ -116,7 +116,12 @@ static int pdBridgePort(void)
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	// Loopback only by default: a simulator shares the Mac's loopback, and a
+	// development build on a phone must not offer this console to everyone on
+	// the same Wi-Fi. PD_BRIDGE_LAN=1 at launch opts in to every interface.
+	const char *lan = getenv("PD_BRIDGE_LAN");
+	const BOOL anyInterface = lan && !strcmp(lan, "1");
+	addr.sin_addr.s_addr = htonl(anyInterface ? INADDR_ANY : INADDR_LOOPBACK);
 	addr.sin_port = htons(kPort);
 
 	// A simulator run killed mid-flight leaves the port in TIME_WAIT for a
@@ -137,7 +142,7 @@ static int pdBridgePort(void)
 		return;
 	}
 
-	NSLog(@"perfectdark: [bridge] listening on :%d", kPort);
+	NSLog(@"perfectdark: [bridge] listening on %s:%d", anyInterface ? "all interfaces" : "loopback", kPort);
 
 	while (1) {
 		int fd = accept(srv, NULL, NULL);

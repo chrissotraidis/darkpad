@@ -100,7 +100,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 ## Empty-cache bootstrap acceptance
 
-- `scripts/bootstrap-apple.sh` completed uninterrupted, exit 0, from clean managed worktree `/Users/chrissotraidis/.codex/worktrees/clean-bootstrap/darkpad` at `dc53fa0`, with no pre-existing work/build/vendor directories. Engine, SDL/curl (three SDKs), ANGLE (both iOS slices), Mac reference and both app bundles rebuilt. Both final Xcode builds succeeded. Log: `work/evidence/clean-bootstrap-dc53fa0.log`.
+- `scripts/bootstrap-apple.sh` completed uninterrupted, exit 0, from clean managed worktree `~/.codex/worktrees/clean-bootstrap/darkpad` at `dc53fa0`, with no pre-existing work/build/vendor directories. Engine, SDL/curl (three SDKs), ANGLE (both iOS slices), Mac reference and both app bundles rebuilt. Both final Xcode builds succeeded. Log: `work/evidence/clean-bootstrap-dc53fa0.log`.
 - No working-checkout dependency libraries or game assets copied into the clean tree. This proves an empty **project** cache on this Mac with installed prerequisites; system developer tools/vpython caches remain host dependencies. No claim of a second Mac test.
 - Installed the clean-produced simulator app after Documents/Library backup; all four ROM/save hashes match (`clean-build-update.json`). Only the existing dedicated simulator remained booted. Mission/save-reload acceptance proceeds on this clean build.
 
@@ -1211,6 +1211,14 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 ## Home-screen name and first physical iPad install (24 October)
 
 - App display/bundle name is now DarkPad (Info.plist and visionOS plist); the Documents folder therefore appears in Files as DarkPad, and in-app help, Bluetooth prompts and the README point there. Game-name references and the texture-pack marker string are unchanged.
-- Signed Release build with PD_PUBLIC=1 (console bridge compiled out), team VKDH2T9UTF, bundle ID com.chrissotraidis.darkpad passed at build time (the repo default com.rebelancap.perfectdark stays for Simulator builds). Log work/device-signed-build.log. codesign verify and iphoneos platform check pass; no ROM in the bundle.
+- Signed Release build with PD_PUBLIC=1 (console bridge compiled out), the owner's team, bundle ID com.chrissotraidis.darkpad passed at build time (the repo default com.rebelancap.perfectdark stays for Simulator builds). Log work/device-signed-build.log. codesign verify and iphoneos platform check pass; no ROM in the bundle.
 - Installed on Chris' iPad Pro 12.9-inch (6th gen), iPadOS 27.0.1, which had no previous DarkPad/Perfect Dark install. Copied the user's ROM to the app's Documents as pd.ntsc-final.z64; read-back MD5 e03b088b6ac9e0080440efed07c1e40f.
 - Launched via devicectl: process alive after 15 s; heartbeat frames=2268, pacing 119.9 Hz, overlay visible, thermal 0, footprint 260.8 MB. pd.ini holds the Goldenpad controller default. No hands-on menu/controls/gameplay acceptance yet; that is the user's test.
+
+## Public-release sanity check (24 October)
+
+- History and tree: no ROMs, saves, pd.ini, IPAs, signing files or credentials in any commit; pack 1.74 MiB; largest blobs are the icon PNGs. One private path and the team ID line removed from PROGRESS.md.
+- Fixed: the development console bridge bound to every interface (INADDR_ANY), exposing it on Wi-Fi from Debug device builds. It now binds loopback unless launched with PD_BRIDGE_LAN=1. Verified on the Simulator: answers on 127.0.0.1:8775, refuses the Mac's LAN address. PD_PUBLIC builds still omit it.
+- Added CONTRIBUTING.md and SECURITY.md (GoldenPad's structure). README: device row no longer implies a sideloading IPA exists; limitations mention the physical iPad launch; project map lists the new files.
+- Tests: texture_upscale, image_decoder_limits, texture_pack_prepare, input_clipboard and gyro_math (ASan/UBSan) pass against the current build tree.
+- Open for the owner: version number (VERSION 1.0.3 is inherited from upstream perfect-dark-ios), inherited docs/upstream screenshot showing Xbox 360 game art, default bundle ID com.rebelancap.perfectdark, LICENSE copyright line for DarkPad's own changes, merge to main, making the repository public, tagging. PadMint player-check does not apply until a PadMint recipe exists.
