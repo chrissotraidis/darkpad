@@ -15,9 +15,10 @@ cd "$ROOT"
 SLICES="ios-device ios-simulator"
 case "${1:-}" in
   --simulator-only) SLICES="ios-simulator" ;;
+  --device-only) SLICES="ios-device" ;;
   --visionos) SLICES="$SLICES visionos-device visionos-simulator" ;;
   "") ;;
-  *) echo "usage: $0 [--visionos|--simulator-only]" >&2; exit 2 ;;
+  *) echo "usage: $0 [--visionos|--simulator-only|--device-only]" >&2; exit 2 ;;
 esac
 
 for s in $SLICES; do

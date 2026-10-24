@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "darkpad",
+  "name": "DarkPad",
+  "game": "Perfect Dark (N64)",
+  "kind": "decomp-patches",
+  "status": "draft-untested",
+  "inputs": [
+    {
+      "type": "n64-rom",
+      "formats": [
+        "z64",
+        "v64",
+        "n64"
+      ],
+      "when": "in-app",
+      "description": "Your own Perfect Dark (USA) Rev 1 / v1.1 ROM. After installing, open DarkPad and choose it from Files. The build does not read it."
+    }
+  ],
+  "targets": {
+    "ios": {
+      "hosts": {
+        "macos-arm64": "experimental"
+      },
+      "output": "ipa",
+      "check": "ipa",
+      "steps": [
+        {
+          "stage": "compile",
+          "command": [
+            "{repo}/scripts/build-personal-ipa.sh",
+            "{output}"
+          ],
+          "env": {
+            "PD_BUILD_JOBS": "{jobs}"
+          }
+        }
+      ]
+    }
+  },
+  "requirements": {
+    "disk_gb": 30,
+    "tools": [
+      {
+        "name": "git",
+        "version_args": [
+          "--version"
+        ]
+      },
+      {
+        "name": "python3",
+        "version_args": [
+          "--version"
+        ],
+        "min_version": "3.9"
+      },
+      {
+        "name": "cmake",
+        "version_args": [
+          "--version"
+        ],
+        "min_version": "3.20",
+        "player": true,
+        "note": "Install CMake: brew install cmake"
+      },
+      {
+        "name": "ninja",
+        "version_args": [
+          "--version"
+        ],
+        "player": true,
+        "note": "Install Ninja: brew install ninja"
+      },
+      {
+        "name": "xcodegen",
+        "version_args": [
+          "--version"
+        ],
+        "player": true,
+        "note": "Install XcodeGen: brew install xcodegen"
+      },
+      {
+        "name": "xcodebuild",
+        "version_args": [
+          "-version"
+        ],
+        "player": true,
+        "note": "Install full Xcode and its iOS platform (Command Line Tools alone are not enough)."
+      }
+    ]
+  },
+  "publication": {
+    "public_binaries": false,
+    "reason": "The app contains code compiled from the Perfect Dark decompilation; releases publish the recipe and source only."
+  }
+}
