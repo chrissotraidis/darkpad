@@ -256,6 +256,8 @@ static PDSettingsHostController *sHost;
 static UIWindow *sWindow;
 static PDSettingsViewController *sSettingsController;
 static BOOL sUtilityOwnsPause;
+// Close-to-play timing (device-only symptom: a pause after closing the menu).
+static CFTimeInterval sDismissedAt, sCloseLastFrame, sCloseFirstFrame, sCloseMaxGap;
 extern int lvIsPaused(void);
 extern void lvSetPaused(int paused);
 /** When the gear was tapped, so viewDidAppear can say how long the page took. */
@@ -286,6 +288,20 @@ static CFTimeInterval sPresentStarted;
 
 + (void)updateNativePause
 {
+	if (sDismissedAt > 0) {
+		const CFTimeInterval now = CACurrentMediaTime();
+		if (sCloseFirstFrame == 0) {
+			sCloseFirstFrame = now;
+		} else {
+			sCloseMaxGap = MAX(sCloseMaxGap, now - sCloseLastFrame);
+		}
+		sCloseLastFrame = now;
+		if (now - sDismissedAt > 1.0) {
+			PDLifecycle("menu close timing: first frame %.0f ms after close, slowest frame %.0f ms in the next second",
+				(sCloseFirstFrame - sDismissedAt) * 1000.0, sCloseMaxGap * 1000.0);
+			sDismissedAt = 0;
+		}
+	}
 	[PDUtilityMenu noteEngineFrame];
 	BOOL wanted = self.isPresented || PDTouchOverlay.current.layoutEditing;
 #if !TARGET_OS_VISION
@@ -549,6 +565,8 @@ static CFTimeInterval sPresentStarted;
 		[game makeKeyAndVisible];
 	}
 	sWindow.hidden = YES;
+	sDismissedAt = CACurrentMediaTime();
+	sCloseFirstFrame = sCloseLastFrame = sCloseMaxGap = 0;
 	// sWindow is deliberately NOT released: see above, and it is what makes the
 	// second open cost nothing.
 	PDLifecycle("settings DISMISS (key -> %s, deferred pacing=%d)",

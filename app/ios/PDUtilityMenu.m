@@ -451,11 +451,16 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	] ]);
 
 	// Add-ons and game data
-	PDMenuNode *addons = pdSubmenu(@"Add-ons & Game Data", @"shippingbox", @[ @[
-		pdAction(@"Texture Packs…", @"photo.stack", ^{ pdOpenSettings(@"Texture Packs"); }),
-		pdAction(@"Xbox 360 Art…", @"sparkles", ^{ pdOpenSettings(@"Xbox 360 Art"); }),
-		pdAction(@"GoldenEye 007 (GE Plus)…", @"star.circle", ^{ pdOpenSettings(@"GoldenEye"); }),
-	] ]);
+	// Every add-on is optional and none is included; the subtitles say so,
+	// because the names alone read like built-in content.
+	PDMenuNode *packs = pdAction(@"HD Texture Packs…", @"photo.stack", ^{ pdOpenSettings(@"Texture Packs"); });
+	packs.subtitle = @"Community packs you add in Files";
+	PDMenuNode *xbla = pdAction(@"Xbox 360 Remaster Art…", @"sparkles", ^{ pdOpenSettings(@"Xbox 360 Art"); });
+	xbla.subtitle = @"From your own copy of the 2010 release";
+	PDMenuNode *geplus = pdAction(@"GoldenEye Levels (GE Plus)…", @"star.circle", ^{ pdOpenSettings(@"GoldenEye"); });
+	geplus.subtitle = @"Needs your own GoldenEye 007 ROM";
+	PDMenuNode *addons = pdSubmenu(@"Optional Add-ons", @"shippingbox", @[ @[ packs, xbla, geplus ] ]);
+	addons.subtitle = @"None included";
 	PDMenuNode *allSettings = pdAction(@"All Settings…", @"gearshape", ^{ pdOpenSettings(nil); });
 
 	// Help & Feedback
@@ -553,7 +558,7 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 + (void)presentAbout
 {
 	NSString *message = [NSString stringWithFormat:
-		@"%@\n%s\n\nPerfect Dark, native on iPhone and iPad. Built on the Perfect Dark decompilation and PC port, Dab's Mod, rebelancap's perfect-dark-ios, SDL2, curl and ANGLE. Each keeps its own license.\n\nNo game data is included. DarkPad is not affiliated with Rare, Microsoft or Nintendo.",
+		@"%@\n%s\n\nPerfect Dark's decompiled source, compiled as a native iPhone and iPad app. No emulator.\n\nThe engine is Dab's Mod, which adds Ghost Trials, the Randomizer and GoldenEye levels (GE Plus) to the main menu. Built on the Perfect Dark decompilation and PC port, Dab's Mod, rebelancap's perfect-dark-ios, SDL2, curl and ANGLE; each keeps its own license.\n\nNo game data is included. DarkPad is not affiliated with Rare, Microsoft or Nintendo.",
 		[self versionLine], PD_IOS_BUILD_STAMP];
 	UIAlertController *about = [self alert:@"About DarkPad" message:message];
 	[about addAction:[UIAlertAction actionWithTitle:@"View on GitHub" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
