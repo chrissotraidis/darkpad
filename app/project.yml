@@ -71,6 +71,7 @@ targets:
       - path: ios/PDController.m
       - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
+      - path: ios/PDUtilityMenu.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m
       - path: ios/PDAudio.m
@@ -166,6 +167,7 @@ targets:
       - path: ios/PDController.m
       - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
+      - path: ios/PDUtilityMenu.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m
       - path: ios/PDAudio.m

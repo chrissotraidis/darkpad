@@ -207,3 +207,28 @@ End Session. End Session is disabled when unavailable and always asks for
 confirmation; START still opens the game's own pause/inventory screen.
 Phone simulator Fire/Reload, saved progression, native settings and confirmed
 exit were checked. This does not certify physical thumb ergonomics.
+
+## Family ••• menu (24 October)
+
+The utility popover was replaced after comparing GoldenPad with the newer public
+ports (SunPad, MeleePad, GalaxyPad), which share one menu shape. `PDUtilityMenu`
+now titles the menu "DarkPad <version>" and offers Display, Controls and Audio
+submenus, Add-ons & Game Data, All Settings, Help & Feedback (Report a Problem…,
+Share Diagnostic Log, Build & Performance, About DarkPad, DarkPad on GitHub) and
+a destructive End Mission or Match last. Choices and toggles apply immediately
+and keep the menu open, like system menu checkmarks.
+
+A system `UIMenu` was tried first. It never finished presenting because the
+engine owns the main thread and pumps the run loop only in its default mode, so
+the menu is drawn in the system menu's style inside the existing settings window,
+which already owns pausing and focus return. Report a Problem follows MeleePad:
+prompt, a redacted diagnostic log in a share sheet, then an optional prefilled
+GitHub issue. The log never reads the ROM, saves, pd.ini or imported art.
+
+BACK is now a labelled chip like START, shown only inside the game's menus.
+It remains because many Perfect Dark menu screens have no back item of their own.
+
+Simulator checks on iPad Air 11-inch (M4) with real AXe touches: menu and each
+submenu open, Show FPS toggles live, Report a Problem writes the log (no
+`/Users/` paths), share sheet and GitHub offer appear, About appears, and closing
+releases the menu's pause.

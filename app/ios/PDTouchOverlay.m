@@ -38,6 +38,7 @@
 #import "PDShell.h"
 #import "PDDefaults.h"
 #import "PDSettingsViewController.h"
+#import "PDUtilityMenu.h"
 
 // overlay 0051 — one menu line as a fraction of the screen's height (D-083).
 extern float menuIosRowFraction(void);
@@ -252,7 +253,7 @@ static NSString *pdControlName(NSString *label)
 // no Cancel item of its own. It is NOT part of the layout editor: it is the only
 // thing on screen while a dialog is open and the only way out of one.
 static const PDButtonSpec kMenuButtons[] = {
-	{ "BACK",  PDPadB, "chevron.backward", 0.9400, 0.0992, 26 },
+	{ "BACK",  PDPadB, "arrow.uturn.backward", 0.9400, 0.0992, 22 },
 };
 #define PD_NUM_MENU_BUTTONS ((int)(sizeof(kMenuButtons) / sizeof(kMenuButtons[0])))
 
@@ -316,17 +317,14 @@ static const PDButtonSpec kMenuButtons[] = {
 			_actionColor = UIColor.systemBlueColor;
 		if ([_label isEqualToString:@"START"]) _actionColor = UIColor.systemRedColor;
 		if ([_label isEqualToString:@"ALT"]) _actionColor = UIColor.systemPurpleColor;
-		if (navigation) {
-			UIImageView *back = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.backward"]];
-			back.tintColor = [UIColor colorWithWhite:1 alpha:MIN(alpha * 2.2, 1)];
-			back.contentMode = UIViewContentModeScaleAspectFit;
-			back.frame = CGRectMake(r - 10, r - 10, 20, 20);
-			[self addSubview:back];
-		} else {
+		// BACK is a labelled chip like START: the family's control language,
+		// not an iOS navigation chevron. Menus still need it to leave dialogs
+		// that have no Cancel item of their own.
+		{
 			_title = [[UILabel alloc] initWithFrame:CGRectInset(self.bounds, 3, 0)];
 			NSDictionary *names = @{@"CROUCH": @"DUCK", @"WHEEL": @"WEAPON", @"SWAP": @"NEXT", @"FIRE_L": @"FIRE"};
 			_title.text = names[_label] ?: _label;
-			CGFloat fontSize = [_label isEqualToString:@"START"] ? 9 : MIN(12, r * .43);
+			CGFloat fontSize = ([_label isEqualToString:@"START"] || navigation) ? 9 : MIN(12, r * .43);
 			UIFontDescriptor *font = [[UIFont systemFontOfSize:fontSize weight:UIFontWeightBold].fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
 			_title.font = [UIFont fontWithDescriptor:font size:fontSize];
 			_title.textAlignment = NSTextAlignmentCenter;
@@ -715,16 +713,29 @@ static __weak PDTouchOverlay *sCurrent;
  */
 - (void)installGearInWindow:(UIWindow *)window
 {
+	// The family's ••• button (MeleePad/GalaxyPad): a dark capsule with a fine
+	// stroke. It opens the DarkPad menu (PDUtilityMenu).
 	UIButton *gear = [UIButton buttonWithType:UIButtonTypeSystem];
-	[gear setImage:[UIImage systemImageNamed:@"ellipsis"] forState:UIControlStateNormal];
+	UIImage *ellipsis = [UIImage systemImageNamed:@"ellipsis" withConfiguration:
+		[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightBold]];
+	UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
+	config.image = ellipsis;
+	config.baseForegroundColor = UIColor.whiteColor;
+	config.contentInsets = NSDirectionalEdgeInsetsZero;
+	config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+	UIBackgroundConfiguration *background = [UIBackgroundConfiguration clearConfiguration];
+	background.backgroundColor = [UIColor colorWithWhite:0.06 alpha:0.72];
+	background.cornerRadius = 22.0;
+	background.strokeColor = [UIColor colorWithWhite:1.0 alpha:0.30];
+	background.strokeWidth = 1.0;
+	config.background = background;
+	// One circular look through the menu transition; iPadOS otherwise
+	// synthesizes a rectangular selected state while the menu closes.
+	gear.automaticallyUpdatesConfiguration = NO;
+	gear.configuration = config;
 	gear.tintColor = UIColor.whiteColor;
-	[gear setPreferredSymbolConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightBold] forImageInState:UIControlStateNormal];
-	gear.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.62];
-	gear.layer.borderWidth = 1;
-	gear.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.34].CGColor;
-	gear.layer.cornerRadius = 22.0;
-	gear.accessibilityLabel = @"Darkpad menu";
-	gear.accessibilityHint = @"Settings, touch layout and diagnostics";
+	gear.accessibilityLabel = @"DarkPad menu";
+	gear.accessibilityHint = @"Display, controls, audio, add-ons and help";
 	gear.translatesAutoresizingMaskIntoConstraints = YES;
 	[gear addTarget:self action:@selector(openUtilities) forControlEvents:UIControlEventTouchUpInside];
 	[window addSubview:gear];
@@ -762,12 +773,13 @@ CGRect PDUtilityMenuFrame(UIWindow *window)
 	gear.frame = PDUtilityMenuFrame(window);
 }
 
+/** Nothing held under the menu may stay pressed. */
 - (void)openUtilities
 {
 	_gearTaps++;
 	[self releaseEverything];
 	inputIosPointerClear();
-	[PDSettingsViewController presentUtilities];
+	[PDUtilityMenu present];
 }
 
 // ---------------------------------------------------------------------------

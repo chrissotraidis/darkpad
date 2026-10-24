@@ -69,7 +69,7 @@ what was inherited and what is new.
 | Area | Inherited from perfect-dark-ios | Added or changed by DarkPad |
 |---|---|---|
 | Touch controls | Virtual stick, look area, editable layout | GoldenPad's layout: labelled Fire, Aim, Use, Reload, Weapon and Duck buttons around a large Fire button, separate iPhone and iPad defaults, per-button size (55–160%) and opacity (20–100%), and dark idle buttons that light up when pressed |
-| ••• menu | A settings window | A round ••• button in the upper right with **Settings**, **Edit Touch Controls**, **Diagnostics** and a confirmed **End Session…**. Opening it pauses the game and releases held touches |
+| ••• menu | A settings window | The family ••• menu: Display, Controls, Audio, Add-ons, Help & Feedback (Report a Problem, diagnostic log, GitHub link) and a confirmed End Mission or Match |
 | Controllers | SDL game-controller support | GoldenPad's controller layout by default on new installs, also available as a one-tap preset; reconnecting a controller no longer rewrites your bindings |
 | Aiming | Touch and controller look | **Gyro while aiming** (experimental): tilt the device to fine-tune aim while holding Aim |
 | Graphics | Texture packs, Xbox 360 art import, frame rate and resolution options | One **Art profile** switch (Original, Enhanced or Remaster), an in-app texture-pack chooser, and a HUD kept inside the screen's safe area |
@@ -171,7 +171,7 @@ app deletes them, so update in place rather than reinstalling.
 | **DUCK** | Cycles standing, crouching and low crouch |
 | **NEXT / ALT** | Next weapon, and the weapon's secondary function |
 | **START** | The game's own pause and inventory menu, below ••• |
-| **BACK** | Back in the game's menus, on the left |
+| **BACK** | Leaves the game's own menus; shown on the left only while one is open |
 
 Open **••• → Edit Touch Controls** to rearrange the live overlay. Drag a button
 to move it, or select it to change its size and opacity. **Reset** restores the
@@ -207,17 +207,29 @@ a backup of your previous bindings and leaves D-pad and keyboard bindings alone.
 
 ## The ••• menu
 
-The round ••• button stays in the upper-right corner during play.
+The round ••• button stays in the upper-right corner. Opening it pauses the game
+and releases any held touches; tapping outside it resumes. It follows the same
+layout as SunPad, MeleePad and GalaxyPad:
 
-| Item | What it does |
+| Item | What's inside |
 |---|---|
-| **Settings** | Graphics, controls, gyro, audio and imported content |
-| **Edit Touch Controls** | Opens the live layout editor |
-| **Diagnostics** | Build number, FPS, screenshot and save-settings tools |
-| **End Session…** | Ends the current mission or match after confirmation. Completed progress is kept. Unavailable in menus, cutscenes and training |
+| **Display** | Art profile, frame rate, render resolution, FPS counter |
+| **Controls** | Edit Touch Controls, on-screen controls (Auto/On/Off), touch settings, GoldenPad controller layout, controller settings, gyro aiming and recenter |
+| **Audio** | Main volume, mute, how DarkPad shares audio with other apps |
+| **Add-ons & Game Data** | Texture packs, Xbox 360 art, GoldenEye 007 (GE Plus) |
+| **All Settings…** | The full Settings page |
+| **Help & Feedback** | Report a Problem…, Share Diagnostic Log, Build & Performance, About DarkPad, DarkPad on GitHub |
+| **End Mission or Match…** | Ends the current mission or match after confirmation. Completed progress is kept. Unavailable in menus, cutscenes and training |
 
-Opening the menu pauses the game, and closing it resumes. **START** remains the
-game's own pause menu.
+**Report a Problem…** asks what went wrong, writes a diagnostic log you can
+review and share, then offers to open a prefilled GitHub issue. Nothing is
+uploaded automatically. The log contains device, build, settings and DarkPad's
+own runtime records, with private file paths removed. It never includes your
+ROM, saves or imported art.
+
+**START** is the game's own pause and inventory menu. **BACK** appears on the
+left only inside the game's menus, to leave screens that have no back option of
+their own.
 
 ## Settings reference
 
@@ -314,8 +326,9 @@ Source revisions are recorded in `UPSTREAM_PIN`, `dependencies/pins.env` and
   archives apply after restarting DarkPad.
 
 When filing a [GitHub issue](https://github.com/chrissotraidis/darkpad/issues),
-include your device and OS version, the build number from **••• → Diagnostics**,
-the exact step that failed and any on-screen message. Never attach or link the
+or use **••• → Help & Feedback → Report a Problem…**, include your device and OS
+version, the build number from **••• → Help & Feedback → About DarkPad**, the exact
+step that failed and any on-screen message. Never attach or link the
 ROM, extracted art, saves or signing files.
 
 ## Current limitations
