@@ -1222,3 +1222,11 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - Added CONTRIBUTING.md and SECURITY.md (GoldenPad's structure). README: device row no longer implies a sideloading IPA exists; limitations mention the physical iPad launch; project map lists the new files.
 - Tests: texture_upscale, image_decoder_limits, texture_pack_prepare, input_clipboard and gyro_math (ASan/UBSan) pass against the current build tree.
 - Open for the owner: version number (VERSION 1.0.3 is inherited from upstream perfect-dark-ios), inherited docs/upstream screenshot showing Xbox 360 game art, default bundle ID com.rebelancap.perfectdark, LICENSE copyright line for DarkPad's own changes, merge to main, making the repository public, tagging. PadMint player-check does not apply until a PadMint recipe exists.
+
+## Version, bundle ID, license and screenshot (24 October)
+
+- VERSION is now 0.1.0 (DEV_ITERATION 0, so the app reports 0.1.0).
+- Default bundle ID is com.chrissotraidis.darkpad (project.yml iOS and visionOS targets, bundleIdPrefix, URL type names, dispatch queue labels, packaging/validation scripts, README). Historical docs under docs/upstream and docs/network-integration.md keep the IDs those builds actually used. Other developers still pass their own PRODUCT_BUNDLE_IDENTIFIER for device signing.
+- LICENSE adds "Copyright (c) 2026 Chris Sotraidis" beside rebelancap's line.
+- Removed docs/upstream/screenshots/vision-pro-airbase-xbla.jpg from the tree; it remains in history from 3eab186.
+- Simulator Debug build installed fresh under the new ID on iPad Air 11-inch (M4); ROM copied (MD5 e03b088b…); bridge reports version=0.1.0, engine=running. The old com.rebelancap.perfectdark Simulator install and its test data are left in place.

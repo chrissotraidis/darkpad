@@ -11,7 +11,7 @@
 # work/deps-$(PLATFORM_NAME) symlinks are named to match.
 name: perfectdark
 options:
-  bundleIdPrefix: com.rebelancap
+  bundleIdPrefix: com.chrissotraidis
   createIntermediateGroups: true
 settings:
   base:
@@ -96,7 +96,7 @@ targets:
       base:
         SDKROOT: iphoneos
         TARGETED_DEVICE_FAMILY: "1,2"
-        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_BUNDLE_IDENTIFIER: com.chrissotraidis.darkpad
         PRODUCT_NAME: perfectdark
         INFOPLIST_FILE: ios/Info.plist
         MARKETING_VERSION: "PD_MARKETING_VERSION"
@@ -203,7 +203,7 @@ targets:
       base:
         SDKROOT: xros
         TARGETED_DEVICE_FAMILY: "7"
-        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_BUNDLE_IDENTIFIER: com.chrissotraidis.darkpad
         PRODUCT_NAME: perfectdark
         INFOPLIST_FILE: ios/Info-visionos.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -36,7 +36,7 @@ static dispatch_queue_t pdAudioQueue(void)
 	static dispatch_queue_t q;
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
-		q = dispatch_queue_create("com.rebelancap.perfectdark.audio-session",
+		q = dispatch_queue_create("com.chrissotraidis.darkpad.audio-session",
 			dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
 	});
 	return q;

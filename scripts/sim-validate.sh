@@ -29,7 +29,7 @@ cd "$REPO"
 # Lane 3 (D-002 / charter §Simulator validation). Lane 1 is openQ4/vkQuake/
 # RetroArch, lane 2 GoldenEye. Never create a device; never touch another lane.
 SIM="${PD_SIM:-$(xcrun simctl list devices available | awk -F'[()]' '/iPhone 17e/{print $2; exit}')}"
-BUNDLE=com.rebelancap.perfectdark
+BUNDLE=com.chrissotraidis.darkpad
 # 8775 (D-002), or PD_BRIDGE_PORT — vision-validate.sh has taken its port from
 # the environment since Phase 5 and this one had not, which is how a lane-3 run
 # and a lane-1 run ended up talking to each other: a simulator's loopback is the

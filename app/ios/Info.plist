@@ -123,7 +123,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.rebelancap.perfectdark</string>
+			<string>com.chrissotraidis.darkpad</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>

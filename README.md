@@ -269,7 +269,7 @@ Install and run the Simulator build:
 xcrun simctl boot "iPad Air 11-inch (M4)"
 open -a Simulator
 xcrun simctl install booted build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app
-xcrun simctl launch booted com.rebelancap.perfectdark
+xcrun simctl launch booted com.chrissotraidis.darkpad
 ```
 
 Boot only one Simulator at a time. On first launch, drag your ROM onto the
