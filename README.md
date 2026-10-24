@@ -281,8 +281,12 @@ developer test server:
 
 ```sh
 PD_PUBLIC=1 scripts/gen-app-project.sh
-xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark   -configuration Release -sdk iphoneos -derivedDataPath build/dd-device-signed   DEVELOPMENT_TEAM=YOURTEAMID PRODUCT_BUNDLE_IDENTIFIER=com.yourname.darkpad   CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates build
-xcrun devicectl device install app --device YOUR_DEVICE_ID   build/dd-device-signed/Build/Products/Release-iphoneos/perfectdark.app
+xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark \
+  -configuration Release -sdk iphoneos -derivedDataPath build/dd-device-signed \
+  DEVELOPMENT_TEAM=YOURTEAMID PRODUCT_BUNDLE_IDENTIFIER=com.yourname.darkpad \
+  CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates build
+xcrun devicectl device install app --device YOUR_DEVICE_ID \
+  build/dd-device-signed/Build/Products/Release-iphoneos/perfectdark.app
 ```
 
 <details>
