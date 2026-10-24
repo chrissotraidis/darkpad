@@ -66,7 +66,10 @@ backup, and applies to all four player slots:
 | Menu accept / cancel | A / B |
 
 The preset disables the conflicting optional dual-trigger-fire mode. It does
-not auto-overwrite existing custom layouts. Applied bindings for all four players
+not auto-overwrite existing custom layouts. Since 2026-10-24 it is also the
+default for new installs: when no pd.ini exists before the engine starts,
+`PDController` applies it once on the first engine frame and records the
+decision in user defaults. Installs with a pd.ini keep their bindings. Applied bindings for all four players
 were read back from pd.ini and survived relaunch; keyboard/mouse and D-pad values
 matched their backups. Physical button behavior, CamSpy and wheel usability still
 need device acceptance. Test CamSpy, weapon wheel, secondary fire,

@@ -6,10 +6,11 @@
 // an SDL_GameController without this file doing anything at all. So what is
 // left for the shell is the three things SDL cannot know:
 //
-//   1. **Explicit Goldenpad preset.** Existing engine bindings load normally.
-//      The native settings action applies the requested semantic layout only
-//      when chosen, preserving keyboard/D-pad binds and backing up the prior
-//      state. Connecting a controller never reapplies this preset over edits.
+//   1. **Goldenpad layout.** A new install (no pd.ini yet) gets the Goldenpad
+//      layout once, on the first engine frame. Existing pd.ini bindings load
+//      normally and are never replaced; the native settings action applies the
+//      same layout on request, preserving keyboard/D-pad binds and backing up
+//      the prior state. Connecting a controller never reapplies it over edits.
 //   2. **Look.** PD's right stick is NOT a look axis (docs/frame-map.md): it
 //      goes into the N64 pad struct for the game's control styles. Twin-stick
 //      look on a modern pad therefore has to come from the same degrees seam
@@ -51,8 +52,14 @@ static const float kFlickOut = 0.70f;
 static const float kFlickBack = 0.30f;
 static const NSTimeInterval kFlickWindow = 0.30;
 
+// Set once the new-install controller default has been decided, so later
+// launches never reconsider it.
+static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDecided";
+
 @implementation PDController {
 	NSTimeInterval _lastLook;
+	// A new install: apply the Goldenpad layout on the first engine frame.
+	BOOL _applyDefaultLayout;
 	// The double-flick state machine. _flickOut is the side of the excursion in
 	// progress (0 = the stick is inside kFlickBack); _lastFlickSide/_lastFlickAt
 	// are the flick that completed most recently.
@@ -105,6 +112,14 @@ static const NSTimeInterval kFlickWindow = 0.30;
 
 - (void)start
 {
+	// Before the engine starts, pd.ini's absence means nobody has bindings yet.
+	NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+	if (![defaults boolForKey:kDefaultLayoutDecided]) {
+		NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+		_applyDefaultLayout = ![NSFileManager.defaultManager
+			fileExistsAtPath:[docs stringByAppendingPathComponent:@"pd.ini"]];
+		if (!_applyDefaultLayout) [defaults setBool:YES forKey:kDefaultLayoutDecided];
+	}
 	[NSNotificationCenter.defaultCenter addObserver:self selector:@selector(padsChanged)
 	                                           name:GCControllerDidConnectNotification object:nil];
 	[NSNotificationCenter.defaultCenter addObserver:self selector:@selector(padsChanged)
@@ -227,6 +242,12 @@ static void pdRadialDeadzone(float *x, float *y)
 
 - (void)tick
 {
+	if (_applyDefaultLayout) {
+		_applyDefaultLayout = NO;
+		NSString *result = [PDController applyGoldenpadLayout];
+		[NSUserDefaults.standardUserDefaults setBool:YES forKey:kDefaultLayoutDecided];
+		NSLog(@"perfectdark: [pad] new install, default controller layout: %@", result);
+	}
 	GCController *pad = GCController.controllers.firstObject;
 	if (!pad.extendedGamepad) {
 		_lastLook = 0;

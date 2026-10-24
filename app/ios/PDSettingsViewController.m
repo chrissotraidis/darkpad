@@ -999,7 +999,7 @@ static CFTimeInterval sPresentStarted;
 #if !TARGET_OS_VISION
         @"Motion Aiming",
 #endif
-        @"Audio", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Texture Packs", @"Diagnostics" ];
+        @"Audio", @"Texture Packs", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Diagnostics" ];
 	_rows = @[
 		@[
 			// The Frame rate row, and the one-line insurance behind it (D-044).
@@ -1130,6 +1130,15 @@ static CFTimeInterval sPresentStarted;
 			pdSwitchRow(@"Mute", PDDefAudioMute),
 		],
 		@[
+			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
+			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
+			pdButtonRow(@"Reload packs (F9)", ^{
+				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
+				[weakSelf refreshTexturePackStatus];
+			}),
+		],
+		@[
 			// Asset imports stay here; the selected art profile controls activation.
 			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Remaster under Graphics → Art profile"; }),
 			// What is in Documents/added-content (or the legacy xbla/), named. The engine's own
@@ -1194,15 +1203,6 @@ static CFTimeInterval sPresentStarted;
 			}),
 			pdButtonRow(@"Add or replace Goldfinger 64…", ^{
 				[weakSelf importGoldenEye:PDGoldenEyeHack];
-			}),
-		],
-		@[
-			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
-			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
-			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
-			pdButtonRow(@"Reload packs (F9)", ^{
-				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
-				[weakSelf refreshTexturePackStatus];
 			}),
 		],
 		@[
