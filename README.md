@@ -5,40 +5,46 @@
 </p>
 
 <p align="center">
-  <strong>Perfect Dark, running natively on iPhone and iPad.</strong><br>
-  The decompiled Perfect Dark engine with an Apple shell: touch controls,
-  game controllers, optional gyro aiming, HD art options and reliable saves.
-  You supply the game.
+  <strong>Perfect Dark, native on iPhone and iPad.</strong><br>
+  The decompiled N64 classic compiled as a real ARM64 app, with GoldenPad-style
+  touch and controller play, optional HD art and solid saves. You supply the game.
 </p>
 
 <p align="center">
   <img alt="iOS and iPadOS 15 or later" src="https://img.shields.io/badge/iOS%20%2F%20iPadOS-15%2B-0A84FF?logo=apple">
+  <img alt="Native ARM64, no emulator" src="https://img.shields.io/badge/runtime-native%20ARM64-30D158">
   <img alt="ANGLE to Metal renderer" src="https://img.shields.io/badge/renderer-ANGLE%20%E2%86%92%20Metal-5E5CE6">
-  <img alt="Native ARM64" src="https://img.shields.io/badge/runtime-native%20ARM64-30D158">
   <img alt="Developer preview" src="https://img.shields.io/badge/status-developer%20preview-FF9F0A">
-  <img alt="ROM not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
-  <a href="https://discord.gg/xwHfUD2bxW"><img alt="Join the Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white"></a>
+  <img alt="Game data is not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
+  <a href="https://github.com/chrissotraidis/padmint"><img alt="Build DarkPad with PadMint" src="https://img.shields.io/badge/PadMint-build%20your%20own-3EB489"></a>
+  <a href="https://discord.gg/xwHfUD2bxW"><img alt="Join the community on Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white"></a>
 </p>
 
-DarkPad turns the native PC port of the
-[Perfect Dark decompilation](https://github.com/n64decomp/perfect_dark), by way of
-[Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod), into an iPhone and
-iPad app. It starts from rebelancap's
-[perfect-dark-ios](https://github.com/rebelancap/perfect-dark-ios) shell and adds
-GoldenPad's control scheme and menu, gyro aiming, simpler art settings, a
-reproducible build and a series of fixes. The game runs as native ARM64 code with
+<p align="center">
+  <strong><a href="#get-darkpad">Get DarkPad</a> ·
+  <a href="#controls">Controls</a> ·
+  <a href="#whats-on-the-main-menu">Main menu guide</a> ·
+  <a href="#graphics-and-add-ons">Graphics and add-ons</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="https://discord.gg/xwHfUD2bxW">Discord</a></strong>
+</p>
+
+DarkPad runs the [Perfect Dark decompilation](https://github.com/n64decomp/perfect_dark)
+as a native iPhone and iPad app. The game's original C source, rebuilt by the
+decompilation project, is compiled ahead of time for Apple's ARM64 chips: there is
 no emulator and no JIT. [ANGLE](https://chromium.googlesource.com/angle/angle)
-translates its OpenGL ES rendering to Metal.
+turns its OpenGL ES rendering into Metal.
 
-No game data is included. On first launch you choose your own **Perfect Dark
-(USA) Rev 1 / v1.1** ROM from Files.
+The engine is [Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod), an
+extended fork of the [Perfect Dark PC port](https://github.com/perfect-dark-pc-port/perfect_dark).
+DarkPad starts from rebelancap's [perfect-dark-ios](https://github.com/rebelancap/perfect-dark-ios)
+shell and adds GoldenPad's controls and menu, a fixed controller path, gyro
+aiming, simpler art settings and a reproducible one-command build.
 
-> **Development boundary:** ROMs, extracted game art, saves, gameplay captures
-> and signing material are never committed or packaged. The upstream engine is
-> fetched at build time and stays unmodified; DarkPad's engine changes live in
-> reviewable patches under [`overlay/`](overlay/). No prebuilt IPA is published:
-> you build your own app. No official, commercial or App Store clearance is
-> claimed.
+> [!IMPORTANT]
+> No game data is included and no IPA is published. You build your own copy on an
+> Apple Silicon Mac, then choose your own **Perfect Dark (USA) Rev 1 / v1.1** ROM in
+> the app. See [Get DarkPad](#get-darkpad).
 
 > [!NOTE]
 > **AI disclosure:** DarkPad uses substantial AI assistance for code, tests,
@@ -49,115 +55,69 @@ No game data is included. On first launch you choose your own **Perfect Dark
 
 ## Get DarkPad
 
-You build DarkPad yourself on an Apple Silicon Mac (see
-[Build from source](#build-from-source)), then run it in the Simulator or sign
-it for your own iPhone or iPad.
+You need an Apple Silicon Mac with Xcode, about 30 GB of free space for the first
+build, your own Perfect Dark ROM, and a way to install your own app: AltStore
+Classic, SideStore, Sideloadly or Xcode.
 
-| Option | Status | What to do |
-|---|---|---|
-| Local Simulator build | **Verified** | Run `scripts/bootstrap-apple.sh`, then install the app on a Simulator. |
-| Your own iPhone/iPad | **Builds and installs; early hardware testing** | Sign it with your own Apple developer team and install it with Xcode tools; see [Build from source](#build-from-source). |
-| PadMint | **Not yet available** | No DarkPad recipe exists yet. |
-| Prebuilt IPA | **Not published** | Build your own. |
-| App Store / TestFlight | **Not planned** | Store distribution needs separate rights and review. |
+**With PadMint (recommended, once DarkPad's first release is published):**
 
-## What DarkPad adds
+1. Once, install the tools PadMint does not fetch itself: `brew install cmake ninja xcodegen`.
+2. Download [PadMint](https://github.com/chrissotraidis/padmint/releases/latest),
+   unzip it and double-click `PadMint.command`. Choose DarkPad and click
+   **Make my copy**. PadMint builds DarkPad from this repository and saves an
+   unsigned IPA in your Downloads folder.
+3. Install that IPA with your sideloading tool, open DarkPad, and choose your ROM.
 
-DarkPad keeps what the rebelancap iOS port already did well. This table shows
-what was inherited and what is new.
+The first build downloads ANGLE's sources and takes a while; later builds reuse
+them. **By hand:** follow [Build from source](#build-from-source).
 
-| Area | Inherited from perfect-dark-ios | Added or changed by DarkPad |
-|---|---|---|
-| Touch controls | Virtual stick, look area, editable layout | GoldenPad's layout: labelled Fire, Aim, Use, Reload, Weapon and Duck buttons around a large Fire button, separate iPhone and iPad defaults, per-button size (55–160%) and opacity (20–100%), and dark idle buttons that light up when pressed |
-| ••• menu | A settings window | The family ••• menu: Display, Controls, Audio, Add-ons, Help & Feedback (Report a Problem, diagnostic log, GitHub link) and a confirmed End Mission or Match |
-| Controllers | SDL game-controller support | GoldenPad's controller layout by default on new installs, also available as a one-tap preset; reconnecting a controller no longer rewrites your bindings |
-| Aiming | Touch and controller look | **Gyro while aiming** (experimental): tilt the device to fine-tune aim while holding Aim |
-| Graphics | Texture packs, Xbox 360 art import, frame rate and resolution options | One **Art profile** switch (Original, Enhanced or Remaster), an in-app texture-pack chooser, and a HUD kept inside the screen's safe area |
-| Game menus | Touch pointer for the original menus | Reliable touch scrolling, dropdown selection and arrow targets |
-| Stability | Watchdog and crash reports | Bounds checks for oversized images, texture upscaling and clipboard text |
-| Building | Needed the author's private sibling projects | One command fetches and builds every pinned dependency from public sources |
-| App icon | Perfect Dark logo | Original DarkPad icon (see [art provenance](docs/ART.md)) |
+Update by installing a new IPA over the old one, signed the same way. Deleting
+the app deletes your saves, settings and imported art.
 
-## Multiplayer
+| Option | Status |
+|---|---|
+| Build on an Apple Silicon Mac by hand | **Works** |
+| Build with PadMint | **Recipe ready**; listed once DarkPad publishes its first release |
+| Windows or Linux | Not yet |
+| Prebuilt IPA, App Store, TestFlight | Not offered |
 
-**The DarkPad app plays on one device.** It has no online play.
+## Status
 
-- **Combat Simulator with bots** works: up to eight simulants, the usual
-  scenarios and saved bot setups. Challenges work too.
-- **Local split-screen** is part of the original engine, and the controller
-  layout covers all four player slots, but play with two or more controllers on
-  one iPhone or iPad has not been tested.
-- **LAN and co-op play** exist only in a separate experimental build called
-  *DarkPad Network Test*. It is not part of the normal app or its build command.
-  It uses a newer Dab's Mod engine and adds a **Direct LAN** page to the main
-  menu:
-  - **Join** a host by typing its IPv4 address and port.
-  - **Host LAN Game** offers **Combat** (scenario, arena, weapons, limits and
-    simulants) or **Co-op** (mission, difficulty, radar and friendly fire).
-  - Both players must run the same DarkPad Network Test build. It uses its own
-    protocol version, so it cannot join ordinary Dab's Mod PC servers.
-  - There is no internet lobby, matchmaking, relay or Counter-Operative mode.
+DarkPad 0.1.0 is a **developer preview**. On the maintainer's iPad Pro (12.9-inch,
+6th generation) with an Xbox Wireless Controller, controller play, the ••• menu,
+audio and frame pacing behave as intended in early hands-on play. Defection,
+Investigation, Challenge 1 and bot matches have been completed and reloaded on
+Simulators. The full campaign, touch-only play on a phone, heat and battery use,
+and multiplayer on two real devices have not been tested yet. See
+[Current limitations](#current-limitations).
 
-  It has only been tested between an iPad Simulator and a Mac on the same
-  machine. Timed bot matches, joining, leaving, host loss and a short match with
-  added delay and 2% packet loss worked. Co-op missions start and can be
-  abandoned without changing either player's save, but no co-op mission has been
-  completed yet, and two physical devices on Wi-Fi have not been tried. See
-  [network integration](docs/network-integration.md) for details.
+## Controls
 
-## Graphics and textures
+### Controller
 
-Open **••• → Settings → Graphics**.
+Xbox, PlayStation and MFi controllers work. New installs use GoldenPad's layout,
+adjusted for Perfect Dark's extra actions:
 
-| Setting | Options | What it does |
-|---|---|---|
-| **Art profile** | Original, Enhanced, Remaster | **Original** is the N64 look. **Enhanced** adds 2× texture filtering and uses an installed HD texture pack if you add one. **Remaster** uses art from your own copy of the Xbox 360 release if you import it |
-| **Frame rate** | 60 Hz (default), or your display's maximum (such as 120 Hz on ProMotion), marked experimental | Some of the game's timing is tied to the frame rate, so parts run fast above 60 Hz |
-| **Resolution** | Native, 75%, 50% | Internal render scale. Lower values trade sharpness for speed. Applies after restarting the app |
-| **Show FPS** | On, Off | Frame-rate counter |
+| Action | Controller |
+|---|---|
+| Move and strafe | Left stick |
+| Turn and look | Right stick |
+| Step and strafe | D-pad |
+| Fire / Aim | RT / LT |
+| Crouch | LB |
+| Next weapon | A, Y, RB |
+| Use (doors, switches) | B, X |
+| Reload | Left-stick click |
+| Secondary function | Right-stick click |
+| Weapon wheel and gadgets | View / Back |
+| Pause | Start |
+| Menu accept / cancel | A / B |
 
-No textures or remastered art are bundled. To use an HD pack, open
-**Files → On My iPhone/iPad → DarkPad → texture-packs**, add the pack folder
-or archive, restart DarkPad, choose **Enhanced**, then pick the pack under
-**Settings → Texture Packs**. The community **PD Forever Plus HD v0.10** pack,
-made for the original N64 models, has been tested this way. Check each pack's
-terms before sharing it.
+While a controller is connected the touch buttons hide (On-Screen Controls: Auto).
+**Settings → Controller → Use GoldenPad Controller Layout…** restores this layout
+and keeps a backup of your previous bindings.
 
-For **Remaster**, put your own Xbox 360 Perfect Dark package in
-**Files → DarkPad → added-content**, or use **Settings → Xbox 360 Art → Add or
-replace the package…**. Without a package, Remaster falls back to N64 art.
-
-### GoldenEye levels (GE Plus)
-
-Dab's Mod can play GoldenEye 007 levels inside the Perfect Dark engine, and
-DarkPad keeps that feature under **Settings → GoldenEye 007 (GE Plus)**. Add your
-own GoldenEye 007 (US) ROM, and optionally the GoldenEye XBLA package for its
-textures and models or the Goldfinger 64 ROM hack. Each one appears as its own
-entry in the Perfect Menu after a restart. This is an inherited, optional feature
-that DarkPad has not tested in depth.
-
-## Supported game
-
-| Game | Revision | Status |
-|---|---|---|
-| **Perfect Dark** | USA Rev 1 (v1.1), 32 MiB, MD5 `e03b088b6ac9e0080440efed07c1e40f` | Supported |
-| Perfect Dark | PAL, Japanese, USA v1.0 | Recognised and refused with an explanation |
-| GoldenEye 007 and Goldfinger 64 | US | Optional extras for GE Plus, not a substitute for Perfect Dark |
-
-The importer accepts `.z64`, `.v64` and `.n64` files and explains why a file was
-refused. Renaming a file cannot change its revision.
-
-## First launch
-
-1. Install and open DarkPad.
-2. Tap **Choose Perfect Dark ROM…** and pick your USA Rev 1 ROM in Files.
-3. DarkPad checks the file, copies it into its private storage and starts the
-   game. Your original file stays where it was.
-
-Saves, settings and imported art live inside the app's container. Deleting the
-app deletes them, so update in place rather than reinstalling.
-
-## Touch controls
+### Touch
 
 | Control | What it does |
 |---|---|
@@ -170,115 +130,121 @@ app deletes them, so update in place rather than reinstalling.
 | **WEAPON** | Next weapon; hold for the weapon wheel |
 | **DUCK** | Cycles standing, crouching and low crouch |
 | **NEXT / ALT** | Next weapon, and the weapon's secondary function |
-| **START** | The game's own pause and inventory menu, below ••• |
-| **BACK** | Leaves the game's own menus; shown on the left only while one is open |
+| **START** | The game's own pause and inventory menu |
+| **BACK** | Leaves the game's own menus; shown only while one is open |
 
-Open **••• → Edit Touch Controls** to rearrange the live overlay. Drag a button
-to move it, or select it to change its size and opacity. **Reset** restores the
-iPhone or iPad defaults, **Cancel** discards changes and **Done** saves them.
-iPhone and iPad layouts are stored separately.
+**••• → Controls → Edit Touch Controls** moves, resizes (55–160%) and fades
+(20–100%) any button over the live game. iPhone and iPad layouts are saved
+separately. Touch Control Settings has look speed, invert look, control style,
+haptics and double-tap to roll.
 
-**Settings → Touch Controls** also has look speed (horizontal and vertical),
-invert look, **Dual analogue** or **N64 (digital)** control style, when to show
-the on-screen buttons (**Auto** hides them while a controller is connected),
-button opacity, haptics, and double-tap the stick to roll.
-
-## Controllers
-
-Xbox, PlayStation and MFi controllers work out of the box. New installs use
-GoldenPad's controller layout, adjusted for Perfect Dark's extra actions:
-
-| Action | Controller |
-|---|---|
-| Fire / Aim | RT / LT |
-| Crouch | LB |
-| Next weapon | A, Y, RB |
-| Use | B, X |
-| Reload | Left-stick click |
-| Secondary function | Right-stick click |
-| Weapon wheel / gadgets | View / Back |
-| Pause | Start |
-| Menu accept / cancel | A / B |
-
-The left stick moves and strafes, the right stick turns and looks, and the D-pad
-steps and strafes. Installs that already had controller bindings keep them. To
-switch to this layout later, open **Settings → Controller → Use GoldenPad
-Controller Layout…**. It saves a backup of your previous bindings and leaves
-D-pad and keyboard bindings alone.
+**Gyro while aiming** (experimental) tilts the view while you hold Aim.
 
 ## The ••• menu
 
-The round ••• button stays in the upper-right corner. Opening it pauses the game
-and releases any held touches; tapping outside it resumes. It follows the same
-layout as SunPad, MeleePad and GalaxyPad:
+The round ••• button in the upper-right corner pauses the game and opens DarkPad's
+menu. It follows the same layout as GoldenPad, SunPad, MeleePad and GalaxyPad.
 
 | Item | What's inside |
 |---|---|
 | **Display** | Art profile, frame rate, render resolution, FPS counter |
-| **Controls** | Edit Touch Controls, on-screen controls (Auto/On/Off), touch settings, GoldenPad controller layout, controller settings, gyro aiming and recenter |
-| **Audio** | Main volume, mute, how DarkPad shares audio with other apps |
-| **Add-ons & Game Data** | Texture packs, Xbox 360 art, GoldenEye 007 (GE Plus) |
-| **All Settings…** | The full Settings page |
+| **Controls** | Edit Touch Controls, on-screen controls, touch settings, GoldenPad controller layout, gyro aiming |
+| **Audio** | Volume, mute, how DarkPad shares audio with other apps |
+| **Optional Add-ons** | HD texture packs, Xbox 360 remaster art, GoldenEye levels. None are included |
+| **All Settings…** | The full settings page |
 | **Help & Feedback** | Report a Problem…, Share Diagnostic Log, Build & Performance, About DarkPad, DarkPad on GitHub |
-| **End Mission or Match…** | Ends the current mission or match after confirmation. Completed progress is kept. Unavailable in menus, cutscenes and training |
+| **End Mission or Match…** | Ends the current mission or match after confirmation; completed progress is kept |
 
-**Report a Problem…** asks what went wrong, writes a diagnostic log you can
-review and share, then offers to open a prefilled GitHub issue. Nothing is
-uploaded automatically. The log contains device, build, settings and DarkPad's
-own runtime records, with private file paths removed. It never includes your
-ROM, saves or imported art.
+**Report a Problem…** asks what went wrong, writes a diagnostic log you can review
+and share, then offers a prefilled GitHub issue. Nothing is uploaded
+automatically, and the log never includes your ROM, saves or imported art.
+**START** stays the game's own pause menu.
 
-**START** is the game's own pause and inventory menu. **BACK** appears on the
-left only inside the game's menus, to leave screens that have no back option of
-their own.
+## What's on the main menu
 
-## Settings reference
+After you choose an agent file, Perfect Dark's **Perfect Menu** appears. Some
+entries are the original game's and some come from Dab's Mod, the engine DarkPad
+is built on.
 
-| Section | Settings |
-|---|---|
-| **Graphics** | Art profile, frame rate, resolution, FPS counter |
-| **Touch Controls** | Look speeds, invert look, control style, on-screen buttons, opacity, haptics, double-tap roll, layout editor |
-| **Controller** | GoldenPad layout preset |
-| **Motion Aiming** | Gyro while aiming (experimental), sensitivity, invert, status, recenter |
-| **Audio** | How DarkPad shares audio with other apps, volume, mute |
-| **Texture Packs** | Choose and reload installed HD packs |
-| **Xbox 360 Art** | Import your Xbox 360 package for the Remaster profile |
-| **GoldenEye 007 (GE Plus)** | GoldenEye 007 ROM, GoldenEye XBLA textures and models, Goldfinger 64 |
-| **Diagnostics** | Build, version, FPS, screenshot, save settings now |
+| Entry | From | What it is |
+|---|---|---|
+| **Carrington Institute** | Original game | The walkable hub: training, firing range, holograph tests and gadget practice |
+| **Solo Missions** | Original game | The campaign. Start here; Defection is the first mission |
+| **Combat Simulator** | Original game | Bot matches (up to eight simulants) and challenges |
+| **Co-Operative / Counter-Operative** | Original game | Split-screen campaign modes for two players on one screen |
+| **Customize Character** | Dab's Mod | Choose the character model used in missions |
+| **Ghost Trials** | Dab's Mod | Race a recorded ghost run of a mission |
+| **Randomizer** | Dab's Mod | A mission reshuffled from its own pieces, or an endless run of rooms across every map |
+| **GE Plus** | Dab's Mod | GoldenEye 007 levels in the Perfect Dark engine; needs your own GoldenEye ROM |
+
+The game's **Options → Extended Options** page holds Dab's Mod and PC-port
+settings such as field of view, crosshair and gameplay tweaks. DarkPad manages
+frame rate, resolution and controls itself, so change those in the ••• menu.
+
+## Graphics and add-ons
+
+| Setting (••• → Display) | Options | Notes |
+|---|---|---|
+| **Art Profile** | Original, Enhanced, Remaster | Original is the N64 look. Enhanced adds 2× texture filtering plus an HD pack if you install one. Remaster uses your own Xbox 360 art |
+| **Frame Rate** | 60 Hz (default), up to your display's maximum | Above 60 Hz is experimental: parts of the engine's timing are tied to frames and run fast |
+| **Render Resolution** | Native, 75%, 50% | Lower trades sharpness for speed; applies on next launch |
+| **Show FPS Counter** | On, Off | |
+
+Every add-on is optional, none is included, and each needs files you supply:
+
+- **HD texture packs.** Put a pack folder or archive in
+  **Files → On My iPhone/iPad → DarkPad → texture-packs**, restart, choose
+  **Enhanced**, then pick the pack under **Optional Add-ons → HD Texture Packs**.
+  The community **PD Forever Plus HD v0.10** pack has been tested. Check each
+  pack's terms before sharing it.
+- **Xbox 360 remaster art.** Add your own copy of the 2010 Xbox 360 release to
+  **Files → DarkPad → added-content**, then choose **Remaster**. Without it,
+  Remaster falls back to N64 art. Not yet tested with a real package.
+- **GoldenEye levels (GE Plus).** Add your own GoldenEye 007 (US) ROM, and
+  optionally the GoldenEye XBLA package or the Goldfinger 64 hack. They appear as
+  **GE Plus** on the main menu after a restart. Inherited from Dab's Mod and not
+  tested in depth.
+
+## Multiplayer
+
+DarkPad plays on one device. **Combat Simulator** bot matches and challenges
+work, and the original split-screen modes are present but untested with several
+controllers on one iPad.
+
+LAN and online play exist only in a separate experimental build, *DarkPad
+Network Test*, built from a newer Dab's Mod engine. It adds a **Direct LAN** page
+for joining by IP address and hosting Combat or Co-op games. It has been tested
+only between an iPad Simulator and a Mac, has no internet lobby, and is not part
+of the normal app. See [network integration](docs/network-integration.md).
+
+## Supported game
+
+| Game | Revision | Status |
+|---|---|---|
+| **Perfect Dark** | USA Rev 1 (v1.1), 32 MiB, MD5 `e03b088b6ac9e0080440efed07c1e40f` | Supported |
+| Perfect Dark | PAL, Japanese, USA v1.0 | Recognized and refused with an explanation |
+| GoldenEye 007, Goldfinger 64 | US | Optional extras for GE Plus only |
+
+The importer accepts `.z64`, `.v64` and `.n64` and copies the ROM into
+DarkPad's private storage; your original file is not changed.
 
 ## Build from source
 
-You need an Apple Silicon Mac with Xcode and its command-line tools, Python 3,
-and [Homebrew](https://brew.sh) packages for CMake, Ninja and XcodeGen:
+You need an Apple Silicon Mac with Xcode, Python 3.9 or newer, and Homebrew:
 
 ```sh
 brew install cmake ninja xcodegen
 git clone https://github.com/chrissotraidis/darkpad.git
 cd darkpad
-scripts/bootstrap-apple.sh
+scripts/build-personal-ipa.sh ~/Downloads/DarkPad.ipa
 ```
 
-This fetches the pinned engine, SDL2, curl and ANGLE, applies DarkPad's patches,
-and builds the Simulator app, the unsigned device app and a native Mac reference.
-The first ANGLE download and build is large: allow tens of GiB of disk space and
-a long first build. Everything is cached in the ignored `vendor/`, `work/` and
-`build/` folders, so later builds are much faster.
+This fetches the pinned engine, SDL2, curl and ANGLE, applies DarkPad's patches
+and builds an unsigned Release IPA for iPhone and iPad. It is the same command
+PadMint runs. The first run downloads ANGLE's sources (over 10 GB); everything is
+cached under the ignored `vendor/`, `work/` and `build/` folders.
 
-Install and run the Simulator build:
-
-```sh
-xcrun simctl boot "iPad Air 11-inch (M4)"
-open -a Simulator
-xcrun simctl install booted build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app
-xcrun simctl launch booted com.chrissotraidis.darkpad
-```
-
-Boot only one Simulator at a time. On first launch, drag your ROM onto the
-Simulator window so it lands in Files, then pick it in the app.
-
-To install on your own iPhone or iPad, connect and trust it, then sign with your
-own team and a bundle identifier you own. `PD_PUBLIC=1` leaves out the
-developer test server:
+To sign and install directly with your own Apple developer team instead:
 
 ```sh
 PD_PUBLIC=1 scripts/gen-app-project.sh
@@ -291,135 +257,113 @@ xcrun devicectl device install app --device YOUR_DEVICE_ID \
 ```
 
 <details>
-<summary><strong>Developer tools: ROM validation, Mac reference and packaging</strong></summary>
+<summary><strong>Developer builds: Simulator, Mac reference and validation</strong></summary>
 
-Validate a ROM and stage it for the Mac reference build. The original is never
-modified; a byte-swapped copy is normalised into the new file:
+`scripts/bootstrap-apple.sh` builds the Simulator app, an unsigned device app and a
+native Mac reference. Install the Simulator build with:
 
 ```sh
-scripts/validate-rom.py '/path/to/your/Perfect Dark.z64' \
-  --stage work/gamedata/pd.ntsc-final.z64
+xcrun simctl install booted build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app
+xcrun simctl launch booted com.chrissotraidis.darkpad
+```
+
+Development builds include a test console on TCP 8775, reachable only from the
+same machine; `PD_PUBLIC=1` builds leave it out. Validate a ROM and run the Mac
+reference with:
+
+```sh
+scripts/validate-rom.py '/path/to/your/Perfect Dark.z64' --stage work/gamedata/pd.ntsc-final.z64
 scripts/run-oracle.sh -- --skip-intro
 ```
 
-A native Mac window for side-by-side testing:
-
-```sh
-scripts/package-macos-reference.sh
-mkdir -p work/saves/mac-reference
-open -a "$PWD/build/mac-reference/Perfect Dark Reference.app" --args \
-  --basedir "$PWD/work/gamedata" --savedir "$PWD/work/saves/mac-reference" \
-  --skip-intro
-```
-
-The Mac reference is ad-hoc signed, has no ROM importer and can write F12
-screenshots into its own bundle, so keep it private.
-
-Package a finished Simulator build with its license notices and checksums:
-
-```sh
-python3 scripts/package-simulator-app.py \
-  build/dd-iphonesimulator/Build/Products/Debug-iphonesimulator/perfectdark.app \
-  build/deliverables/darkpad-simulator
-```
-
-Source revisions are recorded in `UPSTREAM_PIN`, `dependencies/pins.env` and
-[PROGRESS.md](PROGRESS.md).
+Source revisions are pinned in `UPSTREAM_PIN` and `dependencies/pins.env`; the
+detailed engineering log is [PROGRESS.md](PROGRESS.md).
 
 </details>
 
 ## If it does not work
 
 - **The ROM is refused.** The message names the revision or byte order it found.
-  Only USA Rev 1 (v1.1) is supported. If Files cannot read a file from a cloud
-  provider, copy it to **On My iPhone/iPad** first.
-- **Controls stopped responding after closing Settings.** Wait a moment; input
-  resumes once the window has finished closing.
+  Only USA Rev 1 (v1.1) is supported. Copy cloud files to **On My iPhone/iPad** first.
 - **The on-screen buttons disappeared.** A connected controller hides them in
-  **Auto** mode. Set **Settings → Touch Controls → On-screen controls** to **On**.
-- **The art did not change.** Resolution changes and newly added texture-pack
-  archives apply after restarting DarkPad.
+  Auto mode. Set **••• → Controls → On-Screen Controls** to **On**.
+- **The game seems fast.** Set **••• → Display → Frame Rate** to 60 Hz.
+- **Art did not change.** Resolution and newly added texture-pack archives apply
+  after restarting DarkPad.
 
-When filing a [GitHub issue](https://github.com/chrissotraidis/darkpad/issues),
-or use **••• → Help & Feedback → Report a Problem…**, include your device and OS
-version, the build number from **••• → Help & Feedback → About DarkPad**, the exact
-step that failed and any on-screen message. Never attach or link the
-ROM, extracted art, saves or signing files.
+Report anything else with **••• → Help & Feedback → Report a Problem…**, or open a
+[GitHub issue](https://github.com/chrissotraidis/darkpad/issues) with your device,
+OS version, DarkPad build (from **About DarkPad**) and the steps that led to it.
+Never attach ROMs, extracted art, saves or signing files.
 
 ## Current limitations
 
-- Most testing has used iPhone and iPad Simulators. DarkPad has launched on a
-  physical iPad Pro at 120 Hz, but touch feel, controllers, frame rate in
-  missions, heat and battery use on real devices are still being tested.
-- Defection, Investigation, Challenge 1 and bot matches have been completed and
-  reloaded. The rest of the campaign has not been played through.
-- Gyro aiming is experimental and not yet calibrated on hardware.
-- Remaster art and GE Plus have not been tested with real packages.
-- Multiplayer limits are listed under [Multiplayer](#multiplayer).
+- Physical testing so far is one iPad Pro with an Xbox controller. iPhone touch
+  play, heat and battery use are not measured.
+- Only the first missions, Challenge 1 and bot matches have been played through.
+- Above 60 Hz, parts of the engine's game logic run fast.
+- Gyro aiming is experimental and uncalibrated on hardware.
+- Xbox 360 remaster art and GE Plus have not been tested with real files.
+- LAN and online play exist only in the separate experimental build.
 
-## Frequently asked questions
-
-<details>
-<summary><strong>Does this repository contain Perfect Dark?</strong></summary>
-
-No. It contains the Apple shell, build scripts, engine patches and
-documentation. You supply your own legally obtained ROM.
-</details>
+## FAQ
 
 <details>
 <summary><strong>Is DarkPad an emulator?</strong></summary>
 
-No. It compiles the decompiled game into a native ARM64 app. ANGLE translates its
-OpenGL ES rendering to Metal.
+No. Perfect Dark's decompiled source is compiled into a native ARM64 iPhone and
+iPad app. ANGLE translates its OpenGL ES rendering to Metal.
+</details>
+
+<details>
+<summary><strong>Does this repository contain Perfect Dark?</strong></summary>
+
+No. It contains the Apple shell, engine patches, build scripts and documentation.
+You supply your own legally obtained ROM.
 </details>
 
 <details>
 <summary><strong>Where is the IPA?</strong></summary>
 
-None is published. Build your own with the steps in
-[Build from source](#build-from-source).
+None is published, because the app contains code compiled from the game. Build
+your own with PadMint or the command in [Build from source](#build-from-source).
 </details>
 
 <details>
 <summary><strong>Can I play online?</strong></summary>
 
-Not in the DarkPad app. A separate experimental LAN build exists for testing;
-see [Multiplayer](#multiplayer).
+Not in DarkPad yet. A separate experimental LAN build exists for testing; see
+[Multiplayer](#multiplayer).
 </details>
 
 <details>
-<summary><strong>Do the HD options make the game run faster?</strong></summary>
+<summary><strong>Why 60 Hz by default on a ProMotion display?</strong></summary>
 
-No. Art profiles change how textures look. A lower **Resolution** can make it run
-faster, while HD packs and higher frame rates use more memory and power.
+The engine's uncapped mode still runs some game logic once per frame, so parts
+of the game run fast at 120 Hz. 60 Hz is the speed the game was designed for.
 </details>
 
 ## Project map
 
 | Path | Purpose |
 |---|---|
-| [`app/ios/`](app/ios/) | Native shell: touch overlay, controller, gyro, settings, onboarding, audio |
+| [`app/ios/`](app/ios/) | Native shell: touch overlay, controller, ••• menu, settings, onboarding, audio |
 | [`overlay/patches/`](overlay/patches/) | Ordered engine patches applied to the pinned upstream at build time |
-| [`overlay/network-candidate/`](overlay/network-candidate/) | Experimental LAN and co-op patches for the newer engine; unused by the normal build |
-| [`scripts/`](scripts/) | Bootstrap, dependency, build, validation and packaging scripts |
+| [`overlay/network-candidate/`](overlay/network-candidate/) | Experimental LAN and co-op patches for the newer engine |
+| [`scripts/`](scripts/) | Bootstrap, build, packaging and validation scripts |
+| [`padmint.json`](padmint.json) | PadMint build recipe |
 | [`tests/`](tests/) | Focused tests for input, networking, textures and save isolation |
-| [PROGRESS.md](PROGRESS.md) | Detailed build and test log |
 | [docs/acceptance.md](docs/acceptance.md) | What has been verified and what remains |
 | [docs/goldenpad-reference.md](docs/goldenpad-reference.md) | How GoldenPad's controls and menu were adapted |
-| [docs/network-integration.md](docs/network-integration.md) | The LAN and co-op experiment |
 | [docs/ART.md](docs/ART.md) | App icon provenance |
-| [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) | How to contribute and report vulnerabilities |
-| [docs/goal.md](docs/goal.md), [docs/prd.md](docs/prd.md) | Project goals and requirements |
+| [PROGRESS.md](PROGRESS.md) | Detailed engineering log |
 
 ## Community and support
 
 [Join the Discord](https://discord.gg/xwHfUD2bxW) for help and news. It is one
-community for DarkPad and its sibling projects, such as GoldenPad, KartPad and
-BlueWake.
-
-Found a bug? [Open an issue](https://github.com/chrissotraidis/darkpad/issues)
-with your device, its OS version, and the steps that led to it. Read [Contributing](CONTRIBUTING.md) before proposing a change and
-[Security](SECURITY.md) before reporting a vulnerability.
+community for DarkPad and its sibling projects, such as GoldenPad, KartPad,
+MeleePad and BlueWake. Read [Contributing](CONTRIBUTING.md) before proposing a
+change and [Security](SECURITY.md) before reporting a vulnerability.
 
 ## Legal and acknowledgements
 
@@ -431,5 +375,5 @@ DarkPad builds on the [Perfect Dark decompilation](https://github.com/n64decomp/
 the [Perfect Dark PC port](https://github.com/perfect-dark-pc-port/perfect_dark),
 [Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod),
 rebelancap's [perfect-dark-ios](https://github.com/rebelancap/perfect-dark-ios),
-SDL2, curl and ANGLE. The Apple shell is MIT-licensed, and each upstream component
+SDL2, curl and ANGLE. The Apple shell is MIT-licensed; each upstream component
 keeps its own license. Full notices are in [LICENSE](LICENSE).
