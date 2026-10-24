@@ -325,7 +325,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	self.view.backgroundColor = [UIColor colorWithRed:0.04 green:0.04 blue:0.06 alpha:1.0];
 
 	UILabel *title = [UILabel new];
-	title.text = @"Perfect Dark";
+	title.text = @"DarkPad";
 	title.font = [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
 	title.textColor = UIColor.whiteColor;
 
@@ -351,7 +351,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	help.numberOfLines = 0;
 	help.font = [UIFont systemFontOfSize:14];
 	help.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
-	help.text = @"You can also add the ROM through Files → On My iPhone → Perfect Dark. "
+	help.text = @"You can also add the ROM through Files → On My iPhone/iPad → DarkPad. "
 	             "Return here to continue. Optional artwork can be added later in Settings.";
 
 	UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:

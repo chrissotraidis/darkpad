@@ -117,14 +117,14 @@ Open **••• → Settings → Graphics**.
 | **Show FPS** | On, Off | Frame-rate counter |
 
 No textures or remastered art are bundled. To use an HD pack, open
-**Files → On My iPhone/iPad → Perfect Dark → texture-packs**, add the pack folder
+**Files → On My iPhone/iPad → DarkPad → texture-packs**, add the pack folder
 or archive, restart DarkPad, choose **Enhanced**, then pick the pack under
 **Settings → Texture Packs**. The community **PD Forever Plus HD v0.10** pack,
 made for the original N64 models, has been tested this way. Check each pack's
 terms before sharing it.
 
 For **Remaster**, put your own Xbox 360 Perfect Dark package in
-**Files → Perfect Dark → added-content**, or use **Settings → Xbox 360 Art → Add or
+**Files → DarkPad → added-content**, or use **Settings → Xbox 360 Art → Add or
 replace the package…**. Without a package, Remaster falls back to N64 art.
 
 ### GoldenEye levels (GE Plus)
@@ -274,6 +274,16 @@ xcrun simctl launch booted com.rebelancap.perfectdark
 
 Boot only one Simulator at a time. On first launch, drag your ROM onto the
 Simulator window so it lands in Files, then pick it in the app.
+
+To install on your own iPhone or iPad, connect and trust it, then sign with your
+own team and a bundle identifier you own. \`PD_PUBLIC=1\` leaves out the
+developer test server:
+
+```sh
+PD_PUBLIC=1 scripts/gen-app-project.sh
+xcodebuild -project app/perfectdark.xcodeproj -scheme perfectdark   -configuration Release -sdk iphoneos -derivedDataPath build/dd-device-signed   DEVELOPMENT_TEAM=YOURTEAMID PRODUCT_BUNDLE_IDENTIFIER=com.yourname.darkpad   CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates build
+xcrun devicectl device install app --device YOUR_DEVICE_ID   build/dd-device-signed/Build/Products/Release-iphoneos/perfectdark.app
+```
 
 <details>
 <summary><strong>Developer tools: ROM validation, Mac reference and packaging</strong></summary>

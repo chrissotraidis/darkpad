@@ -156,7 +156,7 @@ static NSString *sUnpackNote;            // the last thing the engine's importer
 		return @"Optional: the Xbox 360 (XBLA) release. Put Perfect Dark.rar, a .7z, the bare "
 		        "Xbox 360 package, or a folder holding one, into the added-content folder (the one "
 		        "folder for every optional extra) here:\n"
-		        "    Files → On My iPhone → Perfect Dark → added-content\n"
+		        "    Files → On My iPhone/iPad → DarkPad → added-content\n"
 		        "Then the game draws 4J's high-resolution textures, meshes, rooms, font and "
 		        "explosions in place of the N64 art.";
 	}

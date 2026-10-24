@@ -1207,3 +1207,10 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - App icon replaced with original DarkPad art (docs/ART.md); scripts/gen-icons.py now reads app/ios/icon/darkpad-icon-{source,mark}.png. The trademarked perfect-dark.ico was removed.
 - README rewritten in Goldenpad's public structure: inherited vs added features, multiplayer scope, graphics/texture options, controls, menu, settings reference, build, troubleshooting, limitations. No prebuilt IPA will be published.
 - Runtime: ROM (MD5 e03b088b…) copied into the Simulator app's Documents; app launched at 60 fps, intro played, Start reached the Perfect Dark file screen. Device Hub (Xcode 27's Simulator UI) accessibility timed out, so the ••• popover itself was not clicked this session. No physical-device tests.
+
+## Home-screen name and first physical iPad install (24 October)
+
+- App display/bundle name is now DarkPad (Info.plist and visionOS plist); the Documents folder therefore appears in Files as DarkPad, and in-app help, Bluetooth prompts and the README point there. Game-name references and the texture-pack marker string are unchanged.
+- Signed Release build with PD_PUBLIC=1 (console bridge compiled out), team VKDH2T9UTF, bundle ID com.chrissotraidis.darkpad passed at build time (the repo default com.rebelancap.perfectdark stays for Simulator builds). Log work/device-signed-build.log. codesign verify and iphoneos platform check pass; no ROM in the bundle.
+- Installed on Chris' iPad Pro 12.9-inch (6th gen), iPadOS 27.0.1, which had no previous DarkPad/Perfect Dark install. Copied the user's ROM to the app's Documents as pd.ntsc-final.z64; read-back MD5 e03b088b6ac9e0080440efed07c1e40f.
+- Launched via devicectl: process alive after 15 s; heartbeat frames=2268, pacing 119.9 Hz, overlay visible, thermal 0, footprint 260.8 MB. pd.ini holds the Goldenpad controller default. No hands-on menu/controls/gameplay acceptance yet; that is the user's test.

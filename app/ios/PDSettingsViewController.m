@@ -674,7 +674,7 @@ static CFTimeInterval sPresentStarted;
 			if (!weakSelf.view.window) return;
 			UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"Choose Texture Pack"
 				message:names.count ? @"Choose the artwork used by the Enhanced profile."
-					: @"Add a pack folder or archive in Files → Perfect Dark → texture-packs. Restart the app to prepare new archives."
+					: @"Add a pack folder or archive in Files → DarkPad → texture-packs. Restart the app to prepare new archives."
 				preferredStyle:UIAlertControllerStyleAlert];
 			for (NSString *name in names) {
 				[picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -1428,7 +1428,7 @@ static CFTimeInterval sPresentStarted;
 		        "Changes here take effect the next time you open the app.";
 	}
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Texture Packs"]) {
-		return @"In Files, open On My iPhone/iPad → Perfect Dark → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
+		return @"In Files, open On My iPhone/iPad → DarkPad → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
 	}
 	return nil;
 }
