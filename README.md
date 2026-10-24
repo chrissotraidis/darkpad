@@ -276,7 +276,7 @@ Boot only one Simulator at a time. On first launch, drag your ROM onto the
 Simulator window so it lands in Files, then pick it in the app.
 
 To install on your own iPhone or iPad, connect and trust it, then sign with your
-own team and a bundle identifier you own. \`PD_PUBLIC=1\` leaves out the
+own team and a bundle identifier you own. `PD_PUBLIC=1` leaves out the
 developer test server:
 
 ```sh
