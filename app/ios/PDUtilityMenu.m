@@ -378,7 +378,8 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	const NSInteger high = PDPanelHighHz();
 	if (high > 60 && !PDDefBool(PDDefHide60On120)) {
 		[display addObject:pdChoices(@"Frame Rate", @"gauge.with.dots.needle.67percent", PDDefRefreshHz,
-			@[ @"60 Hz", [NSString stringWithFormat:@"%ld Hz", (long)high] ], @[ @60, @(high) ], @[])];
+			@[ @"60 Hz", [NSString stringWithFormat:@"%ld Hz", (long)high] ], @[ @60, @(high) ],
+			@[ @"Recommended", @"Experimental: some game timing runs fast" ])];
 	}
 #if !TARGET_OS_VISION
 	[display addObject:pdChoices(@"Render Resolution", @"square.resize", PDDefRenderScalePct,

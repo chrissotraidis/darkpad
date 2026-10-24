@@ -11,11 +11,9 @@
 //      normally and are never replaced; the native settings action applies the
 //      same layout on request, preserving keyboard/D-pad binds and backing up
 //      the prior state. Connecting a controller never reapplies it over edits.
-//   2. **Look.** PD's right stick is NOT a look axis (docs/frame-map.md): it
-//      goes into the N64 pad struct for the game's control styles. Twin-stick
-//      look on a modern pad therefore has to come from the same degrees seam
-//      the touch layer uses, dt-normalised so the feel does not change with the
-//      frame rate, anchored at 120 Hz.
+//   2. **Look is the engine's.** With Input.PlayerN.SwapSticks=1 (upstream's
+//      default) the right stick is the N64 stick, which CONTROLMODE_PC uses to
+//      turn and pitch; the left stick is movement. The shell adds no pad look.
 //   3. **Hide gameplay touch controls in Auto while a pad is connected.**
 //      Menu navigation and the layout editor remain touchable.
 //   4. Optional double-flick roll, using the touch layer's existing gesture
@@ -36,12 +34,6 @@ extern int inputGetKeyByName(const char *name);
 extern int inputGetContKeyByName(const char *name);
 extern const char *inputGetContKeyName(unsigned ck);
 
-// Radial deadzone, the family constant.
-static const float kPadDeadzone = 0.15f;
-// The look integration is anchored here: a 120 Hz frame moves the view by
-// exactly (speed / 120) degrees, and any other frame rate is scaled to match.
-static const double kLookAnchorHz = 120.0;
-
 // --- the double-flick roll (D-037) ------------------------------------------
 // A flick is the stick going out past kFlickOut and coming back inside
 // kFlickBack; two of them to the SAME side inside kFlickWindow are a roll. The
@@ -57,7 +49,6 @@ static const NSTimeInterval kFlickWindow = 0.30;
 static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDecided";
 
 @implementation PDController {
-	NSTimeInterval _lastLook;
 	// A new install: apply the Goldenpad layout on the first engine frame.
 	BOOL _applyDefaultLayout;
 	// The double-flick state machine. _flickOut is the side of the excursion in
@@ -226,20 +217,6 @@ static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDeci
 	}
 }
 
-/** Radial deadzone, then the remaining range rescaled so it still reaches 1. */
-static void pdRadialDeadzone(float *x, float *y)
-{
-	float mag = sqrtf(*x * *x + *y * *y);
-	if (mag <= kPadDeadzone) {
-		*x = 0.f;
-		*y = 0.f;
-		return;
-	}
-	float scaled = MIN(1.f, (mag - kPadDeadzone) / (1.f - kPadDeadzone));
-	*x = *x / mag * scaled;
-	*y = *y / mag * scaled;
-}
-
 - (void)tick
 {
 	if (_applyDefaultLayout) {
@@ -248,46 +225,16 @@ static void pdRadialDeadzone(float *x, float *y)
 		[NSUserDefaults.standardUserDefaults setBool:YES forKey:kDefaultLayoutDecided];
 		NSLog(@"perfectdark: [pad] new install, default controller layout: %@", result);
 	}
-	GCController *pad = GCController.controllers.firstObject;
-	if (!pad.extendedGamepad) {
-		_lastLook = 0;
-		return;
-	}
+	// Look belongs to the engine. Input.PlayerN.SwapSticks (default 1) sends
+	// the physical right stick to the N64 stick, which CONTROLMODE_PC turns
+	// and pitches with, and the left stick to movement. A second shell look
+	// on the right stick doubled the pitch and turned the opposite way.
+	GCExtendedGamepad *gp = GCController.controllers.firstObject.extendedGamepad;
 
-	GCExtendedGamepad *gp = pad.extendedGamepad;
-
-	// The left stick is PD's look axis under CONTROLMODE_PC, and a double flick
-	// of it either way is the combat roll (D-037).
-	if (NSDate.timeIntervalSinceReferenceDate >= _injectUntil) {
+	// A double flick of the left stick either way is the combat roll (D-037).
+	if (gp && NSDate.timeIntervalSinceReferenceDate >= _injectUntil) {
 		[self noteLeftStickX:gp.leftThumbstick.xAxis.value];
 	}
-
-	float rx = gp.rightThumbstick.xAxis.value;
-	float ry = gp.rightThumbstick.yAxis.value;
-	pdRadialDeadzone(&rx, &ry);
-	if (rx == 0.f && ry == 0.f) {
-		_lastLook = NSDate.timeIntervalSinceReferenceDate;
-		return;
-	}
-
-	NSTimeInterval now = NSDate.timeIntervalSinceReferenceDate;
-	double dt = (_lastLook > 0) ? (now - _lastLook) : (1.0 / kLookAnchorHz);
-	_lastLook = now;
-	// A hitch must not throw the view across the room.
-	dt = MIN(MAX(dt, 1.0 / 240.0), 1.0 / 15.0);
-
-	double speed = PDDefFloat(PDDefPadLookSpeed);   // degrees per second at full stick
-	if (speed <= 0) {
-		speed = 180.0;
-	}
-	double invert = PDDefBool(PDDefInvertY) ? -1.0 : 1.0;
-
-	// Square response on the stick: precision near centre, full speed at the
-	// edge, which is what every console shooter of this shape does.
-	double fx = rx * fabs(rx);
-	double fy = ry * fabs(ry);
-
-	inputIosLookAddDegrees((float)(fx * speed * dt), (float)(-fy * speed * dt * invert));
 }
 
 /**

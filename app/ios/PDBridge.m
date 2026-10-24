@@ -882,6 +882,43 @@ static NSString *pdErr(NSString *fmt, ...)
 	}
 	// --- end round Q ----------------------------------------------------------
 
+	// `stick <left|right> X Y` (-1..1) and `stick off`: a held physical stick,
+	// delivered where SDL delivers one. inputReadController() maps the physical
+	// sticks through Input.PlayerN.SwapSticks into the N64 stick (axisMap[0]) and
+	// rstick (axisMap[1]); this writes the same two fields through the shell's
+	// merge seam, honouring the same swap.
+	if ([cmd isEqualToString:@"stick"]) {
+		NSString *which = argv.count > 1 ? argv[1].lowercaseString : @"";
+		BOOL off = [which isEqualToString:@"off"];
+		if (!off && (argv.count < 4 || !([which isEqualToString:@"left"] || [which isEqualToString:@"right"]))) {
+			return pdErr(@"usage: stick <left|right> <x -1..1> <y -1..1> | stick off");
+		}
+		float x = off ? 0.f : MAX(-1.f, MIN(1.f, argv[2].floatValue));
+		float y = off ? 0.f : MAX(-1.f, MIN(1.f, argv[3].floatValue));
+		BOOL right = [which isEqualToString:@"right"];
+		__block int swapped = 0;
+		if (![shell enqueueAndWait:^{
+				swapped = inputControllerGetSticksSwapped(0);
+				int nx = (int)lroundf(x * 127.f), ny = (int)lroundf(y * 127.f);
+				if (off) {
+					inputIosPadSet(inputIosPadGetButtons(), 0, 0);
+					inputIosPadSetRStick(0, 0);
+					return;
+				}
+				// Physical left is the N64 stick unless swapped; right is the other.
+				BOOL toStick = right ? swapped : !swapped;
+				if (toStick) {
+					inputIosPadSet(inputIosPadGetButtons(), nx, ny);
+				} else {
+					inputIosPadSetRStick(nx, ny);
+				}
+			} timeout:kEngineTimeout]) {
+			return pdErr(@"engine did not reach a frame boundary");
+		}
+		return off ? @"stick off" : [NSString stringWithFormat:@"stick %@ %.2f %.2f -> engine %@ (SwapSticks=%d)%@",
+			which, x, y, (right ? swapped : !swapped) ? @"stick" : @"rstick", swapped, @""];
+	}
+
 	if ([cmd isEqualToString:@"pad"]) {
 		if (argv.count < 3) {
 			return pdErr(@"usage: pad <a|b|z|start|l|r|cu|cd|cl|cr|x|y|roll|crouch> <down|up>"

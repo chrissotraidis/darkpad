@@ -112,7 +112,7 @@ Open **••• → Settings → Graphics**.
 | Setting | Options | What it does |
 |---|---|---|
 | **Art profile** | Original, Enhanced, Remaster | **Original** is the N64 look. **Enhanced** adds 2× texture filtering and uses an installed HD texture pack if you add one. **Remaster** uses art from your own copy of the Xbox 360 release if you import it |
-| **Frame rate** | 60 Hz, or your display's maximum (such as 120 Hz on ProMotion) | Rendering rate |
+| **Frame rate** | 60 Hz (default), or your display's maximum (such as 120 Hz on ProMotion), marked experimental | Some of the game's timing is tied to the frame rate, so parts run fast above 60 Hz |
 | **Resolution** | Native, 75%, 50% | Internal render scale. Lower values trade sharpness for speed. Applies after restarting the app |
 | **Show FPS** | On, Off | Frame-rate counter |
 
@@ -200,10 +200,11 @@ GoldenPad's controller layout, adjusted for Perfect Dark's extra actions:
 | Pause | Start |
 | Menu accept / cancel | A / B |
 
-Installs that already had controller bindings keep them. To switch to this layout
-later, open **Settings → Controller → Use GoldenPad Controller Layout…**. It saves
-a backup of your previous bindings and leaves D-pad and keyboard bindings alone.
-**Gamepad look speed** adjusts right-stick turning.
+The left stick moves and strafes, the right stick turns and looks, and the D-pad
+steps and strafes. Installs that already had controller bindings keep them. To
+switch to this layout later, open **Settings → Controller → Use GoldenPad
+Controller Layout…**. It saves a backup of your previous bindings and leaves
+D-pad and keyboard bindings alone.
 
 ## The ••• menu
 
@@ -237,7 +238,7 @@ their own.
 |---|---|
 | **Graphics** | Art profile, frame rate, resolution, FPS counter |
 | **Touch Controls** | Look speeds, invert look, control style, on-screen buttons, opacity, haptics, double-tap roll, layout editor |
-| **Controller** | Gamepad look speed, GoldenPad layout preset |
+| **Controller** | GoldenPad layout preset |
 | **Motion Aiming** | Gyro while aiming (experimental), sensitivity, invert, status, recenter |
 | **Audio** | How DarkPad shares audio with other apps, volume, mute |
 | **Texture Packs** | Choose and reload installed HD packs |

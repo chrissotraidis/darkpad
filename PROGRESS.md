@@ -1230,3 +1230,12 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - LICENSE adds "Copyright (c) 2026 Chris Sotraidis" beside rebelancap's line.
 - Removed docs/upstream/screenshots/vision-pro-airbase-xbla.jpg from the tree; it remains in history from 3eab186.
 - Simulator Debug build installed fresh under the new ID on iPad Air 11-inch (M4); ROM copied (MD5 e03b088b…); bridge reports version=0.1.0, engine=running. The old com.rebelancap.perfectdark Simulator install and its test data are left in place.
+
+## Controller look and 120 Hz speed fix (24 October)
+
+User report from the physical iPad Pro: both sticks seemed to look, controls felt finicky, and the game seemed sped up.
+
+- Added overlay 0071 (playerIosGetView: vv_theta/vv_verta) and bridge `player_view` plus `stick <left|right> X Y | stick off`, which writes the engine's stick fields through the shell merge seam honouring Input.PlayerN.SwapSticks. 58/58 patches apply.
+- Measured in the Carrington Institute (Simulator, iPad pd.ini settings, SwapSticks=1): the engine already maps the physical right stick to the N64 stick (CONTROLMODE_PC turn/pitch) and the left to movement. PDController additionally fed right-stick look degrees, which turned the OPPOSITE way at 180°/s: a full right push net-drifted ~35°/s, and pitch was compounded. Removed the shell's pad look and the Gamepad look speed setting. After: right stick +x turns right ~215°/s and returns exactly; pitch symmetric; left stick and D-pad (C-buttons) move/strafe only; no view change from either.
+- Speed: frame rate defaulted to the panel maximum (120 Hz on the iPad Pro) with Game.TickRateDivisor forced to 0; dabs-mod HANDOFF-f3 documents uncapped mode's "stock frame-rate dependence" (per-tick logic runs per frame). Default is now 60 Hz; 120 Hz is labelled experimental in Settings and the ••• menu. Game clock itself is real-time (osGetTime from microseconds); 60 Hz walk speed ~376 units/s both directions. 120 Hz behaviour was not reproducible on the 60 Hz Simulator.
+- Signed PD_PUBLIC Release 0.1.0 installed on the iPad Pro over the previous build; eeprom.bin, pd.ini, ROM preserved; no stored refresh preference, so it now boots at 60 Hz. Physical controller feel still needs the user's test.

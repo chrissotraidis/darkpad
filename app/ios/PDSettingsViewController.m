@@ -116,7 +116,7 @@ static PDRow *pdPercentSliderRow(NSString *title, NSString *key)
 static PDRow *pdFrameRateRow(void)
 {
 	const NSInteger high = PDPanelHighHz();
-	NSString *highLabel = [NSString stringWithFormat:@"%ld Hz", (long)high];
+	NSString *highLabel = [NSString stringWithFormat:@"%ld Hz (experimental)", (long)high];
 	if (high <= 60) {
 		return pdSegRow(@"Frame rate", PDDefRefreshHz, @[ @"60 Hz" ], @[ @60 ]);
 	}
@@ -1011,7 +1011,6 @@ static CFTimeInterval sPresentStarted;
 			}),
 		],
 		@[
-			pdSliderRow(@"Gamepad look speed", PDDefPadLookSpeed, 60.0f, 540.0f),
 			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
 				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
 					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
@@ -1404,7 +1403,7 @@ static CFTimeInterval sPresentStarted;
         return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides gameplay controls when a controller connects, while keeping menus touchable. In game menus, tap to select and drag to scroll.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Controller"]) {
-        return @"The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
+        return @"Left stick moves and strafes; right stick turns and looks; the D-pad steps and strafes. The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Graphics"]) {
         return @"Original uses N64 art. Enhanced enables texture filtering and installed texture packs. Remaster uses your imported Xbox 360 assets, with N64 art as the fallback. Resolution changes apply after restarting the app.";

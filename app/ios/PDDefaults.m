@@ -23,7 +23,6 @@ NSString *const PDDefGraphicsProfile = @"pd.graphics.profile";
 NSString *const PDDefLookDegPerPoint  = @"pd.look.degPerPoint";
 NSString *const PDDefLookDegPerPointY = @"pd.look.degPerPointY";
 NSString *const PDDefInvertY          = @"pd.look.invertY";
-NSString *const PDDefPadLookSpeed     = @"pd.pad.lookDegPerSec";
 
 NSString *const PDDefTouchMode        = @"pd.touch.mode";
 NSString *const PDDefButtonScale      = @"pd.touch.buttonScale";
@@ -66,9 +65,6 @@ void PDDefaultsRegister(void)
 		PDDefLookDegPerPoint: @0.30f,
 		PDDefLookDegPerPointY: @0.30f,
 		PDDefInvertY: @NO,
-		// A pad's right stick at full deflection: 180 deg/s is roughly where a
-		// console shooter of this era sat before anyone learned to raise it.
-		PDDefPadLookSpeed: @180.0f,
 
 		PDDefTouchMode: @(0),   // auto
 		PDDefButtonScale: @1.0f,
@@ -94,7 +90,12 @@ void PDDefaultsRegister(void)
 		// booting at half its panel rate and needing the row touched to get the
 		// other half — and it is what stops the headset booting at 60 on a
 		// 90 Hz panel, which is what 0.0.0.9 did.
-		PDDefRefreshHz: @(PDPanelHighHz()),
+		// 60 Hz by default. The tick gate is off on iOS (see the apply below), and
+		// upstream's uncapped mode still runs some per-tick game logic per frame
+		// (dabs-mod HANDOFF-f3: "a stock frame-rate dependence of uncapped
+		// mode"), so 120 Hz plays parts of the game at double speed. The panel's
+		// higher rate stays available as an experimental choice.
+		PDDefRefreshHz: @60,
 		// Native. 2x SSAA is deliberately not offered: the harbourmasters
 		// policy is that it goes on the menu only after a device gpu-time
 		// check proves the headroom, and this port has no device number at all

@@ -68,6 +68,8 @@ void inputIosPadSetRStick(int x, int y);
 // overlay 0021 — where the player is standing, so "analogue" can be measured
 // rather than asserted. Returns 0 when there is no player (a menu, a load).
 int playerIosGetPos(float *x, float *y, float *z);
+int playerIosGetView(float *theta, float *verta);
+int inputControllerGetSticksSwapped(int cidx);
 
 // overlay 0021 — the engine's own aim-mode flag (player.insightaimmode). The
 // AIM chip is hold-and-drag (D-046) and "the lift really left aim mode" is an

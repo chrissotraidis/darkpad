@@ -347,6 +347,10 @@ int pdExtraPumpMs = 0;
 		} else {
 			[s appendString:@"player_pos=none\n"];
 		}
+		float theta = 0, verta = 0;
+		if (playerIosGetView(&theta, &verta)) {
+			[s appendFormat:@"player_view=%.2f,%.2f\n", theta, verta];
+		}
 		// The AIM chip's whole claim, from the engine rather than from the
 		// shell's own mask (D-046).
 		[s appendFormat:@"player_aimmode=%d\n", playerIosGetAimMode()];
