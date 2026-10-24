@@ -48,6 +48,35 @@ static const NSTimeInterval kFlickWindow = 0.30;
 // launches never reconsider it.
 static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDecided";
 
+extern void inputSaveBinds(void);
+
+// Set once the arrow keys have been taken off the N64 stick on this install.
+static NSString *const kArrowsOffStick = @"pd.controller.arrowsOffStick";
+
+/**
+ * Arrow keys on the N64 stick are a desktop default. On iPhone and iPad the
+ * system can deliver a controller's left stick and D-pad as arrow presses
+ * (before iOS 18, or wherever the gamepad claim is unavailable), which then
+ * drive the look stick at full deflection. Engine thread.
+ */
+static void pdRemoveArrowStickBinds(void)
+{
+	static const char *const stickKeys[] = { "STICK_XNEG", "STICK_XPOS", "STICK_YNEG", "STICK_YPOS" };
+	static const char *const arrows[] = { "LEFT", "RIGHT", "DOWN", "UP" };
+	for (int player = 0; player < 4; player++) {
+		for (int i = 0; i < 4; i++) {
+			int ck = inputGetContKeyByName(stickKeys[i]);
+			int vk = inputGetKeyByName(arrows[i]);
+			if (ck < 0 || ck >= 32 || vk <= 0) continue;
+			const unsigned *binds = inputKeyGetBinds(player, (unsigned)ck);
+			for (int slot = 0; slot < 4; slot++) {
+				if (binds[slot] == (unsigned)vk) inputKeyBind(player, (unsigned)ck, slot, 0);
+			}
+		}
+	}
+	inputSaveBinds();
+}
+
 @implementation PDController {
 	// A new install: apply the Goldenpad layout on the first engine frame.
 	BOOL _applyDefaultLayout;
@@ -86,19 +115,22 @@ static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDeci
  */
 + (void)claimGamepadEventsInWindow:(UIWindow *)window
 {
-#if TARGET_OS_VISION
+	// iPhone and iPad as well (iOS 18+): without this the system also turns the
+	// left stick and D-pad into arrow-key presses for UI focus, SDL delivers
+	// them as keystrokes, and the arrows were bound to the N64 stick - so the
+	// left stick moved AND spun the view at full deflection (device trace,
+	// 2026-10-25: GC left 0.58 -> engine stick -128,127 plus the rstick).
 	static BOOL done = NO;
 	if (done || !window) {
 		return;
 	}
-	done = YES;
-	GCEventInteraction *gamepad = [[GCEventInteraction alloc] init];
-	gamepad.handledEventTypes = GCUIEventTypeGamepad;
-	[window addInteraction:gamepad];
-	NSLog(@"perfectdark: [pad] GCEventInteraction installed (GCUIEventTypeGamepad claimed)");
-#else
-	(void)window;
-#endif
+	if (@available(iOS 18.0, visionOS 2.0, *)) {
+		done = YES;
+		GCEventInteraction *gamepad = [[GCEventInteraction alloc] init];
+		gamepad.handledEventTypes = GCUIEventTypeGamepad;
+		[window addInteraction:gamepad];
+		NSLog(@"perfectdark: [pad] GCEventInteraction installed (GCUIEventTypeGamepad claimed)");
+	}
 }
 
 - (void)start
@@ -178,6 +210,7 @@ static NSString *const kDefaultLayoutDecided = @"pd.controller.defaultLayoutDeci
 		for (unsigned ck = 0; ck < 32; ck++)
 			for (int slot = 0; slot < 4; slot++)
 				inputKeyBind(player, ck, slot, proposed[player][ck][slot]);
+	pdRemoveArrowStickBinds();
 	// Goldenpad's LT always aims; the optional dual-trigger-fire mode conflicts.
 	configSetValue("Mod.AkimboTriggers", "0");
 	inputSaveBinds();
@@ -285,6 +318,12 @@ static void pdPadTrace(GCExtendedGamepad *gp)
 
 - (void)tick
 {
+	if (![NSUserDefaults.standardUserDefaults boolForKey:kArrowsOffStick]) {
+		pdRemoveArrowStickBinds();
+		configSave("$S/pd.ini");
+		[NSUserDefaults.standardUserDefaults setBool:YES forKey:kArrowsOffStick];
+		NSLog(@"perfectdark: [pad] arrow keys removed from the N64 stick binds");
+	}
 	if (_applyDefaultLayout) {
 		_applyDefaultLayout = NO;
 		NSString *result = [PDController applyGoldenpadLayout];
