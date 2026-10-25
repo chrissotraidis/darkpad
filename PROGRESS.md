@@ -1259,3 +1259,13 @@ User report from the physical iPad Pro: both sticks seemed to look, controls fel
 - Byte-swapped (.v64) and little-endian (.n64) ROMs are now converted to a temporary .z64, validated, installed and the copy removed (PDOnboarding checkRomAtPath:usable:, used by loose-ROM adoption and the document picker). The README already promised this. Simulator: loose "My Perfect Dark.v64" adopted with MD5 e03b088b…; bridge `rom check` on .n64 and .v64 gives verdict 0, converted=1; a truncated .v64 gives the size error; tests/rom_classifier.py 14/14.
 - GE Plus on the Simulator with a GoldenEye (U) ROM: the black screen with two circles is the loading intro, then the folder menu, mission select, Dam briefing and gameplay load at 60 fps; left stick moves without turning, right stick turns.
 
+
+## Release gate run (25 October)
+
+- PadMint scripts/player-check.sh (Apple Python 3.9.6, empty PadMint folder, cold build) PASSED twice: on 1b76eee with PadMint 0.5.13 (880 s) and on af050a3 with PadMint main 37c2c50 / 0.5.14 (959 s). Each produced a 10 MB personal-only IPA. Logs: work/player-check-1b76eee-pass.log, work/player-check-head.log. The catalog branch codex/catalog-darkpad was rebased onto 37c2c50 (now f3844cc); 365 PadMint tests pass. Not pushed.
+- Shipping-build tests pass: input_clipboard (build/src input.c), gyro_math under ASan/UBSan with the Xcode SDK, texture_upscale, image_decoder_limits, texture_pack_prepare, frame_interval_report. Network-candidate audit at 3ee8ed0 applies 73/73 (work/upstream-audit.cFLquq); all eleven candidate tests pass against it (direct_session_cancel takes port/src/net/netsession.c, network_weapon_progress takes src/game/training.c).
+- Signed PD_PUBLIC Release (af050a3 app code) installed on the iPad Pro. Backup work/device-backup-20261025-125639 (2,932 files, SHA256SUMS); after install, Documents (save, pd.ini, both ROMs) and 2,905 Library files (GE Plus conversion, preferences) are byte-identical.
+- Simulator hang dump at 13:02 (work/evidence/sim-hang-20261025-1302-during-coldbuild.txt): main thread waited 5 s in an ANGLE occlusion-query read during GE Plus Dam, starting with the PadMint cold build; recovered to 60 fps. Treated as host GPU starvation, not changed. Watch for hang.txt on device in sunlit levels.
+- Simulator crash report 2026-10-24 22:43: SIGTERM timeout during exit() from gfx_sdl_handle_events while the system terminated the app for a reinstall. Teardown only; no gameplay impact.
+- No ROMs, saves or IPAs in tracked files or history; README/CONTRIBUTING/SECURITY links resolve.
+
