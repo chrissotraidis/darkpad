@@ -35,11 +35,12 @@ decompilation project, is compiled ahead of time for Apple's ARM64 chips: there 
 no emulator and no JIT. [ANGLE](https://chromium.googlesource.com/angle/angle)
 turns its OpenGL ES rendering into Metal.
 
-The engine is [Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod), an
-extended fork of the [Perfect Dark PC port](https://github.com/perfect-dark-pc-port/perfect_dark).
+The engine is [Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod) v3.15.1,
+an extended fork of the [Perfect Dark PC port](https://github.com/perfect-dark-pc-port/perfect_dark).
 DarkPad starts from rebelancap's [perfect-dark-ios](https://github.com/rebelancap/perfect-dark-ios)
-shell and adds GoldenPad's controls and menu, a fixed controller path, gyro
-aiming, simpler art settings and a reproducible one-command build.
+shell, including its 1.0.4 online fixes, and adds GoldenPad's controls and menu,
+a fixed controller path, touch and gyro look over the network, simpler art
+settings and a reproducible one-command build.
 
 > [!IMPORTANT]
 > No game data is included and no IPA is published. You build your own copy on an
@@ -85,10 +86,13 @@ the app deletes your saves, settings and imported art.
 
 DarkPad 0.1.0 is a **developer preview**. On the maintainer's iPad Pro (12.9-inch,
 6th generation) with an Xbox Wireless Controller, controller play, the ••• menu,
-audio and frame pacing behave as intended in early hands-on play. Defection,
-Investigation, Challenge 1 and bot matches have been completed and reloaded on
-Simulators. The full campaign, touch-only play on a phone, heat and battery use,
-and multiplayer on two real devices have not been tested yet. See
+audio and frame pacing behaved as intended in hands-on play on the previous
+engine (Dab's Mod v3.14.0). The current build moves to v3.15.1: it is installed on
+that iPad with saves intact, and on Simulators it loads saves, plays Carrington
+Institute, GoldenEye's Dam and Combat Simulator matches, and joins and hosts
+online games with desktop Dab's Mod. Hands-on play of the v3.15.1 build on the
+iPad, the full campaign, touch-only play on a phone, heat and battery use, and
+multiplayer between two real devices have not been tested yet. See
 [Current limitations](#current-limitations).
 
 ## Controls
@@ -132,6 +136,7 @@ and keeps a backup of your previous bindings.
 | **NEXT / ALT** | Next weapon, and the weapon's secondary function |
 | **START** | The game's own pause and inventory menu |
 | **BACK** | Leaves the game's own menus; shown only while one is open |
+| **CHAT** | Opens the chat line in an online match; shown only then |
 
 **••• → Controls → Edit Touch Controls** moves, resizes (55–160%) and fades
 (20–100%) any button over the live game. iPhone and iPad layouts are saved
@@ -170,12 +175,18 @@ is built on.
 |---|---|---|
 | **Carrington Institute** | Original game | The walkable hub: training, firing range, holograph tests and gadget practice |
 | **Solo Missions** | Original game | The campaign. Start here; Defection is the first mission |
-| **Combat Simulator** | Original game | Bot matches (up to eight simulants) and challenges |
+| **Combat Simulator** | Original game | Bot matches and challenges. The engine allows up to 80 simulants; DarkPad has been tested with up to eight |
 | **Co-Operative / Counter-Operative** | Original game | Split-screen campaign modes for two players on one screen |
 | **Customize Character** | Dab's Mod | Choose the character model used in missions |
 | **Ghost Trials** | Dab's Mod | Race a recorded ghost run of a mission |
 | **Randomizer** | Dab's Mod | A mission reshuffled from its own pieces, or an endless run of rooms across every map |
-| **GE Plus** | Dab's Mod | GoldenEye 007 levels in the Perfect Dark engine; needs your own GoldenEye ROM |
+| **GoldenEye** | Dab's Mod | GoldenEye 007's missions and arenas in the Perfect Dark engine (GE Plus); appears once you add your own GoldenEye ROM |
+| **Goldfinger 64 / Tomorrow Never Dies 64** | Dab's Mod | GoldenEye ROM hacks, each with its own row; appear once you add the hack's files |
+| **Online Game** | Dab's Mod | Online Lobbies, LAN and Direct Connect. See [Multiplayer](#multiplayer) |
+
+**Leaving GoldenEye:** in a mission, open the watch (Start) and choose Abort, or
+use ••• → End Mission or Match. On GoldenEye's folder, B, BACK or the PREVIOUS tab
+steps back a page; from its first page it returns to the Perfect Menu.
 
 The game's **Options → Extended Options** page holds Dab's Mod and PC-port
 settings such as field of view, crosshair and gameplay tweaks. DarkPad manages
@@ -186,7 +197,7 @@ frame rate, resolution and controls itself, so change those in the ••• men
 | Setting (••• → Display) | Options | Notes |
 |---|---|---|
 | **Art Profile** | Original, Enhanced, Remaster | Original is the N64 look. Enhanced adds 2× texture filtering plus an HD pack if you install one. Remaster uses your own Xbox 360 art |
-| **Frame Rate** | 60 Hz (default), up to your display's maximum | Above 60 Hz is experimental: parts of the engine's timing are tied to frames and run fast |
+| **Frame Rate** | 60 Hz (default), up to your display's maximum | Above 60 Hz is experimental. Dab's Mod v3.15.1 fixed the guns, doors, lifts, enemies and HUD that used to run fast; on a Simulator the game clock and walking speed at 120 frames per second match 60. Not yet measured on an iPad |
 | **Render Resolution** | Native, 75%, 50% | Lower trades sharpness for speed; applies on next launch |
 | **Show FPS Counter** | On, Off | |
 
@@ -201,23 +212,38 @@ Every add-on is optional, none is included, and each needs files you supply:
   **Files → DarkPad → added-content**, then choose **Remaster**. Without it,
   Remaster falls back to N64 art. Not yet tested with a real package.
 - **GoldenEye levels (GE Plus).** Add your own GoldenEye 007 (US) ROM, and
-  optionally the GoldenEye XBLA package or the Goldfinger 64 hack. They appear as
-  **GE Plus** on the main menu after a restart. The first launch converts the
-  levels, then shows a short loading screen. Inherited from Dab's Mod. With a
-  US ROM on a Simulator, the menus, mission select and Dam load and play at
-  60 fps; the full GoldenEye campaign has not been played.
+  optionally the GoldenEye XBLA package, under **••• → Optional Add-ons →
+  GoldenEye Levels** or in **Files → DarkPad → added-content**. **GoldenEye**
+  appears on the Perfect Menu after a restart; the first launch converts the
+  levels. On a Simulator with a US ROM, the folder menus, mission select and Dam
+  load and play at 60 fps; the full GoldenEye campaign has not been played.
+- **Goldfinger 64 and Tomorrow Never Dies 64.** These GoldenEye ROM hacks come as
+  `goldfinger64.zip` and `tnd64.zip`, which patch your GoldenEye ROM. Add them
+  with the ROM hack row in the same place; each gets its own Perfect Menu row.
+  Supported by the engine, not yet tested in DarkPad.
 
 ## Multiplayer
 
-DarkPad plays on one device. **Combat Simulator** bot matches and challenges
-work, and the original split-screen modes are present but untested with several
-controllers on one iPad.
+**Online Game** on the Perfect Menu is Dab's Mod's netplay: Combat Simulator
+matches, co-op and counter-op missions for up to 12 players, with a Game Lobby and
+chat. DarkPad speaks the same protocol (33) as desktop Dab's Mod v3.15.1 and
+reports the same build identity, so iPhone, iPad, Mac and PC players can share a
+room.
 
-LAN and online play exist only in a separate experimental build, *DarkPad
-Network Test*, built from a newer Dab's Mod engine. It adds a **Direct LAN** page
-for joining by IP address and hosting Combat or Co-op games. It has been tested
-only between an iPad Simulator and a Mac, has no internet lobby, and is not part
-of the normal app. See [network integration](docs/network-integration.md).
+| Page | What it does | Status in DarkPad |
+|---|---|---|
+| **Direct Connect** | Host a room, or join one by typing its address (`192.168.1.5` or `192.168.1.5:27100`) | Joined and hosted against desktop Dab's Mod on a Simulator |
+| **LAN** | Lists rooms on your network by broadcast | Create Room works; finding rooms needs Apple's multicast entitlement, which DarkPad does not have yet, so use Direct Connect |
+| **Online Lobbies** | Rooms on Dab's lobby server; your account is a name and a PIN | Present; not tested |
+
+Touch and gyro look work online: DarkPad sends them inside the same look fields
+a desktop mouse uses, so the host turns your player exactly as you see it. iOS
+asks once for Local Network access. A host's firewall must allow UDP 27100–27103.
+
+On one device, **Combat Simulator** bot matches and challenges work, and the
+original split-screen modes are present but untested with several controllers
+on one iPad. See [network integration](docs/network-integration.md) for the
+test record.
 
 ## Supported game
 
@@ -225,7 +251,7 @@ of the normal app. See [network integration](docs/network-integration.md).
 |---|---|---|
 | **Perfect Dark** | USA Rev 1 (v1.1), 32 MiB, MD5 `e03b088b6ac9e0080440efed07c1e40f` | Supported |
 | Perfect Dark | PAL, Japanese, USA v1.0 | Recognized and refused with an explanation |
-| GoldenEye 007, Goldfinger 64 | US | Optional extras for GE Plus only |
+| GoldenEye 007, Goldfinger 64, Tomorrow Never Dies 64 (Expanded 06-22) | US | Optional extras for GE Plus only |
 
 The importer accepts `.z64`, `.v64` and `.n64` and copies the ROM into
 DarkPad's private storage; your original file is not changed.
@@ -290,6 +316,10 @@ detailed engineering log is [PROGRESS.md](PROGRESS.md).
 - **The on-screen buttons disappeared.** A connected controller hides them in
   Auto mode. Set **••• → Controls → On-Screen Controls** to **On**.
 - **The game seems fast.** Set **••• → Display → Frame Rate** to 60 Hz.
+- **Stuck in GoldenEye.** Abort from the watch, then press B or BACK, or tap
+  PREVIOUS, until the Perfect Menu returns.
+- **No LAN rooms listed.** Use **Online Game → Direct Connect** with the host's
+  address; LAN room finding needs an entitlement DarkPad does not have yet.
 - **Art did not change.** Resolution and newly added texture-pack archives apply
   after restarting DarkPad.
 
@@ -303,11 +333,14 @@ Never attach ROMs, extracted art, saves or signing files.
 - Physical testing so far is one iPad Pro with an Xbox controller. iPhone touch
   play, heat and battery use are not measured.
 - Only the first missions, Challenge 1 and bot matches have been played through.
-- Above 60 Hz, parts of the engine's game logic run fast.
+- The v3.15.1 engine has not yet been played by hand on the iPad. Above 60 Hz
+  stays experimental until it is measured there.
 - Gyro aiming is experimental and uncalibrated on hardware.
 - Xbox 360 remaster art has not been tested with a real package. GE Plus has
-  been played only briefly, on a Simulator.
-- LAN and online play exist only in the separate experimental build.
+  been played only briefly, on a Simulator; Goldfinger 64 and TND64 not at all.
+- Online play has been tested only on Simulators and a Mac on one machine: no
+  real devices, Wi-Fi, internet lobby or completed co-op mission yet. LAN room
+  finding does not work without the multicast entitlement.
 
 ## FAQ
 
@@ -335,15 +368,17 @@ your own with PadMint or the command in [Build from source](#build-from-source).
 <details>
 <summary><strong>Can I play online?</strong></summary>
 
-Not in DarkPad yet. A separate experimental LAN build exists for testing; see
-[Multiplayer](#multiplayer).
+Yes, through **Online Game** on the Perfect Menu, with other DarkPad players and
+desktop Dab's Mod v3.15.1 players. It is new and has been tested only on
+Simulators and a Mac so far; see [Multiplayer](#multiplayer).
 </details>
 
 <details>
 <summary><strong>Why 60 Hz by default on a ProMotion display?</strong></summary>
 
-The engine's uncapped mode still runs some game logic once per frame, so parts
-of the game run fast at 120 Hz. 60 Hz is the speed the game was designed for.
+60 Hz is the speed the game was designed for. Dab's Mod v3.15.1 fixed most of
+what used to run fast above 60 Hz, and Simulator measurements at 120 frames per
+second look right, but 120 Hz stays opt-in until it has been played on an iPad.
 </details>
 
 ## Project map
@@ -352,7 +387,7 @@ of the game run fast at 120 Hz. 60 Hz is the speed the game was designed for.
 |---|---|
 | [`app/ios/`](app/ios/) | Native shell: touch overlay, controller, ••• menu, settings, onboarding, audio |
 | [`overlay/patches/`](overlay/patches/) | Ordered engine patches applied to the pinned upstream at build time |
-| [`overlay/network-candidate/`](overlay/network-candidate/) | Experimental LAN and co-op patches for the newer engine |
+| [`overlay/network-candidate/`](overlay/network-candidate/) | Retired: the earlier networking experiment on an intermediate engine |
 | [`scripts/`](scripts/) | Bootstrap, build, packaging and validation scripts |
 | [`padmint.json`](padmint.json) | PadMint build recipe |
 | [`tests/`](tests/) | Focused tests for input, networking, textures and save isolation |

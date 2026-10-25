@@ -1149,13 +1149,14 @@ static CFTimeInterval sPresentStarted;
 			pdButtonRow(@"Add or replace GoldenEye XBLA…", ^{
 				[weakSelf importGoldenEye:PDGoldenEyeXbla];
 			}),
-			// A GoldenEye ROM hack the converter knows (upstream v3.14.0):
-			// converted beside GE Plus into its own Perfect Menu row.
-			pdInfoRow(@"Goldfinger 64", ^NSString *{
+			// A GoldenEye ROM hack the converter knows (Goldfinger 64 since
+			// upstream v3.14.0, Tomorrow Never Dies 64 since v3.15.0): converted
+			// beside GE Plus into its own Perfect Menu row.
+			pdInfoRow(@"GoldenEye ROM hack", ^NSString *{
 				PDGoldenEyeFind *f = [PDXbla cachedGoldenEye:PDGoldenEyeHack];
 				return f ? f.rowText : @"checking…";
 			}),
-			pdButtonRow(@"Add or replace Goldfinger 64…", ^{
+			pdButtonRow(@"Add Goldfinger 64 or Tomorrow Never Dies 64…", ^{
 				[weakSelf importGoldenEye:PDGoldenEyeHack];
 			}),
 		],

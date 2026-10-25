@@ -32,9 +32,19 @@ python3 tests/image_decoder_limits.py
 python3 tests/texture_pack_prepare.py
 python3 tests/input_clipboard.py build/src/port/src/input.c
 clang -std=c11 -Iapp/ios -fsanitize=address,undefined tests/gyro_math.c -o /tmp/gyro_math && /tmp/gyro_math
+python3 tests/network_touch_look.py build/src
+python3 tests/network_local_player.py build/src
+python3 tests/network_coop_results.py build/src/src/game/endscreen.c
+python3 tests/network_weapon_progress.py build/src/src/game/training.c
+python3 tests/network_session_exit.py build/src
 ```
 
-Boot one Simulator at a time. Simulator checks do not establish touch feel,
+When you move UPSTREAM_PIN, apply the overlay with scripts/apply-overlay.sh and
+fix any patch that fails by rebasing it; never drop a fix to make the series
+apply. Netplay compares build identities, so keep overlay 0083 and the
+PD_VERSION_HASH argument in scripts/build-ios.sh.
+
+Boot one Simulator at a time unless you are testing online play. Simulator checks do not establish touch feel,
 controller feel, frame rate, heat or campaign completion on hardware; say which
 device you tested on.
 
