@@ -222,10 +222,15 @@ static const PDButtonSpec kButtons[] = {
 	{ "START",  PDPadStart,       "line.3.horizontal",           0.946288, 0.240171, 22 },
 	{ "ALT",    PD_CK_ALTMODE,    "switch.2",                    0.260000, 0.130000, 22 },
 	{ "WHEEL",  PD_CK_RADIAL,     "circle.hexagongrid.fill",     0.790000, 0.898291, 26 },
+	// CHAT (from rebelancap's online round 2, overlay 0085): no pad bit - a tap
+	// opens the online match's chat line and the software keyboard; Return
+	// sends. Shown only while an online match is live (-applyChipRules).
+	{ "CHAT",   0,                "bubble.left.fill",            0.875000, 0.240171, 20 },
 };
 static const CGPoint kTabletButtonUnits[] = {
 	{0.91, 0.71}, {0.91, 0.58}, {0.91, 0.84}, {0.81, 0.89},
 	{0.81, 0.58}, {0.12, 0.12}, {0.972, 0.14}, {0.19, 0.12}, {0.71, 0.89},
+	{0.92, 0.14},
 };
 #define PD_NUM_BUTTONS ((int)(sizeof(kButtons) / sizeof(kButtons[0])))
 
@@ -436,6 +441,7 @@ static const PDButtonSpec kMenuButtons[] = {
 	BOOL _wheelArmed;
 	__weak PDTouchButtonView *_altChip;
 	__weak PDTouchButtonView *_wheelChip;
+	__weak PDTouchButtonView *_chatChip;   // online matches only (overlay 0085)
 
 	CGPoint _stickOrigin;
 	CGVector _stickValue;      // curved, -1…1
@@ -1108,6 +1114,16 @@ static const CGFloat kWheelRadius = 32.0;
  */
 - (void)applyChipRules
 {
+	// CHAT exists only while an online match is live, and never over a menu or
+	// a cinematic. The editor shows every chip, so it is left alone there.
+	PDTouchButtonView *chat = _chatChip;
+	if (chat && !_editing) {
+		const BOOL hideChat = _menuOpen || _cinematic || !netHudIosChatAvailable() || [self userHid:chat];
+		if (chat.hidden != hideChat) {
+			chat.hidden = hideChat;
+		}
+	}
+
 	PDTouchButtonView *alt = _altChip;
 	if (!alt || _editing) {
 		return;
@@ -1702,6 +1718,7 @@ static const CGFloat kWheelRadius = 32.0;
 		[_buttons addObject:b];
 		if ([b.label isEqualToString:@"ALT"]) { _altChip = b; }
 		if ([b.label isEqualToString:@"WHEEL"]) { _wheelChip = b; }
+		if ([b.label isEqualToString:@"CHAT"]) { _chatChip = b; b.hidden = !_editing; }
 	}
 	// Fainter: placeable and pressable, but temporary (bean).
 	_leftFire = [[PDTouchButtonView alloc] initWithSpec:&kLeftFire
@@ -2265,6 +2282,15 @@ static const CGFloat kWheelRadius = 32.0;
 - (void)beginTouchAt:(CGPoint)p touch:(nullable UITouch *)touch
 {
 	PDTouchButtonView *b = [self buttonAtPoint:p];
+	if (b && b == _chatChip && !_editing) {
+		// No pad bit: open the chat line at the next frame boundary. The
+		// keyboard that comes up is SDL's; its Return sends.
+		[PDShell.shared enqueue:^{
+			const int ok = netHudIosChatOpen();
+			NSLog(@"perfectdark: [touch] CHAT pressed: line %@", ok ? @"open" : @"not available");
+		}];
+		return;
+	}
 	if (b) {
 		b.held = YES;
 		_buttonMask |= b.mask;
@@ -2501,7 +2527,8 @@ static CGVector pdStickCurve(CGVector raw)
 	for (PDTouchButtonView *b in _buttons) {
 		if (b.held) { b.held = NO; _buttonMask &= ~b.mask; }
 		_latchMask &= ~b.mask; _unpublishedMask &= ~b.mask;   // D-086: a drop, not a tap
-		b.hidden = _menuOpen || (_cinematic && b.mask != PDPadStart) || [self userHid:b];   // D-088: hidden by the player
+		b.hidden = _menuOpen || (_cinematic && b.mask != PDPadStart) || [self userHid:b]   // D-088: hidden by the player
+			|| (b == _chatChip && !netHudIosChatAvailable());                              // online matches only
 	}
 	if (_leftFire.held) { _leftFire.held = NO; _buttonMask &= ~_leftFire.mask; }
 	_latchMask &= ~_leftFire.mask; _unpublishedMask &= ~_leftFire.mask;

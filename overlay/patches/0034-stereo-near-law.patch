@@ -76,7 +76,7 @@ preprocessed away. At Stereo Depth 0 % `e` is zero, the fold returns before any
 of it, and the two eyes stay bit-identical - which the gates run.
 
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index fd753adf7..d7ae451d1 100644
+index f6ba759c5..d7142416a 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -91,6 +91,9 @@ extern "C" void pdVisionStereoNoteGunDepth(float depth);
@@ -89,7 +89,7 @@ index fd753adf7..d7ae451d1 100644
  #else
  #define PD_VISION_STEREO 0
  #endif
-@@ -2375,8 +2378,37 @@ struct PDStereoState {
+@@ -2407,8 +2410,37 @@ struct PDStereoState {
      float bg_scale;     // bgGetScaleBg2Gfx() for this frame (PD_DLTAG_SCALE)
      float depth_tag;    // the view depth of the next 2D rect, 0 = none
      float world_a;      // P[0][0] of the last PLAIN perspective load
@@ -128,7 +128,7 @@ index fd753adf7..d7ae451d1 100644
  
  // What one eye of the last completed frame saw, for `3d state`. The MUL count
  // is here because D-055 asserted "PD's lists MULTIPLY into the projection" with
-@@ -2418,6 +2450,7 @@ static void gfx_stereo_reset_classes(void) {
+@@ -2450,6 +2482,7 @@ static void gfx_stereo_reset_classes(void) {
      pd_stereo.bg_scale = 1.0f;
      pd_stereo.depth_tag = 0.0f;
      pd_stereo.world_a = 0.0f;
@@ -136,7 +136,7 @@ index fd753adf7..d7ae451d1 100644
      pd_stereo_mul_p = 0;
      pd_stereo_load_p = 0;
      pd_stereo_baked = 0;
-@@ -2521,6 +2554,10 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+@@ -2553,6 +2586,10 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
          return false;
      }
      memcpy(out, P, 16 * sizeof(float));
@@ -147,7 +147,7 @@ index fd753adf7..d7ae451d1 100644
      if (e == 0.0f) {
          // Stereo Depth 0 %: the mono projection in both eyes, bit for bit. The
          // gate leans on this - an L/R pair taken at 0 % must be pixel-identical
-@@ -2616,7 +2653,71 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+@@ -2648,7 +2685,71 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
          // infinity term anyway.
          out[3][0] -= eEye * a;
      }
@@ -220,9 +220,9 @@ index fd753adf7..d7ae451d1 100644
      for (int r = 0; r < 4; r++) {
          out[r][0] += skew * out[r][3];
      }
-@@ -2944,6 +3045,28 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
-         const float z = pos[2];
-         const float w = pos[3];
+@@ -2987,6 +3088,28 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
+             y = oy * w + (y - oy * w) * rdp.rect_scale;
+         }
  
 +#if PD_VISION_STEREO
 +        // D-061: the world's NEAR CLAMP, per vertex, before the aspect
@@ -249,7 +249,7 @@ index fd753adf7..d7ae451d1 100644
          x = gfx_adjust_x_for_aspect_ratio(x, w);
  
          if (taa_active && !fbActive) {
-@@ -7773,7 +7896,16 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+@@ -7841,7 +7964,16 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
          float eSigned = 0.0f, conv = 0.0f, gunConv = 0.0f;
          if (pdVisionStereoFold(&eSigned, &conv, &gunConv) && eSigned != 0.0f &&
              conv > 0.0f && pd_stereo.world_a != 0.0f) {

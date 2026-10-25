@@ -27,7 +27,7 @@ CMake side:
     nothing changes.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a95196865..0c5b821e2 100644
+index 7454e384d..457861630 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1,7 +1,15 @@
@@ -117,7 +117,7 @@ index a95196865..0c5b821e2 100644
    else()
      set(EXTRA_LIBRARIES stdc++ m dl)
    endif()
-@@ -706,10 +733,21 @@ list(APPEND SRC ${LANGPACK_C})
+@@ -708,10 +735,21 @@ list(APPEND SRC ${LANGPACK_C})
  # Game target
  
  set(BIN_NAME "${BIN_BASENAME}")

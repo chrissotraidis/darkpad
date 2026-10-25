@@ -35,8 +35,14 @@ NOT YET APPLIED TO A BUILD - scripts/apply-overlay.sh does not exist yet
 (Phase 1). The 0.3 oracles are stock upstream; the XBLA verification above
 was done by flattening cache/xbla/ by hand.
 
+v3.15.1 (D-103): upstream now looks INSIDE an unpacked archive six deep
+(XBLAIMPORT_UNPACKED_SCAN_DEPTH, "looks deeper inside Perfect Dark XBLA.7z"),
+so the .rar case above is fixed upstream - the oracle unpacks and finds the
+package unpatched. This patch still covers the other case: the same tree
+unpacked by hand into added-content/, which upstream scans two deep.
+
 diff --git a/port/src/xblaimport.c b/port/src/xblaimport.c
-index f999704d9..15902a1ca 100644
+index 17d61fc36..4d2b45af9 100644
 --- a/port/src/xblaimport.c
 +++ b/port/src/xblaimport.c
 @@ -53,7 +53,13 @@
@@ -52,5 +58,5 @@ index f999704d9..15902a1ca 100644
 +// re-unpacks 248MB on every boot.
 +#define XBLAIMPORT_SCAN_DEPTH 4
  
- // Where an archive dropped in xbla/ comes apart: cache/xbla/ beside the
- // executable (or in the save directory), so that xbla/ itself holds nothing
+ // How far into what an archive came apart into: cache/xbla/ holds nothing but
+ // the archive's own tree, so it can be looked through further. An archive made

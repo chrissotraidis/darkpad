@@ -245,6 +245,12 @@ int PDWatchdogFormatHeartbeat(char *buf, int len)
 	const double now = pdNow();
 	const double sinceFrame = now - atomic_load(&sLastFrameAt);
 
+	// The game's own clock (DarkPad 0092): two heartbeats apart give game
+	// seconds per wall second, which is how real game speed is measured on a
+	// device at 120 Hz where the bridge is out of reach. Word-sized reads.
+	int gameFrames = 0;
+	const int gameClock = playerIosGetGameClock(&gameFrames);
+
 	char scenes[64] = "-";
 	int at = 0;
 	for (int i = 0; i < s.sceneCount && i < 4; i++) {
@@ -290,7 +296,10 @@ int PDWatchdogFormatHeartbeat(char *buf, int len)
 		"pacing_wait_mode=%s\n"
 		"pacing_wake_us_mean=%.0f\n"
 		"pacing_wake_us_max=%.0f\n"
-		"pacing_wake_n=%llu\n",
+		"pacing_wake_n=%llu\n"
+		"mono_s=%.3f\n"
+		"game_clock240=%d\n"
+		"game_frames=%d\n",
 		PD_IOS_BUILD_STAMP, PD_IOS_MARKETING_VERSION,
 		(long long)time(NULL),
 		now - atomic_load(&sStartedAt),
@@ -307,7 +316,8 @@ int PDWatchdogFormatHeartbeat(char *buf, int len)
 		p.appliedLinkHz, p.measuredHz, p.targetHz, p.engineHz, p.divisor,
 		p.links, p.presents, p.dropped, p.waiting,
 		p.presentAllowed, p.earlyWait,
-		p.waitMode == 1 ? "runloop" : "sem", p.wakeUsMean, p.wakeUsMax, p.wakeSamples);
+		p.waitMode == 1 ? "runloop" : "sem", p.wakeUsMean, p.wakeUsMax, p.wakeSamples,
+		now, gameClock, gameFrames);
 }
 
 static void pdWriteHeartbeat(void)

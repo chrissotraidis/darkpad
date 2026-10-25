@@ -28,7 +28,7 @@ for the shell's console bridge.
 Every other platform is unchanged.
 
 diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
-index 79673ec32..dc6763d2e 100644
+index 125a6be44..c1f846026 100644
 --- a/port/src/gexplusrom.c
 +++ b/port/src/gexplusrom.c
 @@ -236,12 +236,62 @@ static Gfx *noticeText(Gfx *gdl, const char *text, s32 y)

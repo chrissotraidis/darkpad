@@ -19,10 +19,10 @@ the curved stick magnitude as -128..127 instead of four booleans. No control
 style changes, no bind moves, nothing outside PLATFORM_IOS.
 
 diff --git a/port/include/input.h b/port/include/input.h
-index 043b1dd13..c03a27fd9 100644
+index 3b43e0415..d5bd2e18a 100644
 --- a/port/include/input.h
 +++ b/port/include/input.h
-@@ -242,6 +242,10 @@ void inputMouseGetRawDelta(s32 *dx, s32 *dy);
+@@ -246,6 +246,10 @@ void inputMouseGetRawDelta(s32 *dx, s32 *dy);
  // :8775 bridge share. See the definitions in port/src/input.c.
  void inputIosLookAddDegrees(f32 degx, f32 degy);
  void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
@@ -34,10 +34,10 @@ index 043b1dd13..c03a27fd9 100644
  u32 inputIosPadGetButtons(void);
  // The absolute touch pointer that drives PD's own menu-mouse path. nx/ny are
 diff --git a/port/src/input.c b/port/src/input.c
-index 21dc7d8d9..6bc04fec8 100644
+index 14f231ea4..c3e1b6dce 100644
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -1202,6 +1202,7 @@ static s32 iosPointerWheel = 0, iosPointerWheelFrame = 0;
+@@ -1257,6 +1257,7 @@ static s32 iosPointerWheel = 0, iosPointerWheelFrame = 0;
  static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
  static u32 iosPadButtons = 0;
  static s32 iosPadStickX = 0, iosPadStickY = 0;
@@ -45,7 +45,7 @@ index 21dc7d8d9..6bc04fec8 100644
  
  void inputIosLookAddDegrees(f32 degx, f32 degy)
  {
-@@ -1216,6 +1217,30 @@ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
+@@ -1271,6 +1272,30 @@ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky)
  	iosPadStickY = (sticky < -128) ? -128 : ((sticky > 127) ? 127 : sticky);
  }
  
@@ -76,7 +76,7 @@ index 21dc7d8d9..6bc04fec8 100644
  void inputIosPadSetButton(u32 button, s32 down)
  {
  	if (down) {
-@@ -1249,6 +1274,13 @@ static void inputIosMergePad(OSContPad *npad)
+@@ -1304,6 +1329,13 @@ static void inputIosMergePad(OSContPad *npad)
  		npad->stick_y = iosPadStickY;
  	}
  

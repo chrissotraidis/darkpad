@@ -26,10 +26,10 @@ The bare package read in place (gebeanPkgExtractFile) goes through x360.c's
 own reader, which bounds every block it reads, so it is unchanged.
 
 diff --git a/port/src/gebean.c b/port/src/gebean.c
-index 722121d90..e93f9d462 100644
+index b997846cd..54c6b6580 100644
 --- a/port/src/gebean.c
 +++ b/port/src/gebean.c
-@@ -3086,7 +3086,7 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+@@ -3134,7 +3134,7 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
  	struct x360stfs stfs;
  	char name[512];
  	unsigned long long bytes = 0;
@@ -38,7 +38,7 @@ index 722121d90..e93f9d462 100644
  	s32 consecutive = 1;
  	u8 *buf;
  
-@@ -3108,6 +3108,8 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+@@ -3156,6 +3156,8 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
  
  	for (u32 i = 0; i < stfs.numFiles; i++) {
  		const struct x360stfsfile *f = &stfs.files[i];
@@ -47,7 +47,7 @@ index 722121d90..e93f9d462 100644
  
  		if (f->isDir || !gebeanWantEntry(x360StfsPath(&stfs, i, name, sizeof(name)), NULL)) {
  			continue;
-@@ -3118,6 +3120,28 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+@@ -3166,6 +3168,28 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
  			continue;
  		}
  
@@ -76,7 +76,7 @@ index 722121d90..e93f9d462 100644
  		if (!f->consecutive && f->numBlocks > 1) {
  			consecutive = 0;
  		}
-@@ -3134,7 +3158,15 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+@@ -3182,7 +3206,15 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
  		s->files[s->numFiles].size = f->size;
  		s->numFiles++;
  		bytes += f->size;
@@ -93,7 +93,7 @@ index 722121d90..e93f9d462 100644
  	}
  
  	pkgFilesTotal = (s32)s->numFiles;
-@@ -3160,7 +3192,14 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
+@@ -3208,7 +3240,14 @@ static s32 gebeanPkgPlan(struct gebeanpkgsink *s)
  		return 0;
  	}
  
@@ -109,7 +109,7 @@ index 722121d90..e93f9d462 100644
  
  	if (!s->blocks) {
  		x360StfsClose(&stfs);
-@@ -3285,6 +3324,14 @@ static s32 gebeanPkgSink(const u8 *data, u32 len, void *arg)
+@@ -3333,6 +3372,14 @@ static s32 gebeanPkgSink(const u8 *data, u32 len, void *arg)
  
  			s->tableShift = (((headerSize + 0xfff) & 0xf000) >> 12) == 0xb ? 0 : 1;
  			s->tableEnd = gebeanPkgBlockOffset(s->tableShift, tableBlock + tableBlocks - 1) + GEBEAN_STFS_BLOCK;

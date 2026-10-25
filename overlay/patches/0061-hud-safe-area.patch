@@ -1,6 +1,6 @@
 --- a/src/game/bondgun.c
 +++ b/src/game/bondgun.c
-@@ -1,4 +1,9 @@
+@@ -1,7 +1,12 @@
  #include <ultra64.h>
 +#ifndef PLATFORM_N64
 +// Fraction of the drawable height occupied by the platform's side cutout.
@@ -8,6 +8,9 @@
 +__attribute__((weak)) float pdPlatformHudSideInset(int right) { return 0.0f; }
 +#endif
  #include "constants.h"
+ #ifndef PLATFORM_N64
+ #include "net/net.h"
+ #endif
  #include "game/modrules.h"
  #include "../lib/naudio/n_sndp.h"
 @@ -15210,6 +15215,7 @@

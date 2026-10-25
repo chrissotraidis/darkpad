@@ -33,8 +33,20 @@ else
   PUBLIC_DEF=""
 fi
 
+# PD_MULTICAST=1 signs with com.apple.developer.networking.multicast, which the
+# LAN page's room finder needs for its UDP broadcast (Dab's Mod netlan.c).
+# Apple grants it per team on request, and a build that asks for it without a
+# matching provisioning profile does not sign, so it is off by default: the LAN
+# page then finds no rooms, while Direct Connect and Online Lobbies still work.
+if [ "\${PD_MULTICAST:-0}" = "1" ]; then
+  ENTITLEMENTS="ios\/darkpad-multicast.entitlements"
+  echo "PD_MULTICAST=1: signing with the multicast entitlement"
+else
+  ENTITLEMENTS=""
+fi
+
 sed -e "s/PD_MARKETING_VERSION/$MARKETING/" -e "s/PD_BUILD_NUMBER/$BUILDNUM/" \
-    -e "s/PD_PUBLIC_FLAG/$PUBLIC_DEF/" \
+    -e "s/PD_PUBLIC_FLAG/$PUBLIC_DEF/" -e "s/PD_ENTITLEMENTS/$ENTITLEMENTS/" \
   app/project.yml > app/project.generated.yml
 
 ( cd app && xcodegen generate --spec project.generated.yml --project . >/dev/null )

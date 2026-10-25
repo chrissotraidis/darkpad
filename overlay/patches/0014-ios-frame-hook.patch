@@ -16,10 +16,10 @@ One function, one call, behind PLATFORM_IOS: on every other platform this file
 is byte for byte upstream's.
 
 diff --git a/port/src/pdsched.c b/port/src/pdsched.c
-index fe47662cb..da6d3f44d 100644
+index c2bf697ae..d7f764840 100644
 --- a/port/src/pdsched.c
 +++ b/port/src/pdsched.c
-@@ -247,6 +247,11 @@ void schedSubmitTask(OSSched *sc, OSScTask *t)
+@@ -248,6 +248,11 @@ void schedSubmitTask(OSSched *sc, OSScTask *t)
  	}
  }
  
@@ -31,7 +31,7 @@ index fe47662cb..da6d3f44d 100644
  void schedStartFrame(OSSched *sc)
  {
  	videoStartFrame();
-@@ -282,6 +287,16 @@ void schedEndFrame(OSSched *sc)
+@@ -295,6 +300,16 @@ void schedEndFrame(OSSched *sc)
  {
  	sc->frameCount++;
  

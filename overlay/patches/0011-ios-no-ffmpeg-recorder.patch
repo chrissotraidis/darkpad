@@ -13,7 +13,7 @@ which is upstream's own pattern for PLATFORM_N64 — and recordIsEnabled() is
 false so the menu rows have nothing to show. docs/ios-deadlist.md section 1.
 
 diff --git a/port/src/record.c b/port/src/record.c
-index 705b38c28..c4943bc92 100644
+index b5b178af9..a371f22d9 100644
 --- a/port/src/record.c
 +++ b/port/src/record.c
 @@ -1,3 +1,12 @@
@@ -29,7 +29,7 @@ index 705b38c28..c4943bc92 100644
  // The build is -std=c11, which is strict enough that signal.h hides kill().
  // Everything else this file needs off POSIX happens to be exposed anyway; this
  // has to come before the first system header to be worth anything.
-@@ -2737,3 +2746,41 @@ PD_CONSTRUCTOR static void recordConfigInit(void)
+@@ -2765,3 +2774,41 @@ PD_CONSTRUCTOR static void recordConfigInit(void)
  	// run, recordInit() settling it either way.
  	configRegisterInt("Mod.RecordEnabled", &recordEnabled, -1, 1);
  }

@@ -24,10 +24,10 @@ frame contract mouseDX/DY already have. Behind PLATFORM_IOS throughout; every
 other platform builds byte for byte upstream's file.
 
 diff --git a/port/include/input.h b/port/include/input.h
-index 38c44cb7b..90915c648 100644
+index 0ae156cd6..9ca05af95 100644
 --- a/port/include/input.h
 +++ b/port/include/input.h
-@@ -235,6 +235,17 @@ void inputMouseGetRawDelta(s32 *dx, s32 *dy);
+@@ -239,6 +239,17 @@ void inputMouseGetRawDelta(s32 *dx, s32 *dy);
  
  // returns changes in mouse position since last frame, scaled by sensitivity
  // returns 0, 0 when the mouse is not locked into the window
@@ -46,11 +46,11 @@ index 38c44cb7b..90915c648 100644
  
  // returns changes in mouse position since last frame, scaled by absolute sensitivity
 diff --git a/port/src/input.c b/port/src/input.c
-index 86f4d7935..2255b2149 100644
+index 50eee1683..637654494 100644
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -1167,6 +1167,94 @@ static inline s32 inputAxisScale(s32 x, const s32 deadzone, const f32 scale)
- 	}
+@@ -1222,6 +1222,94 @@ static inline f32 inputAxisSens(const struct controllercfg *cfg, u32 axis)
+ 	return sens;
  }
  
 +#ifdef PLATFORM_IOS
@@ -144,7 +144,7 @@ index 86f4d7935..2255b2149 100644
  s32 inputReadController(s32 idx, OSContPad *npad)
  {
  	if (idx < 0 || idx >= INPUT_MAX_CONTROLLERS  || !npad) {
-@@ -1217,6 +1305,9 @@ s32 inputReadController(s32 idx, OSContPad *npad)
+@@ -1272,6 +1360,9 @@ s32 inputReadController(s32 idx, OSContPad *npad)
  	}
  
  	if (!pads[idx]) {
@@ -154,7 +154,7 @@ index 86f4d7935..2255b2149 100644
  		return 0;
  	}
  
-@@ -1258,6 +1349,10 @@ s32 inputReadController(s32 idx, OSContPad *npad)
+@@ -1313,6 +1404,10 @@ s32 inputReadController(s32 idx, OSContPad *npad)
  		}
  	}
  
@@ -165,8 +165,8 @@ index 86f4d7935..2255b2149 100644
  	return 0;
  }
  
-@@ -1317,6 +1412,10 @@ void inputUpdate(void)
- {
+@@ -1374,6 +1469,10 @@ void inputUpdate(void)
+ 
  	SDL_GameControllerUpdate();
  
 +#ifdef PLATFORM_IOS
@@ -176,9 +176,9 @@ index 86f4d7935..2255b2149 100644
  	if (mouseEnabled) {
  		inputUpdateMouse();
  	}
-@@ -1706,6 +1805,13 @@ void inputMouseGetScaledDelta(f32* dx, f32* dy)
- 		mdx = mouseDX * (0.022f / 3.5f) * mouseSensX;
- 		mdy = mouseDY * (0.022f / 3.5f) * mouseSensY;
+@@ -1795,6 +1894,13 @@ void inputMouseGetScaledDelta(f32* dx, f32* dy)
+ 		mdx = rawdx * (0.022f / 3.5f) * mouseSensX;
+ 		mdy = rawdy * (0.022f / 3.5f) * mouseSensY;
  	}
 +#ifdef PLATFORM_IOS
 +	// Degrees the shell asked for, in the units this function returns: the
@@ -190,9 +190,9 @@ index 86f4d7935..2255b2149 100644
  	if (dx) *dx = mdx;
  	if (dy) *dy = mdy;
  }
-@@ -1717,6 +1823,10 @@ void inputMouseGetAbsScaledDelta(f32* dx, f32* dy)
- 		mdx = mouseDX * (0.022f / 3.5f) * fabsf(mouseSensX);
- 		mdy = mouseDY * (0.022f / 3.5f) * fabsf(mouseSensY);
+@@ -1808,6 +1914,10 @@ void inputMouseGetAbsScaledDelta(f32* dx, f32* dy)
+ 		mdx = rawdx * (0.022f / 3.5f) * fabsf(mouseSensX);
+ 		mdy = rawdy * (0.022f / 3.5f) * fabsf(mouseSensY);
  	}
 +#ifdef PLATFORM_IOS
 +	mdx += iosLookFrameX * (1.f / 3.5f);

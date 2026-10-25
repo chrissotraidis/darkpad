@@ -47,7 +47,7 @@ gfx_run_eye plus one tail call. The oracle's byte-for-byte replay parity is the
 proof and the gate runs it.
 
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 91299e85f..7e697bc46 100644
+index 02a686c72..1d887a55f 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -45,6 +45,51 @@
@@ -102,7 +102,7 @@ index 91299e85f..7e697bc46 100644
  uintptr_t gfxFramebuffer;
  
  #define ALIGN(x, a) (((x) + (a - 1)) & ~(a - 1))
-@@ -2244,6 +2289,221 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+@@ -2276,6 +2321,221 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
      memcpy(res, tmp, sizeof(tmp));
  }
  
@@ -324,7 +324,7 @@ index 91299e85f..7e697bc46 100644
  // A G_MTX's matrix as the RSP reads it, from addr
  static inline void gfx_mtx_read(const int32_t* addr, float matrix[4][4]) {
  #ifndef GBI_FLOATS
-@@ -2277,8 +2537,20 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+@@ -2309,8 +2569,20 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
      if (parameters & G_MTX_PROJECTION) {
          if (parameters & G_MTX_LOAD) {
              memcpy(rsp.P_matrix, matrix, sizeof(matrix));
@@ -345,7 +345,7 @@ index 91299e85f..7e697bc46 100644
          }
      } else { // G_MTX_MODELVIEW
          if ((parameters & G_MTX_PUSH) && rsp.modelview_matrix_stack_size < 11) {
-@@ -2294,7 +2566,7 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+@@ -2326,7 +2598,7 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
          }
          rsp.lights_changed = 1;
      }
@@ -354,7 +354,7 @@ index 91299e85f..7e697bc46 100644
  }
  
  static void gfx_sp_pop_matrix(uint32_t count) {
-@@ -2302,8 +2574,7 @@ static void gfx_sp_pop_matrix(uint32_t count) {
+@@ -2334,8 +2606,7 @@ static void gfx_sp_pop_matrix(uint32_t count) {
          if (rsp.modelview_matrix_stack_size > 0) {
              --rsp.modelview_matrix_stack_size;
              if (rsp.modelview_matrix_stack_size > 0) {
@@ -364,7 +364,7 @@ index 91299e85f..7e697bc46 100644
              }
          }
      }
-@@ -8073,6 +8344,13 @@ static void gfx_run_dl(Gfx* cmd) {
+@@ -8225,6 +8496,13 @@ static void gfx_run_dl(Gfx* cmd) {
          switch (opcode) {
                  // RSP commands:
              case G_NOOP:
@@ -378,7 +378,7 @@ index 91299e85f..7e697bc46 100644
                  break;
              case G_MTX: {
                  gfx_sp_matrix(C0(16, 8), (const int32_t*)seg_addr(cmd->words.w1));
-@@ -8433,6 +8711,11 @@ static void gfx_sp_reset() {
+@@ -8592,6 +8870,11 @@ static void gfx_sp_reset() {
      rsp.modelview_matrix_stack_size = 1;
      rsp.current_num_lights = 2;
      rsp.lights_changed = true;
@@ -390,7 +390,7 @@ index 91299e85f..7e697bc46 100644
  }
  
  extern "C" void gfx_get_dimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
-@@ -8674,8 +8957,23 @@ extern "C" void gfx_start_frame(void) {
+@@ -8833,8 +9116,23 @@ extern "C" void gfx_start_frame(void) {
  
  uint32_t num_dls = 0;
  
@@ -416,7 +416,7 @@ index 91299e85f..7e697bc46 100644
  #ifdef PD_IOS_PROFILER
      // The prologue, which is where ANGLE-Metal asks CoreAnimation for the next
      // drawable - and blocks if they are all in flight. On a 120 Hz panel that
-@@ -8745,7 +9043,17 @@ extern "C" void gfx_run(Gfx* commands) {
+@@ -8905,7 +9203,17 @@ extern "C" void gfx_run(Gfx* commands) {
  
      // Last chance to read the frame back: swap_buffers_begin() presents it and
      // leaves the back buffer undefined.
@@ -435,7 +435,7 @@ index 91299e85f..7e697bc46 100644
          gfx_pre_swap_callback();
      }
  
-@@ -8753,9 +9061,32 @@ extern "C" void gfx_run(Gfx* commands) {
+@@ -8913,9 +9221,32 @@ extern "C" void gfx_run(Gfx* commands) {
      pdProfEnd(PDPROF_GFXEND);
  #endif
  

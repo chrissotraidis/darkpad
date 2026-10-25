@@ -1,0 +1,41 @@
+Subject: cmake: PD_VERSION_HASH, so an iOS build carries the upstream commit it is
+
+VERSION_HASH is `git rev-parse --short HEAD` in CMAKE_SOURCE_DIR. The iOS port
+builds build/src - upstream at UPSTREAM_PIN with this overlay applied, and no
+.git - so git walks up and answers with the PORT's repository (5294726 for a
+v3.15.1 build). Upstream's netplay (v3.15.x) puts VERSION_HASH in CONNECT, in
+LAN/lobby room adverts and in the lobby's room filter, and refuses any player
+whose build differs from the host's. Found on the lane-3 simulator joining the
+macOS oracle with `--connect 127.0.0.1:27100` (D-104): the UDP connect and
+handshake worked and the host answered "The host's build is a8c2ab2d7 and
+yours is 5294726 - both need the same build." Without this no iOS or visionOS
+player could ever join a desktop room of the same release, or host one for
+desktop players.
+
+A cache variable rather than a hard-coded value: scripts/build-ios.sh passes
+the first nine characters of UPSTREAM_PIN (netBuildSame() compares prefixes of
+at least seven, so the CI's own --short length matches either way). Unset, the
+build is exactly upstream's. The other VERSION_HASH readers (title-screen
+version string, crash report, GE stage cache key) get the upstream commit too,
+which is what they describe.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -118,6 +118,17 @@
+   OUTPUT_STRIP_TRAILING_WHITESPACE
+ )
+ 
++# PD_VERSION_HASH (iOS port overlay 0058): the commit this build's GAME is,
++# when the tree being built is not that commit's checkout. The iOS port builds
++# a copy of upstream with its overlay applied and no .git, so the rev-parse
++# above answers with the port's own repository - and netplay refuses every
++# player whose VERSION_HASH differs from the host's ("both need the same
++# build"), so an iOS player could never join a desktop room of the same
++# release, nor host one. build-ios.sh passes the pinned upstream commit.
++if(DEFINED PD_VERSION_HASH AND NOT PD_VERSION_HASH STREQUAL "")
++  set(VERSION_HASH "${PD_VERSION_HASH}")
++endif()
++
+ # git branch name
+ execute_process(
+   COMMAND git rev-parse --abbrev-ref HEAD

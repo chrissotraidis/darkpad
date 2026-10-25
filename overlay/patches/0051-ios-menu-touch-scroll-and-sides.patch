@@ -29,10 +29,10 @@ from touch-down to the lift, is the shell's - app/ios/PDTouchOverlay.m):
 Everything is inside PLATFORM_IOS.
 
 diff --git a/port/include/input.h b/port/include/input.h
-index c03a27fd9..2143540c9 100644
+index d5bd2e18a..9371208ac 100644
 --- a/port/include/input.h
 +++ b/port/include/input.h
-@@ -255,6 +255,9 @@ void inputIosPointerSet(f32 nx, f32 ny, s32 down);
+@@ -259,6 +259,9 @@ void inputIosPointerSet(f32 nx, f32 ny, s32 down);
  void inputIosPointerClear(void);
  void inputIosPointerAddWheel(s32 ticks);
  s32 inputIosPointerIsActive(void);
@@ -43,10 +43,10 @@ index c03a27fd9..2143540c9 100644
  
  void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
 diff --git a/port/src/input.c b/port/src/input.c
-index e0dc3d5cb..38c2734fc 100644
+index 9eb6f790b..3e318e4e7 100644
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -1354,6 +1354,20 @@ s32 inputIosPointerIsActive(void)
+@@ -1409,6 +1409,20 @@ s32 inputIosPointerIsActive(void)
  {
  	return iosPointerActive;
  }
@@ -68,10 +68,10 @@ index e0dc3d5cb..38c2734fc 100644
  
  s32 inputReadController(s32 idx, OSContPad *npad)
 diff --git a/src/game/menu.c b/src/game/menu.c
-index 9d6628d02..a2609a5b9 100644
+index 30b6eefe0..8dac75418 100644
 --- a/src/game/menu.c
 +++ b/src/game/menu.c
-@@ -1532,6 +1532,61 @@ s32 menuIosDialogIsOpen(void)
+@@ -1608,6 +1608,61 @@ s32 menuIosDialogIsOpen(void)
  {
  	return g_Menus[0].curdialog != NULL;
  }
@@ -133,7 +133,7 @@ index 9d6628d02..a2609a5b9 100644
  #endif
  
  #endif
-@@ -5332,6 +5387,17 @@ void menuProcessInput(void)
+@@ -5654,6 +5709,17 @@ void menuProcessInput(void)
  				}
  			}
  			inputs.mousescroll = inputKeyPressed(VK_MOUSE_WHEEL_DN) - inputKeyPressed(VK_MOUSE_WHEEL_UP);
@@ -151,7 +151,7 @@ index 9d6628d02..a2609a5b9 100644
  			inputs.mousemoved = inputMouseGetPosition(&inputs.mousex, &inputs.mousey) || inputs.mousescroll;
  			// aspect correct the X
  			const f32 cx = ((f32)inputs.mousex - (f32)(SCREEN_WIDTH_LO / 2)) * (videoGetAspect() / SCREEN_ASPECT);
-@@ -5823,6 +5889,31 @@ void menuProcessInput(void)
+@@ -6166,6 +6232,31 @@ void menuProcessInput(void)
  				}
  			}
  		}
@@ -184,11 +184,11 @@ index 9d6628d02..a2609a5b9 100644
  
  		// Handle dialogs that allow pressing start to select,
 diff --git a/src/game/menuitem.c b/src/game/menuitem.c
-index b4276298b..ba87b67c0 100644
+index 51106a2e9..a5dc75a1c 100644
 --- a/src/game/menuitem.c
 +++ b/src/game/menuitem.c
-@@ -798,6 +798,19 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
- 			if (inputs->updown || inputs->mousescroll) {
+@@ -834,6 +834,19 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
+ 			if (!leave && (inputs->updown || inputs->mousescroll)) {
  				prev2 = data->list.index;
  				data->list.index += inputs->updown + inputs->mousescroll;
 +#ifdef PLATFORM_IOS
@@ -207,7 +207,7 @@ index b4276298b..ba87b67c0 100644
  #endif
  
  				if (data->list.index < 0) {
-@@ -818,6 +831,37 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
+@@ -854,6 +867,37 @@ bool menuitemListTick(struct menuitem *item, struct menuinputs *inputs, u32 tick
  				}
  			}
  

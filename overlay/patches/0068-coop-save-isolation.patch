@@ -1,0 +1,50 @@
+Subject: Keep LAN mission results and weapon discoveries out of offline saves
+
+--- a/src/game/endscreen.c
++++ b/src/game/endscreen.c
+@@ -1646,6 +1646,10 @@
+ 			}
+ 		}
+ 
++#ifndef PLATFORM_N64
++		// LAN results must not persist session options or offline progress.
++		if (g_NetMode == NETMODE_NONE)
++#endif
+ 		filemgrSaveOrLoad(&g_GameFileGuid, FILEOP_SAVE_GAME_000, 0);
+ 	}
+ 
+@@ -1735,6 +1739,10 @@
+ 	}
+ 
+ 	if (g_Vars.currentplayer == g_Vars.bond) {
++#ifndef PLATFORM_N64
++		// LAN results must not persist session options or offline progress.
++		if (g_NetMode == NETMODE_NONE)
++#endif
+ 		filemgrSaveOrLoad(&g_GameFileGuid, FILEOP_SAVE_GAME_000, 0);
+ 	}
+ 
+--- a/src/game/training.c
++++ b/src/game/training.c
+@@ -37,6 +37,9 @@
+ #include "lib/mtx.h"
+ #include "data.h"
+ #include "types.h"
++#ifndef PLATFORM_N64
++#include "net/net.h"
++#endif
+ 
+ #define FRSCRIPTINDEX_WEAPONS 0x00
+ #define FRSCRIPTINDEX_TARGETS 0x22
+@@ -178,6 +181,11 @@
+ 
+ void frSetWeaponFound(s32 weaponnum)
+ {
++#ifndef PLATFORM_N64
++	// Online pickups must not unlock the offline firing range, even if a
++	// later local settings change saves the in-memory game file.
++	if (g_NetMode != NETMODE_NONE) return;
++#endif
+ 	if (weaponnum < (s32)sizeof(g_GameFile.weaponsfound) * 8) {
+ 		u32 byteindex = weaponnum >> 3;
+ 		u32 value = g_GameFile.weaponsfound[byteindex];

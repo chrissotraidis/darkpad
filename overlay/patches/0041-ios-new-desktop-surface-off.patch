@@ -31,10 +31,10 @@ row and its automatic path go through:
 Every hunk is PLATFORM_IOS-gated; no other platform changes by a byte.
 
 diff --git a/port/src/optionsmenu.c b/port/src/optionsmenu.c
-index 08bc1678e..af4b39916 100644
+index 90805a923..558757c8f 100644
 --- a/port/src/optionsmenu.c
 +++ b/port/src/optionsmenu.c
-@@ -892,6 +892,14 @@ static MenuItemHandlerResult menuhandlerGpuVertices(s32 operation, struct menuit
+@@ -931,6 +931,14 @@ static MenuItemHandlerResult menuhandlerGpuVertices(s32 operation, struct menuit
  static MenuItemHandlerResult menuhandlerSmaa(s32 operation, struct menuitem *item, union handlerdata *data)
  {
  	switch (operation) {
@@ -49,7 +49,7 @@ index 08bc1678e..af4b39916 100644
  	case MENUOP_GET:
  		return videoGetSmaa();
  	case MENUOP_SET:
-@@ -917,6 +925,14 @@ static MenuItemHandlerResult menuhandlerUpscaling(s32 operation, struct menuitem
+@@ -956,6 +964,14 @@ static MenuItemHandlerResult menuhandlerUpscaling(s32 operation, struct menuitem
  	};
  
  	switch (operation) {
@@ -64,7 +64,7 @@ index 08bc1678e..af4b39916 100644
  	case MENUOP_GETOPTIONCOUNT:
  		data->dropdown.value = VIDEO_UPSCALING_COUNT;
  		break;
-@@ -948,6 +964,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
+@@ -987,6 +1003,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
  	};
  
  	switch (operation) {
@@ -79,7 +79,7 @@ index 08bc1678e..af4b39916 100644
  	case MENUOP_GETOPTIONCOUNT:
  		data->dropdown.value = VIDEO_SUPERSAMPLING_COUNT;
  		break;
-@@ -969,6 +993,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
+@@ -1008,6 +1032,14 @@ static MenuItemHandlerResult menuhandlerSupersampling(s32 operation, struct menu
  static MenuItemHandlerResult menuhandlerFsrSharpness(s32 operation, struct menuitem *item, union handlerdata *data)
  {
  	switch (operation) {
@@ -94,7 +94,7 @@ index 08bc1678e..af4b39916 100644
  	case MENUOP_GETSLIDER:
  		data->slider.value = (2.f - videoGetFsrSharpness()) * 10.f + 0.5f;
  		break;
-@@ -1010,7 +1042,14 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
+@@ -1049,7 +1081,14 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
  
  	switch (operation) {
  	case MENUOP_GETOPTIONCOUNT:
@@ -109,7 +109,7 @@ index 08bc1678e..af4b39916 100644
  		break;
  	case MENUOP_GETOPTIONTEXT:
  		if (data->dropdown.value >= menuMsaaCount()) {
-@@ -1027,9 +1066,12 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
+@@ -1066,9 +1105,12 @@ static MenuItemHandlerResult menuhandlerMSAA(s32 operation, struct menuitem *ite
  		break;
  	case MENUOP_GETSELECTEDINDEX:
  		msaa = videoGetMSAA();
@@ -123,7 +123,7 @@ index 08bc1678e..af4b39916 100644
  			data->dropdown.value = 0;
  		} else if (msaa < 4) {
  			data->dropdown.value = 1;
-@@ -1054,6 +1096,12 @@ static MenuItemHandlerResult menuhandlerRenderer(s32 operation, struct menuitem
+@@ -1093,6 +1135,12 @@ static MenuItemHandlerResult menuhandlerRenderer(s32 operation, struct menuitem
  	s32 count;
  
  	switch (operation) {
@@ -136,7 +136,7 @@ index 08bc1678e..af4b39916 100644
  	case MENUOP_GETOPTIONCOUNT:
  		count = 1;
  		while (count < ARRAYCOUNT(names) && videoRendererAvailable(count)) {
-@@ -7537,6 +7585,10 @@ static const struct {
+@@ -7658,6 +7706,10 @@ static const struct {
  };
  
  #define ADVANCED_ROW_RAWINPUT 3
@@ -147,7 +147,7 @@ index 08bc1678e..af4b39916 100644
  
  static const char *menutextAdvancedRestart(struct menuitem *item)
  {
-@@ -7561,7 +7613,14 @@ static MenuItemHandlerResult menuhandlerAdvancedRestart(s32 operation, struct me
+@@ -7682,7 +7734,14 @@ static MenuItemHandlerResult menuhandlerAdvancedRestart(s32 operation, struct me
  	case MENUOP_SET:
  		advancedRestartRows[idx].set(data->checkbox.value);
  		break;

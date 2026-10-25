@@ -13,10 +13,10 @@ Not PLATFORM_IOS-guarded: a whole number is the right readout everywhere, and
 this is on the list to offer upstream (Q-002).
 
 diff --git a/src/game/lv.c b/src/game/lv.c
-index 2bc30ed46..6c1591263 100644
+index 029ce2a16..eb3f1a23a 100644
 --- a/src/game/lv.c
 +++ b/src/game/lv.c
-@@ -1128,7 +1128,7 @@ Gfx *lvRenderFPS(Gfx *gdl)
+@@ -1153,7 +1153,7 @@ Gfx *lvRenderFPS(Gfx *gdl)
  	}
  
  	if (g_CharsNumeric && g_FontNumeric) {

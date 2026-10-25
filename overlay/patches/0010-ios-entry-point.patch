@@ -9,10 +9,10 @@ the app, exactly as it does on the desktop.
 Nothing else moves: with PLATFORM_IOS undefined this is upstream's main().
 
 diff --git a/port/src/main.c b/port/src/main.c
-index 2af38b9cb..fc8620c4d 100644
+index 52d3fdc46..35d445301 100644
 --- a/port/src/main.c
 +++ b/port/src/main.c
-@@ -196,7 +196,20 @@ static void mainApplySettingsRevision(void)
+@@ -214,7 +214,20 @@ static void mainApplySettingsRevision(void)
  	g_SettingsRevision = SETTINGS_REVISION;
  }
  

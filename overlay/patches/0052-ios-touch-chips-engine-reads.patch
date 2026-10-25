@@ -8,10 +8,10 @@ wheel chip and the bridge read the active menu's state and the gun's function
 as evidence. Entirely inside PLATFORM_IOS, called from the shell's frame hook.
 
 diff --git a/src/game/player.c b/src/game/player.c
-index a451d9f84..e0bfbb0cc 100644
+index 2cb434d6f..8afea782d 100644
 --- a/src/game/player.c
 +++ b/src/game/player.c
-@@ -8834,3 +8834,70 @@ s32 playerIosGetAimMode(void)
+@@ -9495,3 +9495,70 @@ s32 playerIosGetAimMode(void)
  	return p->insightaimmode ? 1 : 0;
  }
  #endif

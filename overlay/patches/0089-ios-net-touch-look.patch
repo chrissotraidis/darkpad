@@ -1,0 +1,223 @@
+Subject: iOS online: touch and gyro look ride the command's mdx/mdy (protocol 33)
+
+DarkPad overlay 0089. The touch layer's look (inputIosLookAddDegrees, 0015)
+is latched once per presented frame and read as part of
+inputMouseGetScaledDelta. Online that read happens in the stage loop's tick
+passes, so a frame drawn between ticks (present-only, above 60 Hz) dropped its
+degrees and a frame that ran several catch-up ticks applied them to each.
+
+Now, like the mouse (net.c's s_NetMouseDX):
+- netInputAccumulateMouse also sums each frame's touch degrees;
+- a stage-loop read returns the sum, and nothing on a present-only pass;
+- netTickEnd and netStageStart clear it;
+- netpredict's between-ticks view turn includes the unspent degrees.
+
+The degrees go out inside the command's existing f32 mdx/mdy, which the host
+multiplies by 3.5 exactly as the client does, so the wire is unchanged and
+DarkPad plays with desktop Dab's Mod v3.15.1 peers. The host reads mdx/mdy
+only with NETCMD_MOUSELOCKED, which an iPad with no mouse never sets, so
+DarkPad's commands always carry it: mdx/mdy hold only look.
+
+Limit: the host's absolute-delta reader (the active menu) multiplies a remote
+command by the sign of the client's mouse speed. DarkPad keeps mouse speeds
+positive, so touch look keeps its sign. This replaces the earlier
+experimental protocol 0x4431, which carried touch separately.
+
+Offline nothing changes. Everything is inside PLATFORM_IOS.
+
+--- a/port/include/input.h
++++ b/port/include/input.h
+@@ -245,6 +245,8 @@
+ // the mouse sensitivity, and one button mask + stick the touch layer and the
+ // :8775 bridge share. See the definitions in port/src/input.c.
+ void inputIosLookAddDegrees(f32 degx, f32 degy);
++// the degrees latched for this frame (online: net.c sums them per tick)
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy);
+ void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
+ // The touch stick as analogue movement. Under CONTROLMODE_PC (the port's
+ // default) the right stick is movedata.analogstrafe/analogwalk - see the
+--- a/port/include/net/net.h
++++ b/port/include/net/net.h
+@@ -265,6 +265,13 @@
+ // Mouse: summed over a presented frame's inputUpdate(), spent by one tick
+ void netInputAccumulateMouse(void);
+ void netInputMouseRaw(s32 *dx, s32 *dy);
++#ifdef PLATFORM_IOS
++// Touch/gyro look in degrees, summed per presented frame and spent by one
++// tick like the mouse (overlay 0089). Sent inside the command's mdx/mdy, so
++// the wire stays protocol 33.
++void netInputTouchDegrees(f32 *dx, f32 *dy);
++void netPendingTouchDegrees(f32 *dx, f32 *dy);
++#endif
+ 
+ // gfxReset: the player-count row the display list pools are sized by
+ s32 netGfxSizeIndex(s32 index);
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -1338,6 +1338,12 @@
+ 	}
+ }
+ 
++void inputIosLookGetFrameDegrees(f32 *degx, f32 *degy)
++{
++	*degx = iosLookFrameX;
++	*degy = iosLookFrameY;
++}
++
+ static void inputIosLatchFrame(void)
+ {
+ 	iosLookFrameX = iosLookPendingX;
+@@ -2039,8 +2045,12 @@
+ 	// Degrees the shell asked for, in the units this function returns: the
+ 	// consumer multiplies by 3.5 (bondwalk.c:1456). Not scaled by the mouse
+ 	// sensitivity and not gated on mouseLocked - see inputIosLookAddDegrees().
+-	mdx += iosLookFrameX * (1.f / 3.5f);
+-	mdy += iosLookFrameY * (1.f / 3.5f);
++	// Online the stage loop reads the degrees summed since the last tick and
++	// none on a present-only pass (overlay 0089), as it reads the mouse.
++	f32 tdx = iosLookFrameX, tdy = iosLookFrameY;
++	if (g_NetMode != NETMODE_NONE) netInputTouchDegrees(&tdx, &tdy);
++	mdx += tdx * (1.f / 3.5f);
++	mdy += tdy * (1.f / 3.5f);
+ #endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+@@ -2056,8 +2066,10 @@
+ 		mdy = rawdy * (0.022f / 3.5f) * fabsf(mouseSensY);
+ 	}
+ #ifdef PLATFORM_IOS
+-	mdx += iosLookFrameX * (1.f / 3.5f);
+-	mdy += iosLookFrameY * (1.f / 3.5f);
++	f32 tdx = iosLookFrameX, tdy = iosLookFrameY;
++	if (g_NetMode != NETMODE_NONE) netInputTouchDegrees(&tdx, &tdy);
++	mdx += tdx * (1.f / 3.5f);
++	mdy += tdy * (1.f / 3.5f);
+ #endif
+ 	if (dx) *dx = mdx;
+ 	if (dy) *dy = mdy;
+--- a/port/src/net/net.c
++++ b/port/src/net/net.c
+@@ -47,6 +47,10 @@
+ 
+ // Raw mouse counts summed since the last tick spent them
+ static s32 s_NetMouseDX = 0;
++#ifdef PLATFORM_IOS
++static f32 s_NetTouchDegX = 0.f; // overlay 0089: the touch layer's look, as s_NetMouseDX
++static f32 s_NetTouchDegY = 0.f;
++#endif
+ static s32 s_NetMouseDY = 0;
+ 
+ static s32 s_NetSignalsInstalled = 0;
+@@ -181,6 +185,10 @@
+ 	g_NetInStageLoop = 0;
+ 	s_NetMouseDX = 0;
+ 	s_NetMouseDY = 0;
++#ifdef PLATFORM_IOS
++	s_NetTouchDegX = 0.f;
++	s_NetTouchDegY = 0.f;
++#endif
+ 	frametimeNetReset();
+ 
+ 	// The host's last tick rate is a client's tick rate (lvTick), and only
+@@ -350,6 +358,10 @@
+ 	// the tick has spent the frame's mouse; any further tick sees none
+ 	s_NetMouseDX = 0;
+ 	s_NetMouseDY = 0;
++#ifdef PLATFORM_IOS
++	s_NetTouchDegX = 0.f;
++	s_NetTouchDegY = 0.f;
++#endif
+ }
+ 
+ void netPosePuppets(f32 alpha)
+@@ -393,7 +405,34 @@
+ 	inputMouseGetRawDelta(&dx, &dy);
+ 	s_NetMouseDX += dx;
+ 	s_NetMouseDY += dy;
++#ifdef PLATFORM_IOS
++	f32 tdx, tdy;
++	inputIosLookGetFrameDegrees(&tdx, &tdy);
++	s_NetTouchDegX += tdx;
++	s_NetTouchDegY += tdy;
++#endif
+ }
++
++#ifdef PLATFORM_IOS
++// A stage-loop read: everything since the last tick, none on a present-only
++// pass; outside the stage loop the caller keeps the frame's own degrees
++void netInputTouchDegrees(f32 *dx, f32 *dy)
++{
++	if (!g_NetInStageLoop) {
++		return;
++	}
++
++	*dx = g_NetPass == NETPASS_PRESENT_ONLY ? 0.f : s_NetTouchDegX;
++	*dy = g_NetPass == NETPASS_PRESENT_ONLY ? 0.f : s_NetTouchDegY;
++}
++
++// The degrees summed since the last tick and not yet spent (netpredict.c)
++void netPendingTouchDegrees(f32 *dx, f32 *dy)
++{
++	*dx = g_NetInStageLoop ? s_NetTouchDegX : 0.f;
++	*dy = g_NetInStageLoop ? s_NetTouchDegY : 0.f;
++}
++#endif
+ 
+ /**
+  * The mouse a getter reads in the stage loop: none on a present-only pass,
+--- a/port/src/net/netplayers.c
++++ b/port/src/net/netplayers.c
+@@ -2394,6 +2394,13 @@
+ 		s_MenuBusy += c->buttons || c->sx || c->sy || c->rsx || c->rsy || c->mdx != 0 || c->mdy != 0;
+ 	}
+ 	c->flags = netMouseLocked(g_NetLocalSlot) ? NETCMD_MOUSELOCKED : 0;
++#ifdef PLATFORM_IOS
++	// A finger or the gyro turns the view with no mouse locked, and the host
++	// takes mdx/mdy only with this flag (netMouseDelta). mdx/mdy hold the
++	// touch layer's degrees and, when one is locked, a real mouse's motion:
++	// nothing that is not look (overlay 0089).
++	c->flags |= NETCMD_MOUSELOCKED;
++#endif
+ 
+ 	// a menu's choices go with this command, and with every resend of it
+ 	if (s_EquipPending) {
+--- a/port/src/net/netpredict.c
++++ b/port/src/net/netpredict.c
+@@ -2117,13 +2117,23 @@
+ 	// will turn it (bmoveProcessInput: the scaled delta times 3.5 degrees,
+ 	// by the fov) - on a frame drawn between ticks only, and not while
+ 	// aiming, where the mouse moves the crosshair instead
+-	if (g_NetPass != NETPASS_PRESENT_ONLY || !inputMouseIsLocked() || p->insightaimmode) {
++	f32 tx = 0.f;
++	f32 ty = 0.f;
++
++#ifdef PLATFORM_IOS
++	// overlay 0089: and the touch layer's degrees, which need no mouse lock
++	netPendingTouchDegrees(&tx, &ty);
++#endif
++
++	if (g_NetPass != NETPASS_PRESENT_ONLY || p->insightaimmode) {
+ 		return;
+ 	}
+ 
+-	netPendingMouse(&rdx, &rdy);
++	if (inputMouseIsLocked()) {
++		netPendingMouse(&rdx, &rdy);
++	}
+ 
+-	if (rdx || rdy) {
++	if (rdx || rdy || tx != 0.f || ty != 0.f) {
+ 		f32 sx;
+ 		f32 sy;
+ 		f32 fovscale = viGetFovY() / PLAYER_DEFAULT_FOV;
+@@ -2131,8 +2141,8 @@
+ 		f32 dverta;
+ 
+ 		inputMouseGetSpeed(&sx, &sy);
+-		dtheta = rdx * 0.022f * sx * fovscale;
+-		dverta = -rdy * 0.022f * sy * fovscale * (optionsGetForwardPitch(g_Vars.currentplayerstats->mpindex) ? 1.f : -1.f);
++		dtheta = (rdx * 0.022f * sx + tx) * fovscale;
++		dverta = -(rdy * 0.022f * sy + ty) * fovscale * (optionsGetForwardPitch(g_Vars.currentplayerstats->mpindex) ? 1.f : -1.f);
+ 
+ 		if (dverta + p->vv_verta > 90.f) {
+ 			dverta = 90.f - p->vv_verta;

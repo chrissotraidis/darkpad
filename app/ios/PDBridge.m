@@ -21,6 +21,7 @@
 #ifndef PD_PUBLIC
 
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <AVFoundation/AVFoundation.h>
 
 #include <arpa/inet.h>
@@ -250,7 +251,7 @@ static NSString *pdErr(NSString *fmt, ...)
 		        " heartbeat | hang <ms> | dump | graft <on|off> | hide60 <on|off> |"
 		        " stall <ms>|every <s> <ms>|off | geo [repair on|off|now] | presented | picker cancel|dismiss|pick <path> |"
 		        " audio trace on|off|dump [name] | audio interrupt begin|end |"
-		        " give <weaponnum> [noammo] | ammo <weaponnum> | pacing engine <hz|auto>"
+		        " give <weaponnum> [noammo] | ammo <weaponnum> | pacing engine <hz|auto> | clock [chrs] | kbd [type <text>|back|return]"
 #if TARGET_OS_VISION
 	        " | 3d <on|off|park|unpark|crown|showeye|state|recenter|depth <pct>|gunconv <units>"
 	        "|settings <open|close|get|set <row> <value>|press <row>|reset>>"
@@ -1141,6 +1142,109 @@ static NSString *pdErr(NSString *fmt, ...)
 		});
 		if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)))) {
 			return pdErr(@"UIKit did not respond (is the game loop running?)");
+		}
+		return out;
+	}
+
+	// `kbd` / `kbd type <text>` / `kbd back` / `kbd return` — the iOS software
+	// keyboard's own path into the game (Online round 2, D-105). SDL raises the
+	// keyboard over a hidden UITextField when the game calls SDL_StartTextInput
+	// (the online pages' name, address, password and chat boxes) and turns that
+	// field's edits into SDL_TEXTINPUT / Backspace / Return. `type` inserts into
+	// that first responder through UIKeyInput, which is what a key on the
+	// keyboard does, so the text reaches the game by the same route a finger's
+	// does; `simctl` cannot type into a simulator app and a hardware keyboard
+	// is a different path (SDL key events). Bare `kbd` reports whether a field
+	// is first responder (= the keyboard is up) and what it holds.
+	if ([cmd isEqualToString:@"kbd"]) {
+		NSString *what = argv.count > 1 ? argv[1].lowercaseString : @"";
+		NSString *text = @"";
+		if ([what isEqualToString:@"type"]) {
+			NSRange r = [cmdline rangeOfString:@"type"];
+			text = r.location != NSNotFound ? [cmdline substringFromIndex:NSMaxRange(r)] : @"";
+			if ([text hasPrefix:@" "]) {
+				text = [text substringFromIndex:1];
+			}
+		}
+		__block NSString *out = nil;
+		dispatch_semaphore_t done = dispatch_semaphore_create(0);
+		dispatch_async(dispatch_get_main_queue(), ^{
+			__block UITextField *field = nil;
+			__block void (^walk)(UIView *) = nil;
+			void (^walker)(UIView *) = ^(UIView *v) {
+				if (field) {
+					return;
+				}
+				if ([v isKindOfClass:UITextField.class] && v.isFirstResponder) {
+					field = (UITextField *)v;
+					return;
+				}
+				for (UIView *sub in v.subviews) {
+					walk(sub);
+				}
+			};
+			walk = walker;
+			for (UIScene *sc in UIApplication.sharedApplication.connectedScenes) {
+				if ([sc isKindOfClass:UIWindowScene.class]) {
+					for (UIWindow *w in ((UIWindowScene *)sc).windows) {
+						walk(w);
+					}
+				}
+			}
+			walk = nil;
+			if (field && [what isEqualToString:@"type"]) {
+				// One character per insert, as keys arrive: SDL turns each edit
+				// into text by diffing the field against its last commit, and a
+				// whole string inserted at once into a field that still held
+				// earlier text came through cut short ("reb" for a 15-letter name).
+				[text enumerateSubstringsInRange:NSMakeRange(0, text.length)
+				                         options:NSStringEnumerationByComposedCharacterSequences
+				                      usingBlock:^(NSString *ch, NSRange r1, NSRange r2, BOOL *stop) {
+					[field insertText:ch];
+				}];
+			} else if (field && [what isEqualToString:@"back"]) {
+				[field deleteBackward];
+			} else if (field && [what isEqualToString:@"return"]) {
+				if ([field.delegate respondsToSelector:@selector(textFieldShouldReturn:)]) {
+					[field.delegate textFieldShouldReturn:field];
+				}
+			}
+			out = [NSString stringWithFormat:@"kbd_up=%d kbd_field=%@ kbd_text_len=%lu",
+				field != nil, field ? NSStringFromClass(field.class) : @"-",
+				(unsigned long)field.text.length];
+			dispatch_semaphore_signal(done);
+		});
+		if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)))) {
+			return pdErr(@"UIKit did not respond (is the game loop running?)");
+		}
+		return out;
+	}
+
+	// `clock [chrs]` - one reading for timing game speed (DarkPad 0092): wall
+	// time, the game's lvframe240 / lvframenum, the player's position and, with
+	// "chrs", every live character slot's position. Two readings apart give
+	// game seconds per wall second and units per game second, at any refresh.
+	if ([cmd isEqualToString:@"clock"]) {
+		NSMutableString *out = [NSMutableString string];
+		[out appendFormat:@"wall=%.4f\n", CACurrentMediaTime()];
+		if (!PDShell.shared.engineRunning) {
+			[out appendString:@"engine=stopped\n"];
+			return out;
+		}
+		int frames = 0;
+		const int lv240 = playerIosGetGameClock(&frames);
+		[out appendFormat:@"lvframe240=%d\nlvframenum=%d\n", lv240, frames];
+		float px = 0, py = 0, pz = 0;
+		if (playerIosGetPos(&px, &py, &pz)) {
+			[out appendFormat:@"player_pos=%.2f,%.2f,%.2f\n", px, py, pz];
+		}
+		if (argv.count > 1 && [argv[1] isEqualToString:@"chrs"]) {
+			for (int i = 0; i < 64; i++) {
+				float x, y, z;
+				if (playerIosGetChrPos(i, &x, &y, &z)) {
+					[out appendFormat:@"chr%d=%.2f,%.2f,%.2f\n", i, x, y, z];
+				}
+			}
 		}
 		return out;
 	}

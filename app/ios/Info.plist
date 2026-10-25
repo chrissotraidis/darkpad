@@ -97,6 +97,12 @@
 	<string>DarkPad can connect to Bluetooth game controllers.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>DarkPad can connect to Bluetooth game controllers.</string>
+	<!-- Dab's Mod v3.15.1 netplay (UDP): Direct Connect and LAN rooms talk to
+	     other devices on the local network, which iOS gates behind the Local
+	     Network prompt. LAN room finding also needs the multicast entitlement
+	     (PD_MULTICAST=1, scripts/gen-app-project.sh). -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DarkPad uses the local network to find and join multiplayer games.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

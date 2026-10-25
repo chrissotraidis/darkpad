@@ -29,7 +29,7 @@ The desktop path is untouched by a byte: WIN32 and the generic `else()` are
 exactly upstream's, and PD_IOS is false in every desktop configure.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3bc021b45..ecf3ef2a8 100644
+index d4aa8321f..754f0f623 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -315,6 +315,54 @@ if(WIN32)

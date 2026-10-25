@@ -25,10 +25,10 @@ the stamp the same way. A stamp an earlier build wrote converts once more.
 Every other platform is unchanged.
 
 diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
-index a922b5e29..91649df0d 100644
+index 599dbcc50..df3719da0 100644
 --- a/port/src/gexplusrom.c
 +++ b/port/src/gexplusrom.c
-@@ -716,7 +716,15 @@ static void variantReady(const char *name)
+@@ -831,7 +831,15 @@ static void variantReady(const char *name)
  	}
  }
  
@@ -44,7 +44,7 @@ index a922b5e29..91649df0d 100644
  
  // the second line of a conversion's CONVERT.txt: the file it was made from
  static s32 variantStampFrom(const char *dir, char *from, u32 fromlen)
-@@ -1015,6 +1023,23 @@ static void variantCanonical(const char *path, char *out, u32 outlen)
+@@ -1156,6 +1164,23 @@ static void variantCanonical(const char *path, char *out, u32 outlen)
  	char *full = realpath(fsFullPath(path), NULL);
  
  	if (full) {

@@ -1,0 +1,40 @@
+Subject: iOS menus: a finger's click lands where the focus walk says it is
+
+Online round 2 (D-105). D-083's menuIosPointOnFocusedItem() (overlay 0051)
+swallows a touch click that is not on the focused item, by walking the dialog's
+columns and rows the way dialogChangeItemFocusWithMouse() does. Upstream has
+since widened the focus walk's last column out to the dialog's side ("the online
+pages' windows are wider than their columns"), and the iOS copy kept the
+column's own width. On Create Room the centred Create row's focus came from the
+wide walk, the click test then said "not on the focused item", and the row lit
+up but could never be pressed by touch (a pad's A pressed it). Same pick width
+in both now.
+
+Entirely inside PLATFORM_IOS.
+
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -1661,8 +1661,22 @@
+ 
+ 	for (col = 0; col < dialog->numcols; col++, curx += colwidth) {
+ 		s32 colindex = dialog->colstart + col;
++		s32 pickwidth;
+ 		colwidth = menu->cols[colindex].width;
+-		if (mx <= curx || mx >= curx + colwidth) {
++		pickwidth = colwidth;
++
++		// The same pick width dialogChangeItemFocusWithMouse() uses (overlay
++		// 0061): the last column reaches the dialog's side, as upstream draws
++		// it for the online pages' windows. Without it the focus walk took a
++		// finger on a row's right half (Create Room's Create, centred in a
++		// window wider than its column) and this test then called the same
++		// point "not on the focused item" and swallowed the click: the row
++		// lit up and could never be pressed by touch.
++		if (col == dialog->numcols - 1 && curx + colwidth < dialog->x + dialog->width - 2) {
++			pickwidth = dialog->x + dialog->width - 2 - curx;
++		}
++
++		if (mx <= curx || mx >= curx + pickwidth) {
+ 			continue;
+ 		}
+ 

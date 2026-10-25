@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Used only when PD_MULTICAST=1 (scripts/gen-app-project.sh): lets the LAN
+     page's room finder send its UDP broadcast. Apple grants this entitlement
+     per team on request; until the provisioning profile carries it, a build
+     that asks for it does not sign. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.networking.multicast</key>
+	<true/>
+</dict>
+</plist>

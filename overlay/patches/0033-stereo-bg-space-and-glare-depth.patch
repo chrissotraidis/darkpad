@@ -93,7 +93,7 @@ preprocessed away; the engine-side tags are under #ifndef PLATFORM_N64 and cost
 one G_NOOP each, which changes no draw, tri, vert or texture counter.
 
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 7e697bc46..fd753adf7 100644
+index 1d887a55f..f6ba759c5 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -86,6 +86,11 @@ extern "C" int pdVisionEyeIsCapture(int eye);
@@ -108,7 +108,7 @@ index 7e697bc46..fd753adf7 100644
  #else
  #define PD_VISION_STEREO 0
  #endif
-@@ -2324,19 +2329,79 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+@@ -2356,19 +2361,79 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
  // the znear THEY WERE CALLED WITH rather than one read back out of a matrix),
  // and menuRender's own flat span.
  // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ index 7e697bc46..fd753adf7 100644
          case PD_DLSPAN_FLAT_BEGIN: pd_stereo.flat_span = 1; break;
          case PD_DLSPAN_FLAT_END:   pd_stereo.flat_span = 0; break;
          case PD_DLCLASS_SKY:       pd_stereo.pending_class = PD_DLCLASS_SKY; break;
-@@ -2350,6 +2415,24 @@ static void gfx_stereo_reset_classes(void) {
+@@ -2382,6 +2447,24 @@ static void gfx_stereo_reset_classes(void) {
      pd_stereo.pending_class = PD_DLCLASS_WORLD;
      pd_stereo.p_class = PD_DLCLASS_WORLD;
      pd_stereo.flat_span = 0;
@@ -215,7 +215,7 @@ index 7e697bc46..fd753adf7 100644
  }
  
  /**
-@@ -2420,13 +2503,14 @@ static void gfx_stereo_reset_classes(void) {
+@@ -2452,13 +2535,14 @@ static void gfx_stereo_reset_classes(void) {
   *         is projected geometry through func0f0d479c's own frustum - so under
   *         the world fold the pause menu had depth, and in the headset it
   *         intersected the world.
@@ -237,7 +237,7 @@ index 7e697bc46..fd753adf7 100644
   *
   * Returns false when 3D is off, in which case out[][] is untouched.
   */
-@@ -2444,18 +2528,23 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+@@ -2476,18 +2560,23 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
          return true;
      }
  
@@ -269,7 +269,7 @@ index 7e697bc46..fd753adf7 100644
      pdVisionStereoNoteClass(cls);
  
      if (cls == PD_DLCLASS_FLAT) {
-@@ -2463,30 +2552,74 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
+@@ -2495,30 +2584,74 @@ static bool gfx_stereo_projection(const float P[4][4], const float mv[4][4],
          return true;
      }
  
@@ -359,7 +359,7 @@ index 7e697bc46..fd753adf7 100644
      return true;
  }
  
-@@ -2542,9 +2675,21 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
+@@ -2574,9 +2707,21 @@ static void gfx_sp_matrix(uint8_t parameters, const int32_t* addr) {
              // pending tag is one-shot: an untagged load is WORLD (D-055).
              pd_stereo.p_class = pd_stereo.pending_class;
              pd_stereo.pending_class = PD_DLCLASS_WORLD;
@@ -381,7 +381,7 @@ index 7e697bc46..fd753adf7 100644
              // A MUL into the projection KEEPS the class: it is the same camera
              // and the same subject, with a transform folded in. This is the
              // half the old matrix-shape test could not do — 4J's XBLA lists
-@@ -2805,6 +2950,15 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
+@@ -2848,6 +2993,15 @@ static inline __attribute__((always_inline)) void gfx_sp_load_vertex(struct Load
              x += taa_jx * w;
              y += taa_jy * w;
          }
@@ -397,7 +397,7 @@ index 7e697bc46..fd753adf7 100644
  
          if (rsp.geometry_mode & G_LIGHTING) {
              gfx_light_vertex(d, px, py, pz, vcn->x, vcn->y, vcn->z, &U, &V);
-@@ -7600,6 +7754,32 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+@@ -7668,6 +7822,32 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
      lrxf = lrxf / (4.0f * HALF_SCREEN_WIDTH) - 1.0f;
      lryf = -(lryf / (4.0f * HALF_SCREEN_HEIGHT)) + 1.0f;
  
@@ -430,7 +430,7 @@ index 7e697bc46..fd753adf7 100644
      ulxf = gfx_adjust_x_for_aspect_ratio(ulxf);
      lrxf = gfx_adjust_x_for_aspect_ratio(lrxf);
  
-@@ -9085,6 +9265,15 @@ extern "C" void gfx_run(Gfx* commands) {
+@@ -9245,6 +9425,15 @@ extern "C" void gfx_run(Gfx* commands) {
      }
  #endif
      gfx_run_eye(commands);
@@ -484,10 +484,10 @@ index 775d7c9d1..1ab5e935f 100644
  						}
  
 diff --git a/src/game/bg.c b/src/game/bg.c
-index 9ff66d801..37938369d 100644
+index 4bc6c4435..4724537ab 100644
 --- a/src/game/bg.c
 +++ b/src/game/bg.c
-@@ -2583,6 +2583,18 @@ Gfx *bgRender(Gfx *gdl)
+@@ -2629,6 +2629,18 @@ Gfx *bgRender(Gfx *gdl)
  {
  	gdl = lightsSetDefault(gdl);
  
@@ -507,10 +507,10 @@ index 9ff66d801..37938369d 100644
  
  	gdl = envStartFog(gdl, false);
 diff --git a/src/include/gbiex.h b/src/include/gbiex.h
-index 6eb88ea3d..e39bc4d38 100644
+index 46178b393..1aa2b4bf0 100644
 --- a/src/include/gbiex.h
 +++ b/src/include/gbiex.h
-@@ -257,6 +257,34 @@
+@@ -258,6 +258,34 @@
  #define PD_DLSPAN_FLAT_BEGIN  8
  #define PD_DLSPAN_FLAT_END    9
  

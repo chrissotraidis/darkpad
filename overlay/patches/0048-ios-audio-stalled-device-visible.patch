@@ -22,10 +22,10 @@ never fire - configRegisterInt() clamps the value to its maximum as pd.ini is
 read - so it is removed and the comment says where the clamp really is.
 
 diff --git a/port/src/audio.c b/port/src/audio.c
-index 0b456cf27..74d53077e 100644
+index 763dd60d2..15394237b 100644
 --- a/port/src/audio.c
 +++ b/port/src/audio.c
-@@ -213,6 +213,17 @@ static float rateStep = 1.0f;     /* input frames per output frame */
+@@ -261,6 +261,17 @@ static float rateStep = 1.0f;     /* input frames per output frame */
  static float rateInteg = 0.0f;
  static float rateLevel = -1.0f;   /* filtered queue level; <0 = not yet seeded */
  static s32 rateDropping = 0;      /* a burst is being dropped back to the setpoint */
@@ -43,7 +43,7 @@ index 0b456cf27..74d53077e 100644
  static s16 *fadeBuf = NULL;
  static u32 fadeBufSize = 0;
  /** Resyncs (D-078): re-primes after an underrun, burst drops, samples dropped. */
-@@ -440,12 +451,10 @@ s32 audioInit(void)
+@@ -608,12 +619,10 @@ s32 audioInit(void)
  	}
  	// The rate matcher's authority has a hard ceiling (D-078). A pd.ini from
  	// 1.0.1.1 or earlier carries 10, which is what let a hitch be heard as
@@ -59,8 +59,8 @@ index 0b456cf27..74d53077e 100644
 +	// line that stood here could never fire).
  #endif
  
- 	SDL_AudioSpec want, have;
-@@ -563,6 +572,7 @@ void audioEndFrame(void)
+ 	nextBuf = NULL;
+@@ -865,6 +874,7 @@ void audioEndFrame(void)
  				audioIosQueueSilence(setpoint - inSamples);
  				rateLevel = (float)setpoint;
  				rateDropping = 0;
@@ -68,7 +68,7 @@ index 0b456cf27..74d53077e 100644
  				ratePrev[0] = ratePrev[1] = 0;
  				ratePhase = 0.0f;
  				fade = 1;
-@@ -578,6 +588,7 @@ void audioEndFrame(void)
+@@ -880,6 +890,7 @@ void audioEndFrame(void)
  					return;
  				}
  				rateDropping = 0;
@@ -76,7 +76,7 @@ index 0b456cf27..74d53077e 100644
  				audioIosQueueSilence(setpoint - queued - inSamples);
  				rateLevel = (float)setpoint;
  				ratePrev[0] = ratePrev[1] = 0;
-@@ -586,6 +597,8 @@ void audioEndFrame(void)
+@@ -888,6 +899,8 @@ void audioEndFrame(void)
  			} else if (g_PdAudioPushes > 0 && queued + inSamples > PD_AUDIO_HIGHMARK) {
  				g_PdAudioResyncOver++;
  				rateDropping = 1;

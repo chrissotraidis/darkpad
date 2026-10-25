@@ -1,0 +1,49 @@
+Subject: Online/Ghost account: a 15-character name or 8-digit PIN survives a restart
+
+Online round 2 (D-105). The Online Lobbies (and Ghost Trials) account is kept in
+pd.ini as Mod.GhostUser / Mod.GhostPin (and the remembered accounts' numbered
+keys). They were registered with max_str = GHOSTNET_MAXUSER (15) and
+GHOSTNET_MAXPIN (8), and config.c's CFG_STR load copies max_str - 1 characters:
+an account made with the longest name the page allows ("3-15 characters") or
+the longest PIN came back one character short at the next launch, and the
+automatic sign-in answered "Wrong username or PIN." every time. Found on the
+lane-3 simulator: a 15-character test account name was read back 14 long.
+
+The buffers are MAX + 2 (ghostnet.c), so registering MAX + 1 keeps every
+character. Not iOS-guarded: desktop has the same bug; one for upstream.
+
+--- a/port/src/main.c
++++ b/port/src/main.c
+@@ -608,13 +608,17 @@
+ 	configRegisterInt("Mod.CharacterMissionDefault", &g_ModCiMissionDefault, 0, 1);
+ 	configRegisterInt("Mod.CharacterFilter", &g_ModCiCharFilter, 0, MODGHOST_CHRSET_ALL);
+ 
++	// (overlay 0063: config.c's CFG_STR loads max_str - 1 characters, so a
++	// maximum of GHOSTNET_MAXUSER/MAXPIN read back one short - a 15-character
++	// account name or an 8-digit PIN failed "Wrong username or PIN" on every
++	// launch after the first. The buffers are MAX + 2, so MAX + 1 fits.)
+ 	// The leaderboard account. The PIN is stored as typed, which is what a PIN
+ 	// with no password behind it amounts to - it is a claim on a name on a
+ 	// game leaderboard, not a credential worth protecting on disk. It travels
+ 	// over TLS and the server rate limits guesses, which is where the actual
+ 	// protection is.
+-	configRegisterString("Mod.GhostUser", g_GhostNetUser, GHOSTNET_MAXUSER);
+-	configRegisterString("Mod.GhostPin", g_GhostNetPin, GHOSTNET_MAXPIN);
++	configRegisterString("Mod.GhostUser", g_GhostNetUser, GHOSTNET_MAXUSER + 1);
++	configRegisterString("Mod.GhostPin", g_GhostNetPin, GHOSTNET_MAXPIN + 1);
+ 
+ 	// The accounts this machine remembers besides the active one. Numbered
+ 	// from two so that Mod.GhostUser stays the one in use and a pd.ini written
+@@ -623,10 +627,10 @@
+ 		char key[32];
+ 
+ 		snprintf(key, sizeof(key), "Mod.GhostUser%d", i + 2);
+-		configRegisterString(key, g_GhostNetSavedUser[i], GHOSTNET_MAXUSER);
++		configRegisterString(key, g_GhostNetSavedUser[i], GHOSTNET_MAXUSER + 1);
+ 
+ 		snprintf(key, sizeof(key), "Mod.GhostPin%d", i + 2);
+-		configRegisterString(key, g_GhostNetSavedPin[i], GHOSTNET_MAXPIN);
++		configRegisterString(key, g_GhostNetSavedPin[i], GHOSTNET_MAXPIN + 1);
+ 
+ 		// Each remembered account keeps its own character, in the same range
+ 		// as the active one above. Without these, switching accounts brought

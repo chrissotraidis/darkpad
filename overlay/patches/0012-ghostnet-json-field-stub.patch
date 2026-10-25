@@ -14,10 +14,10 @@ in the first place, and matches the other stubs in that block. Worth sending
 upstream — it is a real bug in a configuration upstream supports.
 
 diff --git a/port/src/ghostnet.c b/port/src/ghostnet.c
-index 1666c3210..55cbe5ccf 100644
+index ecfb59a65..c4907772d 100644
 --- a/port/src/ghostnet.c
 +++ b/port/src/ghostnet.c
-@@ -1878,6 +1878,24 @@ const char *ghostnetGetMessage(void)
+@@ -1989,6 +1989,24 @@ const char *ghostnetGetMessage(void)
  // would clear is only ever the idle one.
  void ghostnetClearState(void) { }
  

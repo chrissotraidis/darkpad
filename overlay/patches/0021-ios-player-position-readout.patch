@@ -17,10 +17,10 @@ Read-only, entirely inside PLATFORM_IOS, called from the shell's frame hook like
 every other engine read.
 
 diff --git a/src/game/player.c b/src/game/player.c
-index 2d1cfc030..a451d9f84 100644
+index d08629c0f..2cb434d6f 100644
 --- a/src/game/player.c
 +++ b/src/game/player.c
-@@ -8760,3 +8760,77 @@ void player0f0c3320(Mtxf *matrices, s32 count)
+@@ -9421,3 +9421,77 @@ void player0f0c3320(Mtxf *matrices, s32 count)
  		mtxF2L(&sp40, matrices + i);
  	}
  }
