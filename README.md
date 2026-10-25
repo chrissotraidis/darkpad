@@ -202,8 +202,10 @@ Every add-on is optional, none is included, and each needs files you supply:
   Remaster falls back to N64 art. Not yet tested with a real package.
 - **GoldenEye levels (GE Plus).** Add your own GoldenEye 007 (US) ROM, and
   optionally the GoldenEye XBLA package or the Goldfinger 64 hack. They appear as
-  **GE Plus** on the main menu after a restart. Inherited from Dab's Mod and not
-  tested in depth.
+  **GE Plus** on the main menu after a restart. The first launch converts the
+  levels, then shows a short loading screen. Inherited from Dab's Mod. With a
+  US ROM on a Simulator, the menus, mission select and Dam load and play at
+  60 fps; the full GoldenEye campaign has not been played.
 
 ## Multiplayer
 
@@ -303,7 +305,8 @@ Never attach ROMs, extracted art, saves or signing files.
 - Only the first missions, Challenge 1 and bot matches have been played through.
 - Above 60 Hz, parts of the engine's game logic run fast.
 - Gyro aiming is experimental and uncalibrated on hardware.
-- Xbox 360 remaster art and GE Plus have not been tested with real files.
+- Xbox 360 remaster art has not been tested with a real package. GE Plus has
+  been played only briefly, on a Simulator.
 - LAN and online play exist only in the separate experimental build.
 
 ## FAQ
