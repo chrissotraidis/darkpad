@@ -105,8 +105,8 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	if (!(h[0] == 0x80 && h[1] == 0x37 && h[2] == 0x12 && h[3] == 0x40)) {
 		if ((h[0] == 0x37 && h[1] == 0x80) || (h[0] == 0x40 && h[1] == 0x12)) {
 			c.verdict = PDRomByteSwapped;
-			c.explanation = @"This ROM is in .v64 or .n64 byte order. Perfect Dark needs the "
-			                 "big-endian .z64 form — convert it (any N64 ROM tool will) and try again.";
+			c.explanation = @"This ROM is in .v64 or .n64 byte order and could not be converted. "
+			                 "Check that the file is complete, or convert it to .z64 and try again.";
 			return c;
 		}
 		c.verdict = PDRomNotARom;
@@ -196,6 +196,64 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	return c;
 }
 
+/**
+ * A big-endian .z64 copy of a .v64 (byte-swapped) or .n64 (word-swapped)
+ * ROM, in the temporary directory; nil if the file is neither. The player's
+ * file is only read. The caller validates the copy and removes it.
+ */
++ (nullable NSString *)z64CopyOfSwappedRom:(NSString *)path
+{
+	NSData *in = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:NULL];
+	if (in.length < 0x40 || in.length % 4) {
+		return nil;
+	}
+	const unsigned char *h = in.bytes;
+	const BOOL v64 = h[0] == 0x37 && h[1] == 0x80 && h[2] == 0x40 && h[3] == 0x12;
+	const BOOL n64 = h[0] == 0x40 && h[1] == 0x12 && h[2] == 0x37 && h[3] == 0x80;
+	if (!v64 && !n64) {
+		return nil;
+	}
+	NSMutableData *out = [NSMutableData dataWithLength:in.length];
+	unsigned char *o = out.mutableBytes;
+	for (NSUInteger i = 0; i < in.length; i += 4) {
+		if (v64) {
+			o[i] = h[i + 1]; o[i + 1] = h[i]; o[i + 2] = h[i + 3]; o[i + 3] = h[i + 2];
+		} else {
+			o[i] = h[i + 3]; o[i + 1] = h[i + 2]; o[i + 2] = h[i + 1]; o[i + 3] = h[i];
+		}
+	}
+	NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:@"pd-normalized.z64"];
+	if (![out writeToFile:tmp atomically:YES]) {
+		return nil;
+	}
+	NSLog(@"perfectdark: [onboard] made a .z64 copy of %@ (%@ order)", path.lastPathComponent, v64 ? @".v64" : @".n64");
+	return tmp;
+}
+
+/**
+ * Classify a ROM, converting a byte-swapped dump into a temporary .z64 copy
+ * first. *usable is the file to install: the original, or that copy.
+ */
++ (PDRomCheck *)checkRomAtPath:(NSString *)path usable:(NSString *_Nullable *_Nonnull)usable
+{
+	PDRomCheck *c = [self classifyFileAtPath:path];
+	*usable = path;
+	if (c.verdict != PDRomByteSwapped) {
+		return c;
+	}
+	NSString *copy = [self z64CopyOfSwappedRom:path];
+	if (!copy) {
+		return c;
+	}
+	PDRomCheck *converted = [self classifyFileAtPath:copy];
+	if (converted.ok) {
+		*usable = copy;
+		return converted;
+	}
+	[NSFileManager.defaultManager removeItemAtPath:copy error:NULL];
+	return converted;
+}
+
 + (NSString *)romDestination
 {
 	NSString *docs = PDShell.shared.documentsPath;
@@ -236,11 +294,15 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	}
 	// Multiple possible inputs require the player's explicit picker selection.
 	if (candidates.count != 1) return nil;
-	NSString *source = candidates.firstObject;
-	if (![self classifyFileAtPath:source].ok) return nil;
+	NSString *source = nil;
+	if (![self checkRomAtPath:candidates.firstObject usable:&source].ok) return nil;
 	NSString *dst = [self romDestination];
 	NSError *err = nil;
-	if (![PDXbla copyFileSafely:source to:dst same:NULL error:&err]) {
+	BOOL copied = [PDXbla copyFileSafely:source to:dst same:NULL error:&err];
+	if (source != candidates.firstObject) {
+		[NSFileManager.defaultManager removeItemAtPath:source error:NULL];
+	}
+	if (!copied) {
 		NSLog(@"perfectdark: [onboard] could not copy %@: %@", source.lastPathComponent, err);
 		return nil;
 	}
@@ -446,7 +508,8 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	// when it is not needed and is the difference between working and silently
 	// reading nothing when it is.
 	BOOL scoped = [url startAccessingSecurityScopedResource];
-	PDRomCheck *check = [PDOnboarding classifyFileAtPath:url.path];
+	NSString *source = nil;
+	PDRomCheck *check = [PDOnboarding checkRomAtPath:url.path usable:&source];
 	NSLog(@"perfectdark: [onboard] picked %@ -> verdict %ld (%@)",
 		url.lastPathComponent, (long)check.verdict, check.explanation);
 
@@ -462,7 +525,10 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	NSError *err = nil;
 	// Copied beside the name and renamed over it only once complete (D-075): a
 	// copy that fails part-way leaves whatever was at that name as it was.
-	BOOL ok = [PDXbla copyFileSafely:url.path to:dst same:NULL error:&err];
+	BOOL ok = [PDXbla copyFileSafely:source to:dst same:NULL error:&err];
+	if (source != url.path) {
+		[NSFileManager.defaultManager removeItemAtPath:source error:NULL];
+	}
 	if (scoped) {
 		[url stopAccessingSecurityScopedResource];
 	}

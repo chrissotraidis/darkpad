@@ -1826,7 +1826,10 @@ static const CGFloat kWheelRadius = 32.0;
 	// shipped those three, they did not fire, and the user's touch was still
 	// dead - because the settings page's own UIWindow had been made key and
 	// then deallocated, and what was left took the event.
-	if (win && !PDSettingsViewController.isPresented) {
+	// A hidden layer (controller connected, or On-Screen Controls Off) takes
+	// no touches by design: probing it would report a fault and re-run the
+	// window recovery on every menu close.
+	if (win && !self.hidden && !PDSettingsViewController.isPresented) {
 		UIWindow *routeWin = nil;
 		const CGPoint probe = [self routeProbePoint];
 		UIView *routed = pdRouteHitTest(probe, &routeWin);

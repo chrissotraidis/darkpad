@@ -1252,3 +1252,10 @@ User report from the physical iPad Pro: both sticks seemed to look, controls fel
 - Menu close timing is logged to lifecycle.txt. Simulator: first engine frame 4 ms after close, slowest frame 18 ms in the following second, so the pause did not reproduce there; device measurement pending.
 - PadMint: padmint.json (iOS, macos-arm64 experimental, in-app ROM, ~30 GB) running new scripts/build-personal-ipa.sh (device-only bootstrap, PD_PUBLIC Release, scripts/package-ipa.sh). Warm-cache run produced a 10 MB IPA in 58 s; padmint check-manifest OK, plan resolves, padmint audit PASS. Catalog entry catalog/darkpad.json committed locally in PadMint worktree ~/.codex/worktrees/padmint-catalog-darkpad (branch codex/catalog-darkpad, from origin/main 56f4132); 365 PadMint tests pass. Not pushed: DarkPad is private and has no release, which the catalog check requires. Cold player-check.sh not run yet.
 - README rewritten to the MeleePad/GoldenPad public structure.
+
+## Hardening pass: menu-close touch recovery, .v64/.n64 ROMs, GE Plus check (25 October)
+
+- PDTouchOverlay reassertTouchability skipped nothing while a controller hid the overlay, so every ••• close logged a false "unreachable-on-unhide" in touch-watchdog.txt on the iPad and ran makeKeyAndVisible recovery. The route probe and recovery now run only when the overlay is visible. Likely part of the reported pause after closing the menu; device timing still pending.
+- Byte-swapped (.v64) and little-endian (.n64) ROMs are now converted to a temporary .z64, validated, installed and the copy removed (PDOnboarding checkRomAtPath:usable:, used by loose-ROM adoption and the document picker). The README already promised this. Simulator: loose "My Perfect Dark.v64" adopted with MD5 e03b088b…; bridge `rom check` on .n64 and .v64 gives verdict 0, converted=1; a truncated .v64 gives the size error; tests/rom_classifier.py 14/14.
+- GE Plus on the Simulator with a GoldenEye (U) ROM: the black screen with two circles is the loading intro, then the folder menu, mission select, Dam briefing and gameplay load at 60 fps; left stick moves without turning, right stick turns.
+

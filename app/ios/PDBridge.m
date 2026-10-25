@@ -283,9 +283,14 @@ static NSString *pdErr(NSString *fmt, ...)
 		if (!path) {
 			return @"rom=none";
 		}
-		PDRomCheck *c = [PDOnboarding classifyFileAtPath:path];
-		return [NSString stringWithFormat:@"rom=%@\nmd5=%@\nverdict=%ld\nwhy=%@",
-			path.lastPathComponent, c.md5 ?: @"-", (long)c.verdict, c.explanation];
+		NSString *usable = nil;
+		PDRomCheck *c = [PDOnboarding checkRomAtPath:path usable:&usable];
+		BOOL converted = usable && ![usable isEqualToString:path];
+		if (converted) {
+			[NSFileManager.defaultManager removeItemAtPath:usable error:NULL];
+		}
+		return [NSString stringWithFormat:@"rom=%@\nmd5=%@\nverdict=%ld\nconverted=%d\nwhy=%@",
+			path.lastPathComponent, c.md5 ?: @"-", (long)c.verdict, (int)converted, c.explanation];
 	}
 
 	// The XBLA package: what is in Documents/xbla, whether it has been unpacked
