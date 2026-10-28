@@ -4,7 +4,7 @@
   "name": "DarkPad",
   "game": "Perfect Dark (N64)",
   "kind": "decomp-patches",
-  "status": "draft-untested",
+  "status": "experimental",
   "inputs": [
     {
       "type": "n64-rom",
@@ -20,7 +20,7 @@
   "targets": {
     "ios": {
       "hosts": {
-        "macos-arm64": "experimental"
+        "macos-arm64": "verified"
       },
       "output": "ipa",
       "check": "ipa",

@@ -38,7 +38,7 @@ fi
 # Apple grants it per team on request, and a build that asks for it without a
 # matching provisioning profile does not sign, so it is off by default: the LAN
 # page then finds no rooms, while Direct Connect and Online Lobbies still work.
-if [ "\${PD_MULTICAST:-0}" = "1" ]; then
+if [ "${PD_MULTICAST:-0}" = "1" ]; then
   ENTITLEMENTS="ios\/darkpad-multicast.entitlements"
   echo "PD_MULTICAST=1: signing with the multicast entitlement"
 else

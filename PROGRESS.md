@@ -1284,3 +1284,13 @@ User report from the physical iPad Pro: both sticks seemed to look, controls fel
 - iPad Pro: backup work/device-backup-20261025-204248 (2,928 files); signed Release installed twice; 2,911 save/settings/ROM/GE Plus files byte-identical afterwards. Hands-on play of this build is the owner's.
 
 - PadMint player-check (Apple Python 3.9, empty PadMint folder, PadMint main 37c2c50 / 0.5.14): PASS on 4bbcc0e (2184 s) and PASS on 8940d11 (2872 s), each a 10 MB personal-only IPA. One intermediate run on 8940d11 failed during the ANGLE download (depot_tools gsutil lock timeout, Errno 35) and passed on rerun; log kept as work/player-check-8940d11-fail-gsutil-lock.log.
+
+
+## Public release preparation (28 October)
+
+- Reorganized the README in the sibling-port style: native-game introduction, disclosure, icon/badges, features, platform table, PadMint/source setup, ROM requirements, controls, FAQ and credits. Moved the detailed menu/add-on reference into docs/PLAYER-GUIDE.md and developer instructions into docs/BUILDING.md.
+- Prepared 0.1.0 preview notes and docs/RELEASE-CHECKLIST.md. Release attachments remain recipe/checksum only; scripts/prepare-release.sh stages them from a clean checkout and refuses an existing output directory. No visibility, tag, public release or announcement changed.
+- Recipe status is experimental; the Apple Silicon Mac build route is verified by the recorded October 25 cold player checks. Current-main player check will be recorded after this candidate is committed. Current-engine hands-on iPad gameplay remains pending.
+- Fixed the personal IPA package guard to match the literal developer-console marker (the old regex interpreted square brackets and missed it); added synthetic Mach-O checks for ordinary packaging, console, ROM, provisioning profile and signature rejection. Fixed the escaped PD_MULTICAST variable so explicit opt-in works; generation verified both on and off, then restored the ordinary PD_PUBLIC project without the entitlement.
+- Reused the existing PadMint codex/catalog-darkpad worktree, rebased onto main 7e4c44c (0.5.22), and added sideloading/first-launch/update guidance. Eighteen catalog-route tests and the recipe/catalog consistency check pass. It remains local until the game release is public.
+- Documentation links, recipe schema and changed shell syntax checked. Updated stale acceptance headings to distinguish the current v3.15.1 engine from October 22 history.

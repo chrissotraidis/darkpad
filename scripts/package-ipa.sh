@@ -17,7 +17,7 @@ for pattern in '*.z64' '*.n64' '*.v64' '*.rom' 'eeprom.bin' 'pd.ini' '*.mobilepr
  [ -z "$hit" ] || { echo "Refusing app containing $hit" >&2; exit 1; }
 done
 [ ! -d "$APP/_CodeSignature" ] || { echo "Refusing signed app; build with CODE_SIGNING_ALLOWED=NO" >&2; exit 1; }
-if strings "$APP/perfectdark" | grep -q 'perfectdark: [bridge] listening'; then
+if LC_ALL=C grep -aF 'perfectdark: [bridge] listening' "$APP/perfectdark" >/dev/null; then
  echo "Refusing a development build; generate the project with PD_PUBLIC=1" >&2; exit 1
 fi
 

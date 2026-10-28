@@ -37,6 +37,7 @@ python3 tests/network_local_player.py build/src
 python3 tests/network_coop_results.py build/src/src/game/endscreen.c
 python3 tests/network_weapon_progress.py build/src/src/game/training.c
 python3 tests/network_session_exit.py build/src
+python3 tests/public_package.py
 ```
 
 When you move UPSTREAM_PIN, apply the overlay with scripts/apply-overlay.sh and
@@ -47,6 +48,13 @@ PD_VERSION_HASH argument in scripts/build-ios.sh.
 Boot one Simulator at a time unless you are testing online play. Simulator checks do not establish touch feel,
 controller feel, frame rate, heat or campaign completion on hardware; say which
 device you tested on.
+
+## Releases
+
+Follow [the release checklist](docs/RELEASE-CHECKLIST.md). Only source, a PadMint
+recipe and its checksum are published. The current-main PadMint player check
+must pass before tagging and again through the published release before an
+announcement. Personal IPAs never become release attachments.
 
 ## Pull requests
 
