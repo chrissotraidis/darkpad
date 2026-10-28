@@ -39,16 +39,13 @@ outputs private.
 ## Publication order, when the owner releases it
 
 1. Review and merge [DarkPad PR #2](https://github.com/chrissotraidis/darkpad/pull/2)
-   into `main`. The default branch still contains the earlier README and no
-   PadMint recipe until this merge. Reconcile any intervening changes and repeat
-   affected checks before tagging.
-2. Make the repository public with the owner's authorization. Update the README's
+   into `main`. Reconcile any intervening changes and repeat affected checks
+   before tagging.
+2. The owner has made the repository public. Update the README's
    preparation notice and the release notes to describe the actual published
    state; remove the temporary preparation-branch clone instructions and the
-   prepared-notes notice. Confirm Issues are enabled and private vulnerability
-   reporting is available at the link in SECURITY.md after making the repository
-   public; its reporting-status endpoint returned 404 while private. Do not
-   announce availability ahead of publication.
+   prepared-notes notice. Confirm Issues and private vulnerability reporting
+   remain enabled at publication. Do not announce availability ahead of publication.
 3. Tag the checked release commit `v0.1.0` and publish it as a regular GitHub
    release marked Latest, with **only** the recipe and checksum attachments.
    Keep the preview wording in its title/notes. PadMint starts at
@@ -61,7 +58,7 @@ outputs private.
    and first-launch instructions. Make it available through the normal PadMint
    release/update route; merging a catalog file alone does not update already
    downloaded PadMint copies. Its current live catalog audit reports exactly
-   one problem: DarkPad releases/latest returns 404 while private/unreleased.
+   one problem: DarkPad releases/latest returns 404 before its first release.
    Rerun that audit after publication and require it to pass before shipping
    the PadMint update.
 5. Recheck from current PadMint `main` **without a checkout argument**:

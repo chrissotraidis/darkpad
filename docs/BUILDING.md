@@ -14,10 +14,6 @@ recipe and checksums; personal IPAs stay on your computer.
 
 ## Build from source
 
-For the unreleased candidate, add `--branch codex/engine-v3.15.1` to
-`git clone` below. After the preparation PR merges, the default branch has the
-same build recipe.
-
 You need an Apple Silicon Mac with Xcode, Python 3.9 or newer, and Homebrew:
 
 ```sh

@@ -42,8 +42,9 @@ of its upstream projects.
 > prebuilt IPA or game data is distributed. Supply your own **Perfect Dark
 > (USA) Rev 1 / v1.1** ROM after installing the app.
 >
-> **0.1.0 is being prepared for its first public preview.** Until the release
-> and PadMint listing are live, use [Build from source](#build-from-source).
+> **Source is available now.** The 0.1.0 recipe release and PadMint 0.5.23
+> catalog update are prepared for publication. Until they are live, use
+> [Build from source](#build-from-source).
 
 ## Highlights
 
@@ -67,7 +68,7 @@ of its upstream projects.
 | Platform or route | Status |
 |---|---|
 | iPhone / iPad, iOS 15+ | Personal unsigned IPA built on an Apple Silicon Mac |
-| PadMint | Recipe prepared; public listing follows the first release |
+| PadMint | DarkPad listing prepared for 0.5.23; source builds work now |
 | Apple Silicon Mac gameplay | Developer reference build; no packaged Mac app |
 | Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
 | App Store, TestFlight, prebuilt IPA | Not offered |
@@ -94,7 +95,7 @@ You need:
 
 ### Build with PadMint
 
-Once DarkPad's first release and catalog entry are published:
+Once DarkPad's recipe release and **PadMint 0.5.23 or newer** are published:
 
 1. Install the build tools once: `brew install cmake ninja xcodegen`.
 2. Download [PadMint](https://github.com/chrissotraidis/padmint/releases/latest),
@@ -109,10 +110,6 @@ The first build downloads more than 10 GB of ANGLE sources and dependencies and
 can take an hour or longer. Later builds reuse downloads.
 
 ### Build from source
-
-For the unreleased candidate, add `--branch codex/engine-v3.15.1` to the
-`git clone` command below. The default branch receives it when the preparation
-PR is merged.
 
 ```sh
 brew install cmake ninja xcodegen
