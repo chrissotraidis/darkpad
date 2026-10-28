@@ -41,10 +41,6 @@ of its upstream projects.
 > PadMint recipe and checksums, with source available in the repository. No
 > prebuilt IPA or game data is distributed. Supply your own **Perfect Dark
 > (USA) Rev 1 / v1.1** ROM after installing the app.
->
-> **Source is available now.** The 0.1.0 recipe release and PadMint 0.5.23
-> catalog update are prepared for publication. Until they are live, use
-> [Build from source](#build-from-source).
 
 ## Highlights
 
@@ -68,7 +64,7 @@ of its upstream projects.
 | Platform or route | Status |
 |---|---|
 | iPhone / iPad, iOS 15+ | Personal unsigned IPA built on an Apple Silicon Mac |
-| PadMint | DarkPad listing prepared for 0.5.23; source builds work now |
+| PadMint | Personal builds with PadMint 0.5.23 or newer |
 | Apple Silicon Mac gameplay | Developer reference build; no packaged Mac app |
 | Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
 | App Store, TestFlight, prebuilt IPA | Not offered |
@@ -95,7 +91,8 @@ You need:
 
 ### Build with PadMint
 
-Once DarkPad's recipe release and **PadMint 0.5.23 or newer** are published:
+Use **PadMint 0.5.23 or newer**. Older downloads do not include DarkPad;
+extract the new ZIP and open the launcher in that new folder to update.
 
 1. Install the build tools once: `brew install cmake ninja xcodegen`.
 2. Download [PadMint](https://github.com/chrissotraidis/padmint/releases/latest),
