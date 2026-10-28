@@ -8,10 +8,11 @@ outputs private.
 
 1. Review the [release notes](releases/v0.1.0.md), README and
    [acceptance record](acceptance.md). Record the owner's latest iPad gameplay
-   results: a Perfect Dark mission, controller movement/aim, GoldenEye gameplay
-   and B/BACK/PREVIOUS returning to the Perfect Menu. Higher refresh rates can
-   stay experimental. Do not describe Simulator or launch checks as device
-   gameplay acceptance.
+   results when available: a Perfect Dark mission, controller movement/aim,
+   GoldenEye gameplay and B/BACK/PREVIOUS returning to the Perfect Menu.
+   Unverified checks remain disclosed preview limitations; they do not block
+   this preparation. Higher refresh rates stay experimental. Do not describe
+   Simulator or launch checks as device gameplay acceptance.
 2. Commit the intended release on the existing DarkPad branch. Verify the source
    and history contain no ROMs, extracted assets, saves or signing material.
    `VERSION` must be `0.1.0` and `DEV_ITERATION` must be `0`.
@@ -42,8 +43,11 @@ outputs private.
 2. Make the repository public with the owner's authorization. Update the README's
    preparation notice and the release notes to describe the actual published
    state; do not announce availability ahead of it.
-3. Tag the checked release commit `v0.1.0` and publish the notes with **only** the
-   recipe and checksum attachments. Do not attach an IPA, a build folder or any
+3. Tag the checked release commit `v0.1.0` and publish it as a regular GitHub
+   release marked Latest, with **only** the recipe and checksum attachments.
+   Keep the preview wording in its title/notes. PadMint starts at
+   `/releases/latest`, so a draft or prerelease-only first release is not
+   discoverable through that route. Do not attach an IPA, a build folder or any
    game-derived artifact. GitHub's source archives come from the tag.
 4. Integrate the prepared `codex/catalog-darkpad` branch in PadMint after the
    public release is readable. Its catalog entry must keep the build Mac-only,
@@ -64,7 +68,14 @@ outputs private.
 
 ## Evidence
 
-The October 25 player check passed on DarkPad `8940d11` using PadMint `37c2c50`
-(v0.5.14). That is historical evidence; the current preparation run is recorded
-in `PROGRESS.md` after it finishes. Publication and the post-publication check
-remain separate steps.
+The October 28 clean player check **passed** on DarkPad
+`26ac4bd14d05ef353d0544767ad6b97ee98dbdf6` using PadMint main
+`7e4c44c22a0c289ccb104ae054dd2f7ae5e6f041` (v0.5.22), Apple Python 3.9.6 and
+an empty PadMint folder. It completed in 873 seconds and produced a private
+11,140,422-byte IPA. Recipe, checksum and source snapshot passed both release
+audits; staged-file discovery and catalog checks passed locally.
+
+Only documentation changed after that build. The recipe and build inputs are
+unchanged. Full evidence is indexed in `PROGRESS.md`. Publication, making the
+catalog available to players, and the post-publication check remain separate
+steps.
