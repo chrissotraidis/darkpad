@@ -38,8 +38,10 @@ outputs private.
 
 ## Publication order, when the owner releases it
 
-1. Integrate the prepared DarkPad branch into `main`. Reconcile any intervening
-   changes and repeat affected checks before tagging.
+1. Review and merge [DarkPad PR #2](https://github.com/chrissotraidis/darkpad/pull/2)
+   into `main`. The default branch still contains the earlier README and no
+   PadMint recipe until this merge. Reconcile any intervening changes and repeat
+   affected checks before tagging.
 2. Make the repository public with the owner's authorization. Update the README's
    preparation notice and the release notes to describe the actual published
    state; remove the temporary preparation-branch clone instructions and the
@@ -53,11 +55,15 @@ outputs private.
    `/releases/latest`, so a draft or prerelease-only first release is not
    discoverable through that route. Do not attach an IPA, a build folder or any
    game-derived artifact. GitHub's source archives come from the tag.
-4. Integrate the prepared `codex/catalog-darkpad` branch in PadMint after the
-   public release is readable. Its catalog entry must keep the build Mac-only,
+4. Review and merge [PadMint PR #213](https://github.com/chrissotraidis/padmint/pull/213)
+   after the public release is readable. Its catalog entry must keep the build Mac-only,
    request the ROM **in the app**, link to `#get-darkpad`, and include sideloading
    and first-launch instructions. Make it available through the normal PadMint
-   release/update route; committing a local catalog file does not publish it.
+   release/update route; merging a catalog file alone does not update already
+   downloaded PadMint copies. Its current live catalog audit reports exactly
+   one problem: DarkPad releases/latest returns 404 while private/unreleased.
+   Rerun that audit after publication and require it to pass before shipping
+   the PadMint update.
 5. Recheck from current PadMint `main` **without a checkout argument**:
 
    ```sh
@@ -73,10 +79,10 @@ outputs private.
 ## Evidence
 
 The October 28 clean player check **passed** on DarkPad
-`26ac4bd14d05ef353d0544767ad6b97ee98dbdf6` using PadMint main
+`c13d20d3b1a91518583955140868b6dd8f590995` using PadMint main
 `7e4c44c22a0c289ccb104ae054dd2f7ae5e6f041` (v0.5.22), Apple Python 3.9.6 and
-an empty PadMint folder. It completed in 873 seconds and produced a private
-11,140,422-byte IPA. Recipe, checksum and source snapshot passed both release
+an empty PadMint folder. It completed in 855 seconds and produced a private
+11,140,514-byte IPA. Recipe, checksum and source snapshot passed both release
 audits; staged-file discovery and catalog checks passed locally.
 
 Only documentation changed after that build. The recipe and build inputs are

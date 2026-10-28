@@ -10,7 +10,7 @@ being prepared for its first public preview; it has not been published.
 | Area | Verified evidence | Still open |
 |---|---|---|
 | Engine and builds | Pin `a8c2ab2d7b1c99f6a96a2d9addee1fdf9630e379`; 73 patches applied without fuzz or offsets. Simulator, device Release and native Mac reference built on October 25. | Broader device/OS coverage. |
-| PadMint | October 28: Apple Python 3.9.6 / empty PadMint-folder check passed on `26ac4bd` with PadMint main `7e4c44c` (0.5.22), 873 seconds, 11.1 MB personal IPA. Evidence is indexed in `PROGRESS.md`. | Post-publication build from the released recipe. |
+| PadMint | October 28: Apple Python 3.9.6 / empty PadMint-folder check passed on `c13d20d` with PadMint main `7e4c44c` (0.5.22), 855 seconds, 11.1 MB personal IPA. Evidence is indexed in `PROGRESS.md`. | Post-publication build from the released recipe. |
 | Physical iPad | Current engine installed and launched on iPad Pro with 2,911 non-runtime save/settings/content files unchanged; approximately 119.9 Hz measured pacing at launch. Previous-engine Xbox-controller play was accepted by the owner. | Hands-on current-engine mission, GoldenEye and controller-navigation acceptance; launch pacing is not gameplay acceptance. |
 | Simulator gameplay | Saved agent loads; Carrington Institute movement, GE Plus Dam and bot matches run. Game clock and walking speed compared at 60/120 Hz. | Full campaign, physical iPhone touch play, hardware timing, thermal and battery behavior. |
 | Network | Current protocol 33 hosts/joins desktop Dab's Mod; touch look applied by the host; two Simulator instances joined a lobby. | Real-device Wi-Fi, internet lobbies, completed co-op and broad recovery testing. Ordinary builds omit the multicast entitlement; use Direct Connect. |
