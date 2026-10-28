@@ -9,9 +9,9 @@ outputs private.
 - The repository is public. [PR #2](https://github.com/chrissotraidis/darkpad/pull/2)
   is merged into `main`; the README has no app icon or temporary branch-clone
   instructions. Issues and private vulnerability reporting are enabled.
-- The [DarkPad 0.1.0 draft](https://github.com/chrissotraidis/darkpad/releases/tag/untagged-3f11c22ee81e5036397d)
+- The [DarkPad 0.1.0 draft](https://github.com/chrissotraidis/darkpad/releases)
   contains exactly the recipe and `SHA256SUMS`.
-- The [PadMint 0.5.23 draft](https://github.com/chrissotraidis/padmint/releases/tag/untagged-51b816560b31848b3546)
+- The [PadMint 0.5.23 draft](https://github.com/chrissotraidis/padmint/releases)
   contains its three platform ZIPs and `SHA256SUMS`. All files passed both release
   gates, and the ZIPs match the independent Windows CI build byte for byte.
   Its catalog change remains in [PR #213](https://github.com/chrissotraidis/padmint/pull/213).
