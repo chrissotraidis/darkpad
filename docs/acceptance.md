@@ -2,23 +2,23 @@
 
 This is an index of evidence, not a declaration of release readiness. The requirements remain in [goal.md](goal.md) and [prd.md](prd.md). Private logs, screenshots, ROMs and saves stay under ignored `work/`; they are not distributed with source.
 
-## Current release candidate: 0.1.0 / Dab's Mod v3.15.1
+## Current public preview: 0.1.0 / Dab's Mod v3.15.1
 
-This section supersedes the older engine and candidate status below. DarkPad is
-being prepared for its first public preview; it has not been published.
+This section supersedes the older engine and candidate status below. DarkPad
+0.1.0 was published on October 28 with a recipe and checksum only. PadMint
+0.5.23 includes its catalog entry.
 
 | Area | Verified evidence | Still open |
 |---|---|---|
 | Engine and builds | Pin `a8c2ab2d7b1c99f6a96a2d9addee1fdf9630e379`; 73 patches applied without fuzz or offsets. Simulator, device Release and native Mac reference built on October 25. | Broader device/OS coverage. |
-| PadMint | October 28: Apple Python 3.9.6 / empty PadMint-folder check passed on `c13d20d` with PadMint main `7e4c44c` (0.5.22), 855 seconds, 11.1 MB personal IPA. Evidence is indexed in `PROGRESS.md`. | Post-publication build from the released recipe. |
+| PadMint | October 28: clean pre-tag check passed on `c13d20d` with PadMint main `7e4c44c` (0.5.22), 855 seconds. After publication, the released `v0.1.0` recipe/tag (`09d3f6d`) passed from PadMint main `0e377ca` (0.5.23), 432 seconds, using Apple Python 3.9.6 and an empty PadMint folder without a checkout argument. Both produced private 11.1 MB IPAs. Evidence is indexed in `PROGRESS.md`. | Broader Mac/Xcode version coverage. |
 | Physical iPad | Current engine installed and launched on iPad Pro with 2,911 non-runtime save/settings/content files unchanged; approximately 119.9 Hz measured pacing at launch. Previous-engine Xbox-controller play was accepted by the owner. | Hands-on current-engine mission, GoldenEye and controller-navigation acceptance; launch pacing is not gameplay acceptance. |
 | Simulator gameplay | Saved agent loads; Carrington Institute movement, GE Plus Dam and bot matches run. Game clock and walking speed compared at 60/120 Hz. | Full campaign, physical iPhone touch play, hardware timing, thermal and battery behavior. |
 | Network | Current protocol 33 hosts/joins desktop Dab's Mod; touch look applied by the host; two Simulator instances joined a lobby. | Real-device Wi-Fi, internet lobbies, completed co-op and broad recovery testing. Ordinary builds omit the multicast entitlement; use Direct Connect. |
 | Optional content | HD pack checks and brief US GoldenEye ROM conversion/Dam play on Simulator. | Xbox 360 art, Goldfinger 64 and TND64 with their optional files. |
 
-The [release checklist](RELEASE-CHECKLIST.md) separates preparation from
-publication and the mandatory post-publication player check. Private evidence
-stays under ignored `work/`.
+The [release checklist](RELEASE-CHECKLIST.md) records publication and both required
+player checks. Private evidence stays under ignored `work/`.
 
 ## Historical evidence through October 22
 
