@@ -1305,3 +1305,11 @@ User report from the physical iPad Pro: both sticks seemed to look, controls fel
 - PadMint's existing codex/catalog-darkpad branch now also carries DarkPad's unchanged original icon and the compatibility/build record. It is not integrated or published; the game's release must be public before the catalog ships.
 - Remaining physical checks are disclosed preview limitations; no new device acceptance is claimed. Release instructions require a regular Latest GitHub release because PadMint begins at releases/latest, and retain the post-publication player check before announcement.
 - Follow-up changes after the checked candidate are documentation only; recipe/build inputs are unchanged. No pushes, visibility changes, tags, public releases, IPAs or announcements were made.
+
+
+## Second release sanity check (28 October)
+
+- Removed the app icon from the README at the owner's request. The installed app and PadMint library keep their existing icons.
+- Corrected the first-launch ROM description to list .z64, .v64 and .n64, matching the existing importer and documentation. No import behavior changed. A fresh current-main player check follows because the app text changed.
+- Release notes now use absolute links pinned to v0.1.0 so they remain valid when pasted into the GitHub release body. Before that tag exists those links intentionally cannot resolve publicly. Added temporary instructions for cloning the prepared branch while main still lacks the recipe, and clarified that manual signing follows the dependency/engine build.
+- GitHub recheck: repository remains private, Issues enabled, no release and no preparation PRs yet. The private-vulnerability-reporting status endpoint returned 404; confirm it after switching public rather than treating the reporting link as verified now.

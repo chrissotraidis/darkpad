@@ -13,10 +13,6 @@ actually been checked. This describes DarkPad's workflow, not the authorship
 of its upstream projects.
 
 <p align="center">
-  <img src="app/ios/icon/AppIcon1024.png" width="192" alt="DarkPad app icon: a faceted D with four directional arrows">
-</p>
-
-<p align="center">
   <strong>Perfect Dark, native on iPhone and iPad.</strong><br>
   Campaign missions, Combat Simulator bots, and optional GoldenEye levels.<br>
   Touch or controller. Your own game. No emulator or JIT.
@@ -113,6 +109,10 @@ The first build downloads more than 10 GB of ANGLE sources and dependencies and
 can take an hour or longer. Later builds reuse downloads.
 
 ### Build from source
+
+For the unreleased candidate, add `--branch codex/engine-v3.15.1` to the
+`git clone` command below. The default branch receives it when the preparation
+PR is merged.
 
 ```sh
 brew install cmake ninja xcodegen

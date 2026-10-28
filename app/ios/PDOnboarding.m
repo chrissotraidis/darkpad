@@ -396,7 +396,7 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	body.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
 	body.font = [UIFont systemFontOfSize:15];
 	body.text =
-		@"Choose your Perfect Dark Nintendo 64 ROM: USA Rev 1 (US V1.1), in .z64 format. "
+		@"Choose your Perfect Dark Nintendo 64 ROM: USA Rev 1 (US V1.1), in .z64, .v64 or .n64 format. "
 		 "Game data is not included. Your file will be copied into the app and checked before play.";
 
 	_status = [UILabel new];

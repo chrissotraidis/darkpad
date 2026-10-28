@@ -14,6 +14,10 @@ recipe and checksums; personal IPAs stay on your computer.
 
 ## Build from source
 
+For the unreleased candidate, add `--branch codex/engine-v3.15.1` to
+`git clone` below. After the preparation PR merges, the default branch has the
+same build recipe.
+
 You need an Apple Silicon Mac with Xcode, Python 3.9 or newer, and Homebrew:
 
 ```sh
@@ -28,7 +32,8 @@ and builds an unsigned Release IPA for iPhone and iPad. It is the same command
 PadMint runs. The first run downloads ANGLE's sources (over 10 GB); everything is
 cached under the ignored `vendor/`, `work/` and `build/` folders.
 
-To sign and install directly with your own Apple developer team instead:
+After the build above has prepared the dependencies and engine, you can sign
+and install directly with your own Apple developer team:
 
 ```sh
 PD_PUBLIC=1 scripts/gen-app-project.sh

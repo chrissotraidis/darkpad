@@ -42,7 +42,11 @@ outputs private.
    changes and repeat affected checks before tagging.
 2. Make the repository public with the owner's authorization. Update the README's
    preparation notice and the release notes to describe the actual published
-   state; do not announce availability ahead of it.
+   state; remove the temporary preparation-branch clone instructions and the
+   prepared-notes notice. Confirm Issues are enabled and private vulnerability
+   reporting is available at the link in SECURITY.md after making the repository
+   public; its reporting-status endpoint returned 404 while private. Do not
+   announce availability ahead of publication.
 3. Tag the checked release commit `v0.1.0` and publish it as a regular GitHub
    release marked Latest, with **only** the recipe and checksum attachments.
    Keep the preview wording in its title/notes. PadMint starts at
