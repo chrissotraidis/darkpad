@@ -38,7 +38,7 @@ cd "$REPO"
 
 # The ONE Apple Vision Pro (visionOS 27.0). Never `simctl create`.
 SIM="${PD_VISION_SIM:-$(xcrun simctl list devices available | awk -F'[()]' '/Apple Vision Pro/{print $2; exit}')}"
-BUNDLE=com.rebelancap.perfectdark
+BUNDLE=com.chrissotraidis.darkpad
 # NOT 8775: a simulator's loopback is the Mac's loopback, the iOS lane runs the
 # same app with the same bridge, and one bridge per port at a time. 8785 is this
 # port's visionOS number (docs/remote-console.md).

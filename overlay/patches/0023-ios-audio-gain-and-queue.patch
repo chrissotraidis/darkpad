@@ -40,13 +40,25 @@ so every other platform is byte for byte upstream's.
    back to the setpoint in one step. A per-push trace ring (`audio trace` on the
    bridge) records queue, ratio, integrator and every resync.
 
+5. Upstream v3.15.1 (surround, D-103). audioInit() is now audioOpenDevice()
+   plus a surround layer that may reopen the device at six channels, and
+   audioEndFrame() fades the speakers for Mute When Unfocused. On iOS the
+   device stays at two channels (audioApplySurround forces it: everything
+   above works on the stereo queue, and 5.1 plays as Dolby Surround), the
+   floors are applied before the first open, the device is opened paused, and
+   audioEndFrame() keeps its own iOS body - upstream's focus fade, then the
+   shell's gain, then the queue; queuedTotal is kept as upstream keeps it, and
+   --audio-dump is written before the shell's gain (a run muted by the shell
+   still dumps what the game played - how Mute When Unfocused is tested).
+   Our gain buffer is iosGainBuf (upstream took gainBuf).
+
 diff --git a/port/src/audio.c b/port/src/audio.c
-index 791b5f8ab..63ed859b0 100644
+index 616f6effc..3db3436df 100644
 --- a/port/src/audio.c
 +++ b/port/src/audio.c
-@@ -15,6 +15,408 @@ static s32 bufferSize = 512;
- static s32 queueLimit = 8192;
- static s32 sampleRate = 22020;
+@@ -63,6 +63,408 @@ static s16 *wideBuf = NULL; // a stereo buffer made 5.1
+ static s16 *recBuf = NULL; // and the stereo the recorder gets for it
+ static u32 wideFrames = 0;
  
 +#ifdef PLATFORM_IOS
 +#include <stdlib.h>
@@ -139,8 +151,8 @@ index 791b5f8ab..63ed859b0 100644
 +	g_PdAudioTraceCount++;
 +}
 +
-+static s16 *gainBuf = NULL;
-+static u32 gainBufSize = 0;
++static s16 *iosGainBuf = NULL;
++static u32 iosGainBufSize = 0;
 +
 +/**
 + * Audio.PrimeSamples - the cushion of silence queued ONCE, in front of the
@@ -394,13 +406,13 @@ index 791b5f8ab..63ed859b0 100644
 +		return buf;
 +	}
 +
-+	if (gainBufSize < len) {
-+		s16 *grown = (s16 *)realloc(gainBuf, len);
++	if (iosGainBufSize < len) {
++		s16 *grown = (s16 *)realloc(iosGainBuf, len);
 +		if (!grown) {
 +			return buf;
 +		}
-+		gainBuf = grown;
-+		gainBufSize = len;
++		iosGainBuf = grown;
++		iosGainBufSize = len;
 +	}
 +
 +	count = len / sizeof(s16);
@@ -411,10 +423,10 @@ index 791b5f8ab..63ed859b0 100644
 +		} else if (v < -32768) {
 +			v = -32768;
 +		}
-+		gainBuf[i] = (s16)v;
++		iosGainBuf[i] = (s16)v;
 +	}
 +
-+	return gainBuf;
++	return iosGainBuf;
 +}
 +
 +static void audioIosQueueSilence(s32 samples)
@@ -450,10 +462,55 @@ index 791b5f8ab..63ed859b0 100644
 +}
 +#endif
 +
- s32 audioInit(void)
+ static s32 audioQueryDeviceChannels(void)
  {
- 	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
-@@ -22,6 +424,29 @@ s32 audioInit(void)
+ #if SDL_VERSION_ATLEAST(2, 24, 0)
+@@ -103,7 +505,29 @@ static s32 audioOpenDevice(s32 nchannels)
+ 	channels = nchannels;
+ 	sampleRate = have.freq;
+ 
++#ifdef PLATFORM_IOS
++	// Left paused on purpose: audioIosStartDevice() starts it at the first
++	// frame that has audio to push, with the cushion already in the queue.
++#else
+ 	SDL_PauseAudioDevice(dev, 0);
++#endif
++
++#ifdef PLATFORM_IOS
++	// What SDL opened, not what was asked for. With allowed_changes 0 SDL
++	// promises the asked-for format and converts internally, so the queue is
++	// counted in the app's own 22020 Hz stereo samples - but a build that ever
++	// stops promising that would silently change what every audio_* row means,
++	// and this is the row that says so.
++	g_PdAudioHaveFreq = have.freq;
++	g_PdAudioHaveSamples = have.samples;
++	g_PdAudioHaveChannels = have.channels;
++	g_PdAudioHaveFormat = (s32)have.format;
++	g_PdAudioBufferSize = bufferSize;
++	g_PdAudioQueueLimit = queueLimit;
++	g_PdAudioPrimeSamples = primeSamples;
++	sysLogPrintf(LOG_NOTE, "audio: SDL opened %d Hz, %d ch, format 0x%x, %d samples/callback",
++		have.freq, have.channels, (unsigned)have.format, have.samples);
++#endif
+ 
+ 	return 0;
+ }
+@@ -127,6 +551,14 @@ static void audioApplySurround(void)
+ 		}
+ 	}
+ 
++#ifdef PLATFORM_IOS
++	// Two channels on iOS whatever was asked for: the shell's rate matcher,
++	// fades and gain (audioEndFrame) work on the stereo queue, and a phone's
++	// default output is stereo anyway. 5.1 then plays as Dolby Surround;
++	// Headphone Surround is two channels and is untouched.
++	want = 2;
++#endif
++
+ 	if (dev && want != channels) {
+ 		if (audioOpenDevice(want) != 0 && want != 2) {
+ 			audioOpenDevice(2);
+@@ -160,6 +592,29 @@ s32 audioInit(void)
  		return -1;
  	}
  
@@ -480,49 +537,16 @@ index 791b5f8ab..63ed859b0 100644
 +	}
 +#endif
 +
- 	SDL_AudioSpec want, have;
- 	SDL_zero(want);
- 	want.freq = 22020; // TODO: this might cause trouble for some platforms
-@@ -38,10 +463,32 @@ s32 audioInit(void)
- 		return -1;
- 	}
+ 	nextBuf = NULL;
+ 	deviceChannels = audioQueryDeviceChannels();
  
-+#ifdef PLATFORM_IOS
-+	// Left paused on purpose: audioIosStartDevice() starts it at the first
-+	// frame that has audio to push, with the cushion already in the queue.
-+#else
- 	SDL_PauseAudioDevice(dev, 0);
-+#endif
+@@ -364,6 +819,122 @@ void audioSetMuteUnfocused(s32 on)
  
- 	sampleRate = have.freq;
- 
-+#ifdef PLATFORM_IOS
-+	// What SDL opened, not what was asked for. With allowed_changes 0 SDL
-+	// promises the asked-for format and converts internally, so the queue is
-+	// counted in the app's own 22020 Hz stereo samples - but a build that ever
-+	// stops promising that would silently change what every audio_* row means,
-+	// and this is the row that says so.
-+	g_PdAudioHaveFreq = have.freq;
-+	g_PdAudioHaveSamples = have.samples;
-+	g_PdAudioHaveChannels = have.channels;
-+	g_PdAudioHaveFormat = (s32)have.format;
-+	g_PdAudioBufferSize = bufferSize;
-+	g_PdAudioQueueLimit = queueLimit;
-+	g_PdAudioPrimeSamples = primeSamples;
-+	sysLogPrintf(LOG_NOTE, "audio: SDL opened %d Hz, %d ch, format 0x%x, %d samples/callback",
-+		have.freq, have.channels, (unsigned)have.format, have.samples);
-+#endif
-+
- 	return 0;
- }
- 
-@@ -69,12 +516,114 @@ void audioSetNextBuffer(const s16 *buf, u32 len)
  void audioEndFrame(void)
  {
- 	if (nextBuf && nextSize) {
--		if (audioGetSamplesBuffered() < queueLimit) {
-+		const s32 queued = audioGetSamplesBuffered();
 +#ifdef PLATFORM_IOS
++	if (nextBuf && nextSize) {
++		const s32 queued = audioGetSamplesBuffered();
 +		g_PdAudioQueued = queued;
 +		if (g_PdAudioQueuedMin < 0 || queued < g_PdAudioQueuedMin) {
 +			g_PdAudioQueuedMin = queued;
@@ -535,9 +559,7 @@ index 791b5f8ab..63ed859b0 100644
 +			// sample it had was played and there was nothing behind them.
 +			g_PdAudioUnderruns++;
 +		}
-+#endif
 +		if (queued < queueLimit) {
-+#ifdef PLATFORM_IOS
 +			// Steady state: the queue is held at its setpoint by resampling the
 +			// frame by at most 1 %, and nothing is inserted (D-039). A HITCH is
 +			// different and is handled as the discontinuity it is (D-078):
@@ -602,7 +624,18 @@ index 791b5f8ab..63ed859b0 100644
 +					out = audioIosFade(out, outLen, fade > 0);
 +					flags |= fade > 0 ? 16 : 32;
 +				}
-+				SDL_QueueAudio(dev, audioIosApplyGain(out, outLen), outLen);
++				// upstream's Mute When Unfocused fade first (a no-op unless
++				// Audio.MuteWhenUnfocused is on and the window lost the focus).
++				// --audio-dump takes the sound here, before the shell's master
++				// gain, so a muted test run still records what the game played.
++				out = (const s16 *)audioApplyGain(out, outLen / 4u, 2, audioWantedGain());
++				if (dumpFile) {
++					fwrite(out, 1, outLen, dumpFile);
++					fflush(dumpFile);
++				}
++				out = audioIosApplyGain(out, outLen);
++				SDL_QueueAudio(dev, out, outLen);
++				queuedTotal += nextSize;
 +				rateOutSamples = (s32)(outLen / 4u);
 +			}
 +			g_PdAudioPushes++;
@@ -616,26 +649,32 @@ index 791b5f8ab..63ed859b0 100644
 +				g_PdAudioRateMaxMilli = g_PdAudioRateMilli;
 +			}
 +			audioIosTrace(queued, rateOutSamples, rateInteg, flags);
-+#else
- 			SDL_QueueAudio(dev, nextBuf, nextSize);
-+#endif
- 			// Inside the check on purpose: a recording should hold what was
- 			// played, and a buffer dropped for a full queue was not.
- 			recordPushAudio(nextBuf, nextSize);
- 		}
-+#ifdef PLATFORM_IOS
-+		else {
++			// Inside the check on purpose: a recording should hold what was
++			// played, and a buffer dropped for a full queue was not.
++			recordPushAudio(nextBuf, nextSize);
++		} else {
 +			g_PdAudioDrops++;
 +			audioIosTrace(queued, 0, rateInteg, 2);
 +		}
-+#endif
++		nextBuf = NULL;
++		nextSize = 0;
++	}
++#else
+ 	if (nextBuf && nextSize) {
+ 		if (audioGetSamplesBuffered() < queueLimit) {
+ 			const void *out = nextBuf;
+@@ -400,6 +971,7 @@ void audioEndFrame(void)
  		nextBuf = NULL;
  		nextSize = 0;
  	}
-@@ -84,4 +633,9 @@ PD_CONSTRUCTOR static void audioConfigInit(void)
- {
- 	configRegisterInt("Audio.BufferSize", &bufferSize, 0, 1 * 1024 * 1024);
- 	configRegisterInt("Audio.QueueLimit", &queueLimit, 0, 1 * 1024 * 1024);
++#endif
+ }
+ 
+ PD_CONSTRUCTOR static void audioConfigInit(void)
+@@ -410,4 +982,9 @@ PD_CONSTRUCTOR static void audioConfigInit(void)
+ 	configRegisterInt("Audio.SurroundLFE", &surroundLfe, 0, 100);
+ 	configRegisterInt("Audio.HeadphoneRoom", &headphoneRoom, 0, 100);
+ 	configRegisterInt("Audio.MuteWhenUnfocused", &muteUnfocused, 0, 1);
 +#ifdef PLATFORM_IOS
 +	configRegisterInt("Audio.PrimeSamples", &primeSamples, 0, 32 * 1024);
 +	configRegisterInt("Audio.RateMatch", &rateMatch, 0, 1);

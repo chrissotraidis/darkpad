@@ -11,7 +11,7 @@
 # work/deps-$(PLATFORM_NAME) symlinks are named to match.
 name: perfectdark
 options:
-  bundleIdPrefix: com.rebelancap
+  bundleIdPrefix: com.chrissotraidis
   createIntermediateGroups: true
 settings:
   base:
@@ -71,6 +71,7 @@ targets:
       - path: ios/PDController.m
       - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
+      - path: ios/PDUtilityMenu.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m
       - path: ios/PDAudio.m
@@ -95,9 +96,10 @@ targets:
       base:
         SDKROOT: iphoneos
         TARGETED_DEVICE_FAMILY: "1,2"
-        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_BUNDLE_IDENTIFIER: com.chrissotraidis.darkpad
         PRODUCT_NAME: perfectdark
         INFOPLIST_FILE: ios/Info.plist
+        CODE_SIGN_ENTITLEMENTS: "PD_ENTITLEMENTS"
         MARKETING_VERSION: "PD_MARKETING_VERSION"
         CURRENT_PROJECT_VERSION: "PD_BUILD_NUMBER"
         # build/ios-device vs build/ios-simulator, chosen by the SDK in use.
@@ -166,6 +168,7 @@ targets:
       - path: ios/PDController.m
       - path: ios/PDGyro.m
       - path: ios/PDSettingsViewController.m
+      - path: ios/PDUtilityMenu.m
       - path: ios/PDXbla.m
       - path: ios/PDTexPacks.m
       - path: ios/PDAudio.m
@@ -201,9 +204,10 @@ targets:
       base:
         SDKROOT: xros
         TARGETED_DEVICE_FAMILY: "7"
-        PRODUCT_BUNDLE_IDENTIFIER: com.rebelancap.perfectdark
+        PRODUCT_BUNDLE_IDENTIFIER: com.chrissotraidis.darkpad
         PRODUCT_NAME: perfectdark
         INFOPLIST_FILE: ios/Info-visionos.plist
+        CODE_SIGN_ENTITLEMENTS: "PD_ENTITLEMENTS"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: "PD_MARKETING_VERSION"
         CURRENT_PROJECT_VERSION: "PD_BUILD_NUMBER"

@@ -1,6 +1,56 @@
-# Networking integration experiment
+# Networking integration
 
-The working solo engine remains pinned to `90c8622e74b35be669d60d177effc6d7d2d7621c`. The reviewed networking candidate is `3ee8ed0cd549b64350848655c43ae1568e449c6d`; neither the pin nor vendor checkout has been changed. Simulator-to-Mac timed bot matches, touch aiming, respawn and background/resume have been exercised. Direct LAN menu joining and cancellation/rejoin have passed; results return and host exit between matches also pass. Menu hosting, setup, start, results return and stop have been exercised. Co-op starts through the menu and abort preserves both peers’ offline saves; completed co-op missions remain unverified. The sections below retain the integration history; use the latest checkpoint and PROGRESS.md for current state.
+## Current state (25 October 2026)
+
+The normal engine is Dab's Mod **v3.15.1** (a8c2ab2d7b1c99f6a96a2d9addee1fdf9630e379).
+Upstream's own netplay ships in it: Online Lobbies, LAN and Direct Connect, protocol
+33, with co-op, counter-op and Combat Simulator rooms. DarkPad uses that netplay
+in the normal app. The separate *Darkpad Network Test* build, its Direct LAN page
+and the experimental protocol 0x4431 described below are retired.
+
+What DarkPad adds on top, in overlay/patches:
+
+- **0083** (rebelancap 0058): PD_VERSION_HASH, so the iOS build reports the
+  upstream commit (a8c2ab2d7). Netplay refuses peers whose build differs.
+- **0084, 0085, 0086** (rebelancap 0059-0061): local-player reads, the CHAT chip,
+  menu click targets for the online pages.
+- **0088** (rebelancap 0063): account names and PINs survive a restart.
+- **0089** (DarkPad): touch and gyro look online. The degrees are summed per
+  tick like the mouse, read as zero on present-only passes, included in
+  between-tick prediction, and sent inside the command's existing mdx/mdy.
+  DarkPad always sets NETCMD_MOUSELOCKED so the host applies them. The wire is
+  unchanged, so DarkPad and desktop v3.15.1 interoperate. Limit: the host's
+  absolute-delta reader (the active menu) applies the sign of the client's
+  mouse speed; DarkPad keeps it positive.
+- **0090** (DarkPad): the view and cinematic reads, and the weapon wheel's slot,
+  use the local player online.
+- **0068, 0073, 0076** carried over from the candidate: online results and weapon
+  discoveries stay out of offline saves; the notice label measures its height;
+  co-op spectators can leave through End Mission.
+
+Tests (ASan/UBSan on the actual functions): tests/network_touch_look.py,
+tests/network_local_player.py, tests/network_coop_results.py,
+tests/network_weapon_progress.py, tests/network_session_exit.py. Earlier candidate
+tests live in tests/candidate/ and run only against the 3ee8ed0 reconstruction.
+
+Runtime evidence, all on one Mac (work/evidence/v3151/):
+
+| Test | Result |
+|---|---|
+| Stock desktop v3.15.1 dedicated host, DarkPad Simulator client | Joined stage 0x32; host reported 1 client, rtt 8 ms, no nacks or resets. A touch drag turned the view 44.95 to 119.95 degrees; a touch-stick walk then moved along the new heading with no snap-back from host snapshots |
+| DarkPad Simulator host, stock desktop client | Client exited 0 at frame 2400; prediction 1125/1125 matched, 0 corrections; 752 snapshots, 0 malformed |
+| Two DarkPad Simulators | Online Game, LAN, name typed with the iOS keyboard, Create Room, Game Lobby; the second Simulator joined by address and appeared in the lobby (2/4) |
+
+Not yet done: two real devices on Wi-Fi, the internet lobby, launching a match
+from the Game Lobby between two DarkPads, a completed co-op mission, and LAN room
+discovery, which needs com.apple.developer.networking.multicast
+(PD_MULTICAST=1 in scripts/gen-app-project.sh once Apple grants it).
+
+## History: the 3ee8ed0 candidate
+
+The rest of this document records the earlier experiment on intermediate commit
+3ee8ed0, kept for its findings. Its protocol 0x4431 and Direct LAN page are not
+in the current app.
 
 ## Reproduce the compatibility audit
 

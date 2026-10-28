@@ -18,10 +18,10 @@ is - a cinematic, which the fold treats as the world like Perfect Dark's own
 cutscenes.
 
 diff --git a/src/game/menu.c b/src/game/menu.c
-index 604829745..9d6628d02 100644
+index c3882230a..30b6eefe0 100644
 --- a/src/game/menu.c
 +++ b/src/game/menu.c
-@@ -6056,7 +6056,14 @@ Gfx *menuRender(Gfx *gdl)
+@@ -6399,7 +6399,14 @@ Gfx *menuRender(Gfx *gdl)
  
  		overfront = true;
  	} else if (gexFrontIsActive()) {

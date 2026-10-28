@@ -1,0 +1,55 @@
+Subject: iOS online: DarkPad's view and cinematic reads ask for this machine's player
+
+DarkPad overlay 0090, on top of rebelancap's 0084. 0071's playerIosGetView()
+(the bridge's player_view) and 0070's playerIosIsCinematic() (which keeps the
+Start/menu chrome up while no playable camera exists) read
+g_Vars.currentplayer. Online, outside the tick that is whichever player the
+last pass left current, so a client could report the host's view or hide its
+chrome over another player's missing prop. Both now use 0084's
+playerIosLocal(). Offline it is g_Vars.currentplayer, as before.
+
+0084's playerIosActiveMenu() switched the current player and then read
+g_AmMenus[g_AmIndex], but setCurrentPlayerNum() does not move g_AmIndex
+(activemenu.c sets it from currentplayernum itself), so online the weapon
+wheel's slot could come from another player's menu. g_AmMenus is indexed by
+player number: read the local player's entry directly.
+
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -9530,7 +9530,7 @@
+  */
+ s32 playerIosGetView(f32 *theta, f32 *verta)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (!p) {
+ 		return 0;
+@@ -9616,12 +9616,12 @@
+ 	struct player *p = playerIosLocal();
+ 
+ 	if (slot) {
+-		// g_AmIndex follows the current player: this machine's, for the read
+-		const s32 prev = g_Vars.currentplayernum;
++		// g_AmMenus is indexed by player number (activemenu.c sets g_AmIndex
++		// = currentplayernum itself; setCurrentPlayerNum() leaves it alone),
++		// so read this machine's player's menu directly (DarkPad 0090)
++		const s32 num = playerIosLocalNum();
+ 
+-		setCurrentPlayerNum(playerIosLocalNum());
+-		*slot = g_AmMenus[g_AmIndex].slotnum;
+-		setCurrentPlayerNum(prev);
++		*slot = num >= 0 && num < MAX_PLAYERS ? g_AmMenus[num].slotnum : 4;
+ 	}
+ 
+ 	return p && p->activemenumode != AMMODE_CLOSED;
+@@ -9630,6 +9630,8 @@
+ /** Shell chrome only: retain Start/menu while no playable camera exists. */
+ s32 playerIosIsCinematic(void)
+ {
+-	return g_InCutscene || !g_Vars.currentplayer || !g_Vars.currentplayer->prop;
++	struct player *p = playerIosLocal(); // online: this machine's player (0084)
++
++	return g_InCutscene || !p || !p->prop;
+ }
+ #endif

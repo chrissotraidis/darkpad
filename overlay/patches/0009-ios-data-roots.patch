@@ -53,10 +53,10 @@ index 981fef3c0..63ad43567 100644
  void *sysMemZeroAlloc(const u32 size);
  void *sysMemRealloc(void *ptr, const u32 newSize);
 diff --git a/port/src/fs.c b/port/src/fs.c
-index af913c8d7..05684af6f 100644
+index 96b427a65..e7553bc5e 100644
 --- a/port/src/fs.c
 +++ b/port/src/fs.c
-@@ -44,6 +44,9 @@ static s32 portable;
+@@ -45,6 +45,9 @@ static s32 portable;
  static char saveDir[FS_MAXPATH + 1]; // replaces $S
  static char homeDir[FS_MAXPATH + 1]; // replaces $H
  static char exeDir[FS_MAXPATH + 1];  // replaces $E
@@ -66,7 +66,7 @@ index af913c8d7..05684af6f 100644
  
  static s32 fsPathIsWritable(const char *path)
  {
-@@ -100,6 +103,9 @@ const char *fsFullPath(const char *relPath)
+@@ -412,6 +415,9 @@ const char *fsFullPath(const char *relPath)
  			case 'M': expStr = numModDirs ? modDirs[0] : NULL; break;
  			case 'B': expStr = baseDir; break;
  			case 'S': expStr = saveDir; break;
@@ -76,7 +76,7 @@ index af913c8d7..05684af6f 100644
  			default: break;
  		}
  		if (expStr) {
-@@ -351,6 +357,14 @@ s32 fsInit(void)
+@@ -666,6 +672,14 @@ s32 fsInit(void)
  {
  	sysGetExecutablePath(exeDir, FS_MAXPATH);
  
@@ -91,7 +91,7 @@ index af913c8d7..05684af6f 100644
  	// if this is set, default to exe path for everything
  	portable = sysArgCheck("--portable");
  	if (portable) {
-@@ -364,6 +378,17 @@ s32 fsInit(void)
+@@ -679,6 +693,17 @@ s32 fsInit(void)
  	if (!path) {
  		// check if there's a `data` directory in working directory or homeDir, otherwise default to exe directory
  		path = "$E/" DEFAULT_BASEDIR_NAME;
@@ -109,7 +109,7 @@ index af913c8d7..05684af6f 100644
  		if (!portable) {
  			if (fsFileSize("./" DEFAULT_BASEDIR_NAME) >= 0) {
  				path = "./" DEFAULT_BASEDIR_NAME;
-@@ -374,6 +399,10 @@ s32 fsInit(void)
+@@ -689,6 +714,10 @@ s32 fsInit(void)
  	}
  	strncpy(baseDir, fsFullPath(path), FS_MAXPATH);
  
@@ -120,7 +120,7 @@ index af913c8d7..05684af6f 100644
  	// get paths to the mod dirs and expand them if needed
  	// mod directories are overlaid on top of the base directory, in order
  	{
-@@ -404,6 +433,15 @@ s32 fsInit(void)
+@@ -719,6 +748,15 @@ s32 fsInit(void)
  	// get path to save dir and expand it if needed
  	path = sysArgGetString("--savedir");
  	if (!path) {
@@ -136,7 +136,7 @@ index af913c8d7..05684af6f 100644
  		if (portable) {
  			path = "$E";
  		} else {
-@@ -703,9 +741,22 @@ void fsFileFree(FILE *f)
+@@ -1177,9 +1215,22 @@ void fsFileFree(FILE *f)
  s32 fsChooseOutputDir(const char *name, char *dst, u32 dstSize)
  {
  	static const char *const roots[] = { "$E", "$S" };

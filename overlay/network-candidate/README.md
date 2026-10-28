@@ -1,3 +1,8 @@
+> **Retired (25 October 2026).** The normal engine is now Dab's Mod v3.15.1 with
+> its own netplay; see docs/network-integration.md. These replacement patches
+> target 3ee8ed0 only. 0068, 0073 and 0076 moved into overlay/patches; touch look
+> is overlay 0089 inside protocol 33. Nothing here is built.
+
 # Experimental networking replacements
 
 These patches replace same-named solo overlay patches **only** when explicitly passed to the audit tool. The normal build does not use this directory.

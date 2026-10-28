@@ -33,7 +33,7 @@ directly - they are the ffmpeg recorder, which patch 0011 compiles out on iOS
 and visionOS entirely.
 
 diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
-index 58c2f416f..eac1889d3 100644
+index 972af9100..46c03601a 100644
 --- a/port/fast3d/gfx_opengl.cpp
 +++ b/port/fast3d/gfx_opengl.cpp
 @@ -73,6 +73,48 @@ static uint32_t frame_count;
@@ -106,7 +106,7 @@ index 58c2f416f..eac1889d3 100644
          glDisable(GL_BLEND);
          glDisable(GL_DEPTH_TEST);
          glDisable(GL_CULL_FACE);
-@@ -2564,6 +2607,13 @@ static void gfx_opengl_update_framebuffer_parameters(int fb_id, uint32_t width,
+@@ -2571,6 +2614,13 @@ static void gfx_opengl_update_framebuffer_parameters(int fb_id, uint32_t width,
                                                       bool can_extract_depth) {
      Framebuffer& fb = framebuffers[fb_id];
  
@@ -120,7 +120,7 @@ index 58c2f416f..eac1889d3 100644
      width = max(width, 1U);
      height = max(height, 1U);
  
-@@ -2637,6 +2687,9 @@ bool gfx_opengl_start_draw_to_framebuffer(int fb_id, float noise_scale) {
+@@ -2644,6 +2694,9 @@ bool gfx_opengl_start_draw_to_framebuffer(int fb_id, float noise_scale) {
  
      if (gfx_framebuffers_enabled && fb_id < (int)framebuffers.size()) {
          Framebuffer& fb = framebuffers[fb_id];
@@ -130,7 +130,7 @@ index 58c2f416f..eac1889d3 100644
          if (noise_scale != 0.0f) {
              current_noise_scale = 1.0f / noise_scale;
          }
-@@ -2682,7 +2735,10 @@ void gfx_opengl_resolve_msaa_color_buffer(int fb_id_target, int fb_id_source) {
+@@ -2689,7 +2742,10 @@ void gfx_opengl_resolve_msaa_color_buffer(int fb_id_target, int fb_id_source) {
      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_src.fbo);
      glBlitFramebuffer(0, 0, fb_src.width, fb_src.height, 0, 0, fb_dst.width, fb_dst.height, GL_COLOR_BUFFER_BIT,
                        GL_NEAREST);
@@ -142,7 +142,7 @@ index 58c2f416f..eac1889d3 100644
      glEnable(GL_SCISSOR_TEST);
  }
  
-@@ -2752,18 +2808,23 @@ void gfx_opengl_copy_framebuffer(int fb_dst, int fb_src, int left, int top, bool
+@@ -2759,18 +2815,23 @@ void gfx_opengl_copy_framebuffer(int fb_dst, int fb_src, int left, int top, bool
          std::swap(dstY0, dstY1);
      }
  
@@ -169,7 +169,7 @@ index 58c2f416f..eac1889d3 100644
  
      glEnable(GL_SCISSOR_TEST);
  }
-@@ -2789,8 +2850,12 @@ void gfx_opengl_set_mipmap_filter(MipmapFilteringMode mode) {
+@@ -2796,8 +2857,12 @@ void gfx_opengl_set_mipmap_filter(MipmapFilteringMode mode) {
  // told about it, because the one caller writing a PNG walks the rows anyway.
  static bool gfx_opengl_read_screen_pixels(int x, int y, int width, int height, void *rgb) {
      gl_mesh_leave();

@@ -14,10 +14,10 @@ is the same runtime-gated / compiled-out no-op it was, so the M-001 display
 list is unchanged.
 
 diff --git a/src/game/sight.c b/src/game/sight.c
-index 8fc733a07..e10ee72a4 100644
+index 6d3382bd6..9879f5728 100644
 --- a/src/game/sight.c
 +++ b/src/game/sight.c
-@@ -1848,6 +1848,22 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+@@ -1854,6 +1854,22 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
  
  	sightTick(sighton);
  
@@ -40,7 +40,7 @@ index 8fc733a07..e10ee72a4 100644
  #ifndef PLATFORM_N64
  	// GoldenEye's own crosshair for anything of GoldenEye's in the hand on GE
  	// Plus's levels (gehud.c). The watch's SIGHT ON-SCREEN is Sight on Screen,
-@@ -1862,23 +1878,15 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
+@@ -1868,23 +1884,15 @@ Gfx *sightDraw(Gfx *gdl, bool sighton, s32 sight)
  			gdl = geHudRenderSight(gdl, crossx, crossy);
  		}
  

@@ -22,6 +22,7 @@
 #import "PDXbla.h"
 #import "PDAudio.h"
 #import "PDWatchdog.h"
+#import "PDUtilityMenu.h"
 #if TARGET_OS_VISION
 #import "PDVision3D.h"   // the 3D rows (D-082); vision3d/ is on this target's path only
 #endif
@@ -115,7 +116,7 @@ static PDRow *pdPercentSliderRow(NSString *title, NSString *key)
 static PDRow *pdFrameRateRow(void)
 {
 	const NSInteger high = PDPanelHighHz();
-	NSString *highLabel = [NSString stringWithFormat:@"%ld Hz", (long)high];
+	NSString *highLabel = [NSString stringWithFormat:@"%ld Hz (experimental)", (long)high];
 	if (high <= 60) {
 		return pdSegRow(@"Frame rate", PDDefRefreshHz, @[ @"60 Hz" ], @[ @60 ]);
 	}
@@ -199,136 +200,15 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 
 @end
 
-// Goldenpad's compact utility popover, rendered above the paused game.
-@interface PDUtilitiesViewController : UIViewController
+// A clear stand-in under alerts and share sheets started from the ••• menu.
+// It keeps them in the settings window, which owns pausing and focus return.
+@interface PDModalHostViewController : UIViewController
 @end
-@implementation PDUtilitiesViewController {
-    UIView *_panel;
-    UIScrollView *_scroll;
-    UIStackView *_rows;
-}
+@implementation PDModalHostViewController
 - (void)viewDidLoad
 {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
-    self.view.accessibilityViewIsModal = YES;
-    UIButton *outside = [UIButton buttonWithType:UIButtonTypeCustom];
-    outside.frame = self.view.bounds;
-    outside.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    outside.accessibilityLabel = @"Close Darkpad menu";
-    [outside addTarget:self action:@selector(resume) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:outside];
-    _panel = [UIView new];
-    _panel.layer.cornerRadius = 14;
-    _panel.layer.borderWidth = 1;
-    _panel.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.22].CGColor;
-    _panel.layer.shadowColor = UIColor.blackColor.CGColor;
-    _panel.layer.shadowOpacity = 0.4;
-    _panel.layer.shadowRadius = 16;
-    _panel.layer.shadowOffset = CGSizeMake(0, 8);
-    [self.view addSubview:_panel];
-    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:
-        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
-    blur.frame = _panel.bounds;
-    blur.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    blur.layer.cornerRadius = 14;
-    blur.clipsToBounds = YES;
-    [_panel addSubview:blur];
-    _scroll = [UIScrollView new];
-    [blur.contentView addSubview:_scroll];
-    _rows = [UIStackView new];
-    _rows.axis = UILayoutConstraintAxisVertical;
-    [_scroll addSubview:_rows];
-    NSArray *titles = @[@"Settings", @"Edit Touch Controls", @"Diagnostics", @"End Session…"];
-    NSArray *icons = @[@"gearshape", @"hand.draw", @"waveform.path.ecg", @"stop.circle"];
-    NSArray *actions = @[@0, @1, @2, @3];
-    for (NSInteger i = 0; i < titles.count; i++) {
-        if (i) {
-            UIView *divider = [UIView new];
-            divider.backgroundColor = UIColor.separatorColor;
-            [divider.heightAnchor constraintEqualToConstant:0.5].active = YES;
-            [_rows addArrangedSubview:divider];
-        }
-        UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-        UIButtonConfiguration *config = [UIButtonConfiguration plainButtonConfiguration];
-        config.title = titles[i];
-        config.image = [UIImage systemImageNamed:icons[i]];
-        config.imagePadding = 12;
-        config.contentInsets = NSDirectionalEdgeInsetsMake(10, 12, 10, 12);
-        config.baseForegroundColor = [actions[i] integerValue] == 3 ? UIColor.systemRedColor : UIColor.labelColor;
-        config.titleTextAttributesTransformer = ^NSDictionary *(NSDictionary *attributes) {
-            NSMutableDictionary *result = attributes.mutableCopy;
-            result[NSFontAttributeName] = [UIFontMetrics.defaultMetrics scaledFontForFont:
-                [UIFont systemFontOfSize:17 weight:UIFontWeightMedium]];
-            return result;
-        };
-        button.configuration = config;
-        button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
-        button.tag = [actions[i] integerValue];
-        if (button.tag == 3) {
-            // Keep the action unavailable until its frame-boundary snapshot.
-            // Confirmation still rechecks eligibility before ending anything.
-            button.enabled = NO;
-            [PDShell.shared enqueue:^{
-                button.enabled = mainIosCanEndSession() != 0;
-                button.accessibilityHint = button.enabled
-                    ? @"Asks for confirmation before ending the session"
-                    : @"Unavailable outside an active mission or match";
-            }];
-        }
-        [button.heightAnchor constraintGreaterThanOrEqualToConstant:48].active = YES;
-        [button addTarget:self action:@selector(selectAction:) forControlEvents:UIControlEventTouchUpInside];
-        [_rows addArrangedSubview:button];
-    }
-}
-- (void)viewDidLayoutSubviews
-{
-    [super viewDidLayoutSubviews];
-    UIEdgeInsets inset = self.view.safeAreaInsets;
-    CGFloat width = MIN(280, self.view.bounds.size.width - inset.left - inset.right - 24);
-    CGFloat height = [_rows systemLayoutSizeFittingSize:CGSizeMake(width - 12, UILayoutFittingCompressedSize.height)
-        withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
-    CGRect anchor = [self.view convertRect:PDUtilityMenuFrame(self.view.window) fromView:self.view.window];
-    CGFloat top = CGRectGetMaxY(anchor) + 12;
-    CGFloat available = MAX(48, self.view.bounds.size.height - inset.bottom - top - 12);
-    CGFloat left = MAX(inset.left + 12, CGRectGetMaxX(anchor) - width);
-    _panel.frame = CGRectMake(left, top, width, MIN(height + 12, available));
-    _scroll.frame = CGRectInset(_panel.bounds, 6, 6);
-    _rows.frame = CGRectMake(0, 0, width - 12, height);
-    _scroll.contentSize = _rows.bounds.size;
-}
-- (void)resume { [PDSettingsViewController dismiss]; }
-- (BOOL)accessibilityPerformEscape { [self resume]; return YES; }
-- (void)selectAction:(UIButton *)sender
-{
-    NSIndexPath *path = [NSIndexPath indexPathForRow:sender.tag inSection:0];
-	if (path.row == 3) {
-		UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"End this session?"
-			message:@"An unfinished mission will restart from the beginning. Completed progression is kept. A match will end at its results screen."
-			preferredStyle:UIAlertControllerStyleAlert];
-		[confirm addAction:[UIAlertAction actionWithTitle:@"Keep Playing" style:UIAlertActionStyleCancel handler:nil]];
-		[confirm addAction:[UIAlertAction actionWithTitle:@"End Session" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-			[PDShell.shared enqueue:^{
-				if (mainIosEndSession()) {
-					pdIosSaveConfigNow();
-					[PDSettingsViewController dismiss];
-				} else {
-					UIAlertController *notice = [UIAlertController alertControllerWithTitle:@"No active session"
-						message:@"Start or resume a mission or match before ending it. This action is unavailable during cutscenes or in the training area."
-						preferredStyle:UIAlertControllerStyleAlert];
-					[notice addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-					[self presentViewController:notice animated:YES completion:nil];
-				}
-			}];
-		}]];
-		[self presentViewController:confirm animated:YES completion:nil];
-	} else if (path.row == 1) {
-		[PDSettingsViewController dismiss];
-		[PDTouchOverlay.current beginLayoutEditing];
-	} else {
-		[PDSettingsViewController present];
-		if (path.row == 2) [PDSettingsViewController scrollToSectionContaining:@"Diagnostics"];
-	}
 }
 @end
 
@@ -353,7 +233,7 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
-    BOOL utility = [self.navigation.topViewController isKindOfClass:PDUtilitiesViewController.class];
+    BOOL utility = ![self.navigation.topViewController isKindOfClass:PDSettingsViewController.class];
     CGRect bounds = self.view.bounds;
     BOOL sheet = !utility && self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad
         && bounds.size.width >= 700;
@@ -376,6 +256,8 @@ static PDSettingsHostController *sHost;
 static UIWindow *sWindow;
 static PDSettingsViewController *sSettingsController;
 static BOOL sUtilityOwnsPause;
+// Close-to-play timing (device-only symptom: a pause after closing the menu).
+static CFTimeInterval sDismissedAt, sCloseLastFrame, sCloseFirstFrame, sCloseMaxGap;
 extern int lvIsPaused(void);
 extern void lvSetPaused(int paused);
 /** When the gear was tapped, so viewDidAppear can say how long the page took. */
@@ -390,6 +272,7 @@ static CFTimeInterval sPresentStarted;
 + (void)build;
 - (void)buildRows;
 - (void)segChanged:(UISegmentedControl *)seg;
+- (void)commit;
 + (void)logOpenLatency;
 + (nullable PDSettingsViewController *)presentedControllerEvenIfHidden;
 + (nullable PDSettingsViewController *)activeController;
@@ -405,6 +288,21 @@ static CFTimeInterval sPresentStarted;
 
 + (void)updateNativePause
 {
+	if (sDismissedAt > 0) {
+		const CFTimeInterval now = CACurrentMediaTime();
+		if (sCloseFirstFrame == 0) {
+			sCloseFirstFrame = now;
+		} else {
+			sCloseMaxGap = MAX(sCloseMaxGap, now - sCloseLastFrame);
+		}
+		sCloseLastFrame = now;
+		if (now - sDismissedAt > 1.0) {
+			PDLifecycle("menu close timing: first frame %.0f ms after close, slowest frame %.0f ms in the next second",
+				(sCloseFirstFrame - sDismissedAt) * 1000.0, sCloseMaxGap * 1000.0);
+			sDismissedAt = 0;
+		}
+	}
+	[PDUtilityMenu noteEngineFrame];
 	BOOL wanted = self.isPresented || PDTouchOverlay.current.layoutEditing;
 #if !TARGET_OS_VISION
 	// The pacer blocks presentation in the background, but still pumps the
@@ -421,10 +319,10 @@ static CFTimeInterval sPresentStarted;
 	}
 }
 
-+ (void)presentUtilities
++ (void)presentPanel:(UIViewController *)panel
 {
 	if (!NSThread.isMainThread) {
-		dispatch_async(dispatch_get_main_queue(), ^{ [self presentUtilities]; });
+		dispatch_async(dispatch_get_main_queue(), ^{ [self presentPanel:panel]; });
 		return;
 	}
 	[self present];
@@ -432,9 +330,64 @@ static CFTimeInterval sPresentStarted;
 	[nav setNavigationBarHidden:YES animated:NO];
 	nav.view.backgroundColor = UIColor.clearColor;
 	sWindow.backgroundColor = UIColor.clearColor;
-	[nav setViewControllers:@[[PDUtilitiesViewController new]] animated:NO];
+	[nav setViewControllers:@[panel] animated:NO];
 	[sHost.view setNeedsLayout];
 	[sHost.view layoutIfNeeded];
+}
+
++ (void)presentModal:(UIViewController *)modal
+{
+	if (!NSThread.isMainThread) {
+		dispatch_async(dispatch_get_main_queue(), ^{ [self presentModal:modal]; });
+		return;
+	}
+	UINavigationController *nav = sHost.navigation;
+	UIViewController *host = nav.topViewController;
+	if (!self.isPresented || ![host isKindOfClass:PDModalHostViewController.class]) {
+		[self present];
+		nav = sHost.navigation;
+		[nav setNavigationBarHidden:YES animated:NO];
+		nav.view.backgroundColor = UIColor.clearColor;
+		sWindow.backgroundColor = UIColor.clearColor;
+		host = [PDModalHostViewController new];
+		[nav setViewControllers:@[host] animated:NO];
+		[sHost.view setNeedsLayout];
+		[sHost.view layoutIfNeeded];
+	}
+	UIPopoverPresentationController *popover = modal.popoverPresentationController;
+	if (popover) {
+		popover.sourceView = host.view;
+		popover.sourceRect = [host.view convertRect:PDUtilityMenuFrame(host.view.window) fromView:host.view.window];
+	}
+	// One flow step at a time: wait for the previous alert to finish leaving.
+	UIViewController *showing = host.presentedViewController;
+	if (showing && showing.isBeingDismissed) {
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
+			dispatch_get_main_queue(), ^{ [self presentModal:modal]; });
+		return;
+	}
+	[(showing ?: host) presentViewController:modal animated:YES completion:nil];
+}
+
++ (void)applyDefaultsChange
+{
+	if (!NSThread.isMainThread) {
+		dispatch_async(dispatch_get_main_queue(), ^{ [self applyDefaultsChange]; });
+		return;
+	}
+	PDSettingsViewController *vc = sSettingsController;
+	if (vc) {
+		vc.enhancedArtStatus = nil;
+		[vc commit];
+		[vc.tableView reloadData];
+		return;
+	}
+	[PDTouchOverlay.current applySettings];
+	[PDAudio gainChanged];
+	[PDShell.shared enqueue:^{
+		PDDefaultsApplyToEngine();
+		configSave("$S/pd.ini");
+	}];
 }
 
 + (void)present
@@ -612,6 +565,8 @@ static CFTimeInterval sPresentStarted;
 		[game makeKeyAndVisible];
 	}
 	sWindow.hidden = YES;
+	sDismissedAt = CACurrentMediaTime();
+	sCloseFirstFrame = sCloseLastFrame = sCloseMaxGap = 0;
 	// sWindow is deliberately NOT released: see above, and it is what makes the
 	// second open cost nothing.
 	PDLifecycle("settings DISMISS (key -> %s, deferred pacing=%d)",
@@ -737,7 +692,7 @@ static CFTimeInterval sPresentStarted;
 			if (!weakSelf.view.window) return;
 			UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"Choose Texture Pack"
 				message:names.count ? @"Choose the artwork used by the Enhanced profile."
-					: @"Add a pack folder or archive in Files → Perfect Dark → texture-packs. Restart the app to prepare new archives."
+					: @"Add a pack folder or archive in Files → DarkPad → texture-packs. Restart the app to prepare new archives."
 				preferredStyle:UIAlertControllerStyleAlert];
 			for (NSString *name in names) {
 				[picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -999,7 +954,7 @@ static CFTimeInterval sPresentStarted;
 #if !TARGET_OS_VISION
         @"Motion Aiming",
 #endif
-        @"Audio", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Texture Packs", @"Diagnostics" ];
+        @"Audio", @"Texture Packs", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Diagnostics" ];
 	_rows = @[
 		@[
 			// The Frame rate row, and the one-line insurance behind it (D-044).
@@ -1074,7 +1029,6 @@ static CFTimeInterval sPresentStarted;
 			}),
 		],
 		@[
-			pdSliderRow(@"Gamepad look speed", PDDefPadLookSpeed, 60.0f, 540.0f),
 			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
 				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
 					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
@@ -1128,6 +1082,15 @@ static CFTimeInterval sPresentStarted;
 			}),
 			pdPercentSliderRow(@"Volume", PDDefAudioMasterVolume),
 			pdSwitchRow(@"Mute", PDDefAudioMute),
+		],
+		@[
+			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
+			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
+			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
+			pdButtonRow(@"Reload packs (F9)", ^{
+				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
+				[weakSelf refreshTexturePackStatus];
+			}),
 		],
 		@[
 			// Asset imports stay here; the selected art profile controls activation.
@@ -1186,23 +1149,15 @@ static CFTimeInterval sPresentStarted;
 			pdButtonRow(@"Add or replace GoldenEye XBLA…", ^{
 				[weakSelf importGoldenEye:PDGoldenEyeXbla];
 			}),
-			// A GoldenEye ROM hack the converter knows (upstream v3.14.0):
-			// converted beside GE Plus into its own Perfect Menu row.
-			pdInfoRow(@"Goldfinger 64", ^NSString *{
+			// A GoldenEye ROM hack the converter knows (Goldfinger 64 since
+			// upstream v3.14.0, Tomorrow Never Dies 64 since v3.15.0): converted
+			// beside GE Plus into its own Perfect Menu row.
+			pdInfoRow(@"GoldenEye ROM hack", ^NSString *{
 				PDGoldenEyeFind *f = [PDXbla cachedGoldenEye:PDGoldenEyeHack];
 				return f ? f.rowText : @"checking…";
 			}),
-			pdButtonRow(@"Add or replace Goldfinger 64…", ^{
+			pdButtonRow(@"Add Goldfinger 64 or Tomorrow Never Dies 64…", ^{
 				[weakSelf importGoldenEye:PDGoldenEyeHack];
-			}),
-		],
-		@[
-			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
-			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
-			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
-			pdButtonRow(@"Reload packs (F9)", ^{
-				[PDShell.shared enqueue:^{ texpackRefreshPacks(); texpackReload(); }];
-				[weakSelf refreshTexturePackStatus];
 			}),
 		],
 		@[
@@ -1467,7 +1422,7 @@ static CFTimeInterval sPresentStarted;
         return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides gameplay controls when a controller connects, while keeping menus touchable. In game menus, tap to select and drag to scroll.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Controller"]) {
-        return @"The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
+        return @"Left stick moves and strafes; right stick turns and looks; the D-pad steps and strafes. The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
     }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Graphics"]) {
         return @"Original uses N64 art. Enhanced enables texture filtering and installed texture packs. Remaster uses your imported Xbox 360 assets, with N64 art as the fallback. Resolution changes apply after restarting the app.";
@@ -1491,7 +1446,7 @@ static CFTimeInterval sPresentStarted;
 		        "Changes here take effect the next time you open the app.";
 	}
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Texture Packs"]) {
-		return @"In Files, open On My iPhone/iPad → Perfect Dark → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
+		return @"In Files, open On My iPhone/iPad → DarkPad → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
 	}
 	return nil;
 }

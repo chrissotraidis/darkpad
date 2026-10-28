@@ -39,7 +39,7 @@ printf 'cfg get Mod.EnhanceTextures\nstate\n' | nc -w 5 localhost 8775
 
 Line-oriented, one reply per command, plain text. On the simulator `localhost`
 is the host's own loopback, because a simulator shares the host's network stack.
-On a device, use the device's tailnet name.
+The bridge listens on loopback only. To reach it on a device over the network, launch with `PD_BRIDGE_LAN=1` (for example `xcrun devicectl device process launch --environment-variables '{"PD_BRIDGE_LAN":"1"}' …`) and use the device's tailnet name. Public builds (`PD_PUBLIC=1`) contain no bridge at all.
 
 Concurrency rules, which are also the reason the bridge is safe:
 

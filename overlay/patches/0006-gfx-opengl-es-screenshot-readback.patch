@@ -15,10 +15,10 @@ to RGB for the caller, which is unchanged. The desktop path is untouched, so
 the oracle's screenshots are still the same bytes as before.
 
 diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
-index 7ca66e188..8349def05 100644
+index 170181e70..0eb89649a 100644
 --- a/port/fast3d/gfx_opengl.cpp
 +++ b/port/fast3d/gfx_opengl.cpp
-@@ -2783,9 +2783,33 @@ static bool gfx_opengl_read_screen_pixels(int x, int y, int width, int height, v
+@@ -2790,9 +2790,33 @@ static bool gfx_opengl_read_screen_pixels(int x, int y, int width, int height, v
          // drain anything that was already pending, so the check below is ours
      }
  

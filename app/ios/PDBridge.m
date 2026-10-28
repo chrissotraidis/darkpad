@@ -21,6 +21,7 @@
 #ifndef PD_PUBLIC
 
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <AVFoundation/AVFoundation.h>
 
 #include <arpa/inet.h>
@@ -116,7 +117,12 @@ static int pdBridgePort(void)
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	// Loopback only by default: a simulator shares the Mac's loopback, and a
+	// development build on a phone must not offer this console to everyone on
+	// the same Wi-Fi. PD_BRIDGE_LAN=1 at launch opts in to every interface.
+	const char *lan = getenv("PD_BRIDGE_LAN");
+	const BOOL anyInterface = lan && !strcmp(lan, "1");
+	addr.sin_addr.s_addr = htonl(anyInterface ? INADDR_ANY : INADDR_LOOPBACK);
 	addr.sin_port = htons(kPort);
 
 	// A simulator run killed mid-flight leaves the port in TIME_WAIT for a
@@ -137,7 +143,7 @@ static int pdBridgePort(void)
 		return;
 	}
 
-	NSLog(@"perfectdark: [bridge] listening on :%d", kPort);
+	NSLog(@"perfectdark: [bridge] listening on %s:%d", anyInterface ? "all interfaces" : "loopback", kPort);
 
 	while (1) {
 		int fd = accept(srv, NULL, NULL);
@@ -245,7 +251,7 @@ static NSString *pdErr(NSString *fmt, ...)
 		        " heartbeat | hang <ms> | dump | graft <on|off> | hide60 <on|off> |"
 		        " stall <ms>|every <s> <ms>|off | geo [repair on|off|now] | presented | picker cancel|dismiss|pick <path> |"
 		        " audio trace on|off|dump [name] | audio interrupt begin|end |"
-		        " give <weaponnum> [noammo] | ammo <weaponnum> | pacing engine <hz|auto>"
+		        " give <weaponnum> [noammo] | ammo <weaponnum> | pacing engine <hz|auto> | clock [chrs] | kbd [type <text>|back|return]"
 #if TARGET_OS_VISION
 	        " | 3d <on|off|park|unpark|crown|showeye|state|recenter|depth <pct>|gunconv <units>"
 	        "|settings <open|close|get|set <row> <value>|press <row>|reset>>"
@@ -278,9 +284,14 @@ static NSString *pdErr(NSString *fmt, ...)
 		if (!path) {
 			return @"rom=none";
 		}
-		PDRomCheck *c = [PDOnboarding classifyFileAtPath:path];
-		return [NSString stringWithFormat:@"rom=%@\nmd5=%@\nverdict=%ld\nwhy=%@",
-			path.lastPathComponent, c.md5 ?: @"-", (long)c.verdict, c.explanation];
+		NSString *usable = nil;
+		PDRomCheck *c = [PDOnboarding checkRomAtPath:path usable:&usable];
+		BOOL converted = usable && ![usable isEqualToString:path];
+		if (converted) {
+			[NSFileManager.defaultManager removeItemAtPath:usable error:NULL];
+		}
+		return [NSString stringWithFormat:@"rom=%@\nmd5=%@\nverdict=%ld\nconverted=%d\nwhy=%@",
+			path.lastPathComponent, c.md5 ?: @"-", (long)c.verdict, (int)converted, c.explanation];
 	}
 
 	// The XBLA package: what is in Documents/xbla, whether it has been unpacked
@@ -877,6 +888,43 @@ static NSString *pdErr(NSString *fmt, ...)
 	}
 	// --- end round Q ----------------------------------------------------------
 
+	// `stick <left|right> X Y` (-1..1) and `stick off`: a held physical stick,
+	// delivered where SDL delivers one. inputReadController() maps the physical
+	// sticks through Input.PlayerN.SwapSticks into the N64 stick (axisMap[0]) and
+	// rstick (axisMap[1]); this writes the same two fields through the shell's
+	// merge seam, honouring the same swap.
+	if ([cmd isEqualToString:@"stick"]) {
+		NSString *which = argv.count > 1 ? argv[1].lowercaseString : @"";
+		BOOL off = [which isEqualToString:@"off"];
+		if (!off && (argv.count < 4 || !([which isEqualToString:@"left"] || [which isEqualToString:@"right"]))) {
+			return pdErr(@"usage: stick <left|right> <x -1..1> <y -1..1> | stick off");
+		}
+		float x = off ? 0.f : MAX(-1.f, MIN(1.f, argv[2].floatValue));
+		float y = off ? 0.f : MAX(-1.f, MIN(1.f, argv[3].floatValue));
+		BOOL right = [which isEqualToString:@"right"];
+		__block int swapped = 0;
+		if (![shell enqueueAndWait:^{
+				swapped = inputControllerGetSticksSwapped(0);
+				int nx = (int)lroundf(x * 127.f), ny = (int)lroundf(y * 127.f);
+				if (off) {
+					inputIosPadSet(inputIosPadGetButtons(), 0, 0);
+					inputIosPadSetRStick(0, 0);
+					return;
+				}
+				// Physical left is the N64 stick unless swapped; right is the other.
+				BOOL toStick = right ? swapped : !swapped;
+				if (toStick) {
+					inputIosPadSet(inputIosPadGetButtons(), nx, ny);
+				} else {
+					inputIosPadSetRStick(nx, ny);
+				}
+			} timeout:kEngineTimeout]) {
+			return pdErr(@"engine did not reach a frame boundary");
+		}
+		return off ? @"stick off" : [NSString stringWithFormat:@"stick %@ %.2f %.2f -> engine %@ (SwapSticks=%d)%@",
+			which, x, y, (right ? swapped : !swapped) ? @"stick" : @"rstick", swapped, @""];
+	}
+
 	if ([cmd isEqualToString:@"pad"]) {
 		if (argv.count < 3) {
 			return pdErr(@"usage: pad <a|b|z|start|l|r|cu|cd|cl|cr|x|y|roll|crouch> <down|up>"
@@ -1094,6 +1142,109 @@ static NSString *pdErr(NSString *fmt, ...)
 		});
 		if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)))) {
 			return pdErr(@"UIKit did not respond (is the game loop running?)");
+		}
+		return out;
+	}
+
+	// `kbd` / `kbd type <text>` / `kbd back` / `kbd return` — the iOS software
+	// keyboard's own path into the game (Online round 2, D-105). SDL raises the
+	// keyboard over a hidden UITextField when the game calls SDL_StartTextInput
+	// (the online pages' name, address, password and chat boxes) and turns that
+	// field's edits into SDL_TEXTINPUT / Backspace / Return. `type` inserts into
+	// that first responder through UIKeyInput, which is what a key on the
+	// keyboard does, so the text reaches the game by the same route a finger's
+	// does; `simctl` cannot type into a simulator app and a hardware keyboard
+	// is a different path (SDL key events). Bare `kbd` reports whether a field
+	// is first responder (= the keyboard is up) and what it holds.
+	if ([cmd isEqualToString:@"kbd"]) {
+		NSString *what = argv.count > 1 ? argv[1].lowercaseString : @"";
+		NSString *text = @"";
+		if ([what isEqualToString:@"type"]) {
+			NSRange r = [cmdline rangeOfString:@"type"];
+			text = r.location != NSNotFound ? [cmdline substringFromIndex:NSMaxRange(r)] : @"";
+			if ([text hasPrefix:@" "]) {
+				text = [text substringFromIndex:1];
+			}
+		}
+		__block NSString *out = nil;
+		dispatch_semaphore_t done = dispatch_semaphore_create(0);
+		dispatch_async(dispatch_get_main_queue(), ^{
+			__block UITextField *field = nil;
+			__block void (^walk)(UIView *) = nil;
+			void (^walker)(UIView *) = ^(UIView *v) {
+				if (field) {
+					return;
+				}
+				if ([v isKindOfClass:UITextField.class] && v.isFirstResponder) {
+					field = (UITextField *)v;
+					return;
+				}
+				for (UIView *sub in v.subviews) {
+					walk(sub);
+				}
+			};
+			walk = walker;
+			for (UIScene *sc in UIApplication.sharedApplication.connectedScenes) {
+				if ([sc isKindOfClass:UIWindowScene.class]) {
+					for (UIWindow *w in ((UIWindowScene *)sc).windows) {
+						walk(w);
+					}
+				}
+			}
+			walk = nil;
+			if (field && [what isEqualToString:@"type"]) {
+				// One character per insert, as keys arrive: SDL turns each edit
+				// into text by diffing the field against its last commit, and a
+				// whole string inserted at once into a field that still held
+				// earlier text came through cut short ("reb" for a 15-letter name).
+				[text enumerateSubstringsInRange:NSMakeRange(0, text.length)
+				                         options:NSStringEnumerationByComposedCharacterSequences
+				                      usingBlock:^(NSString *ch, NSRange r1, NSRange r2, BOOL *stop) {
+					[field insertText:ch];
+				}];
+			} else if (field && [what isEqualToString:@"back"]) {
+				[field deleteBackward];
+			} else if (field && [what isEqualToString:@"return"]) {
+				if ([field.delegate respondsToSelector:@selector(textFieldShouldReturn:)]) {
+					[field.delegate textFieldShouldReturn:field];
+				}
+			}
+			out = [NSString stringWithFormat:@"kbd_up=%d kbd_field=%@ kbd_text_len=%lu",
+				field != nil, field ? NSStringFromClass(field.class) : @"-",
+				(unsigned long)field.text.length];
+			dispatch_semaphore_signal(done);
+		});
+		if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)))) {
+			return pdErr(@"UIKit did not respond (is the game loop running?)");
+		}
+		return out;
+	}
+
+	// `clock [chrs]` - one reading for timing game speed (DarkPad 0092): wall
+	// time, the game's lvframe240 / lvframenum, the player's position and, with
+	// "chrs", every live character slot's position. Two readings apart give
+	// game seconds per wall second and units per game second, at any refresh.
+	if ([cmd isEqualToString:@"clock"]) {
+		NSMutableString *out = [NSMutableString string];
+		[out appendFormat:@"wall=%.4f\n", CACurrentMediaTime()];
+		if (!PDShell.shared.engineRunning) {
+			[out appendString:@"engine=stopped\n"];
+			return out;
+		}
+		int frames = 0;
+		const int lv240 = playerIosGetGameClock(&frames);
+		[out appendFormat:@"lvframe240=%d\nlvframenum=%d\n", lv240, frames];
+		float px = 0, py = 0, pz = 0;
+		if (playerIosGetPos(&px, &py, &pz)) {
+			[out appendFormat:@"player_pos=%.2f,%.2f,%.2f\n", px, py, pz];
+		}
+		if (argv.count > 1 && [argv[1] isEqualToString:@"chrs"]) {
+			for (int i = 0; i < 64; i++) {
+				float x, y, z;
+				if (playerIosGetChrPos(i, &x, &y, &z)) {
+					[out appendFormat:@"chr%d=%.2f,%.2f,%.2f\n", i, x, y, z];
+				}
+			}
 		}
 		return out;
 	}

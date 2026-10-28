@@ -17,10 +17,10 @@ where it is - nothing is moved or deleted.
 Every other platform is unchanged.
 
 diff --git a/port/src/gexplusrom.c b/port/src/gexplusrom.c
-index dc6763d2e..a922b5e29 100644
+index c1f846026..599dbcc50 100644
 --- a/port/src/gexplusrom.c
 +++ b/port/src/gexplusrom.c
-@@ -505,7 +505,15 @@ static s32 gexPlusRomConvertInto(u8 *rom, u32 romlen, const char *dest, const ch
+@@ -507,7 +507,15 @@ static s32 gexPlusRomConvertInto(u8 *rom, u32 romlen, const char *dest, const ch
  
  static void gexPlusRomConvertGoldenEye(void)
  {
@@ -37,10 +37,10 @@ index dc6763d2e..a922b5e29 100644
  	static const char *const romdirs[] = { FS_ADDED_CONTENT_SEARCH, "$B" };
  	struct romsearch search = { "" };
 diff --git a/port/src/mod.c b/port/src/mod.c
-index 81b614826..8f90f82d6 100644
+index 247309f70..e31ba8033 100644
 --- a/port/src/mod.c
 +++ b/port/src/mod.c
-@@ -3482,7 +3482,12 @@ static bool modListRootIsRepeat(const char *const dirs[], s32 index)
+@@ -3576,7 +3576,12 @@ static bool modListRootIsRepeat(const char *const dirs[], s32 index)
  
  void modListRefresh(void)
  {

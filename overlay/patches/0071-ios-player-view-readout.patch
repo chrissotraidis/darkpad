@@ -1,0 +1,37 @@
+Subject: player: which way the player is facing (iOS only)
+
+Controller and touch look need a rate measurement, and position alone cannot
+tell walking from walking-and-turning. playerIosGetView() returns vv_theta and
+vv_verta for the :8775 bridge. Read-only, inside PLATFORM_IOS.
+
+diff --git a/src/game/player.c b/src/game/player.c
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -8833,6 +8833,27 @@ s32 playerIosGetAimMode(void)
+ 
+ 	return p->insightaimmode ? 1 : 0;
+ }
++
++/**
++ * Which way the player is facing: turn angle and look pitch, in degrees.
++ *
++ * Controller look is a claim about rate and about which input moves the view.
++ * Position alone cannot separate "the left stick walks" from "the left stick
++ * walks and turns"; vv_theta and vv_verta can. Read-only, iOS-only.
++ */
++s32 playerIosGetView(f32 *theta, f32 *verta)
++{
++	struct player *p = g_Vars.currentplayer;
++
++	if (!p) {
++		return 0;
++	}
++
++	if (theta) *theta = p->vv_theta;
++	if (verta) *verta = p->vv_verta;
++
++	return 1;
++}
+ #endif
+ 
+ #ifdef PLATFORM_IOS

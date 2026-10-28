@@ -68,6 +68,12 @@ void inputIosPadSetRStick(int x, int y);
 // overlay 0021 — where the player is standing, so "analogue" can be measured
 // rather than asserted. Returns 0 when there is no player (a menu, a load).
 int playerIosGetPos(float *x, float *y, float *z);
+int playerIosGetView(float *theta, float *verta);
+/** DarkPad 0092: the game clock in 240ths (lvframenum through the pointer),
+ *  and a character slot's position (0 for an empty slot). Read-only. */
+int playerIosGetGameClock(int *lvframenum);
+int playerIosGetChrPos(int index, float *x, float *y, float *z);
+int inputControllerGetSticksSwapped(int cidx);
 
 // overlay 0021 — the engine's own aim-mode flag (player.insightaimmode). The
 // AIM chip is hold-and-drag (D-046) and "the lift really left aim mode" is an
@@ -79,6 +85,11 @@ int playerIosGetAimMode(void);
 // right hand's gun has a second function, its weapon number + function (0/1),
 // and whether the active menu (the weapon wheel) is open + its slot (4 = centre).
 int playerIosOnGoldenEyeLevel(void);
+/** The online match's chat line (rebelancap overlay 0085, DarkPad 0085):
+ *  Available while an online match is live; Open opens it as the chat key
+ *  does, bringing up the software keyboard. Call Open at a frame boundary. */
+int netHudIosChatAvailable(void);
+int netHudIosChatOpen(void);
 int playerIosGunHasSecondary(void);
 int playerIosGunState(int *function);
 int playerIosActiveMenu(int *slot);

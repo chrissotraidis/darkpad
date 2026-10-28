@@ -39,10 +39,10 @@ Every hunk is `#ifndef PLATFORM_IOS` (or one `#ifdef`) around an existing array
 entry; no other platform's menus change by a byte.
 
 diff --git a/port/src/optionsmenu.c b/port/src/optionsmenu.c
-index f953d9c6b..08bc1678e 100644
+index 76cceaa09..90805a923 100644
 --- a/port/src/optionsmenu.c
 +++ b/port/src/optionsmenu.c
-@@ -5724,7 +5724,16 @@ struct menudialogdef g_ExtendedDabsModMissionMenuDialog = {
+@@ -6024,7 +6024,16 @@ struct menudialogdef g_ExtendedDabsModMissionMenuDialog = {
  	g_ExtendedDabsModMissionMenuItems,
  	NULL,
  	MENUDIALOGFLAG_LITERAL_TEXT,
@@ -59,7 +59,7 @@ index f953d9c6b..08bc1678e 100644
  };
  
  struct menudialogdef g_ExtendedDabsModDisplayMenuDialog = {
-@@ -7024,6 +7033,11 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
+@@ -7347,6 +7356,11 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
  		0,
  		NULL,
  	},
@@ -71,7 +71,7 @@ index f953d9c6b..08bc1678e 100644
  	{
  		MENUITEMTYPE_SELECTABLE,
  		0,
-@@ -7040,6 +7054,7 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
+@@ -7363,6 +7377,7 @@ struct menuitem g_ExtendedTexturePackMenuItems[] = {
  		0,
  		menuhandlerAssetDumpStatus,
  	},
@@ -80,10 +80,10 @@ index f953d9c6b..08bc1678e 100644
  		MENUITEMTYPE_SELECTABLE,
  		0,
 diff --git a/src/game/mainmenu.c b/src/game/mainmenu.c
-index 9cb342aee..d02979124 100644
+index 173c847b0..18b9d6cee 100644
 --- a/src/game/mainmenu.c
 +++ b/src/game/mainmenu.c
-@@ -5401,6 +5401,20 @@ struct menuitem g_MainMenuMenuItems[] = {
+@@ -5563,6 +5563,20 @@ struct menuitem g_MainMenuMenuItems[] = {
  		(void *)&g_ChangeAgentMenuDialog,
  	},
  #ifndef PLATFORM_N64
@@ -104,7 +104,7 @@ index 9cb342aee..d02979124 100644
  	{
  		MENUITEMTYPE_SELECTABLE,
  		0,
-@@ -5425,6 +5439,7 @@ struct menuitem g_MainMenuMenuItems[] = {
+@@ -5587,6 +5601,7 @@ struct menuitem g_MainMenuMenuItems[] = {
  		0x00000007,
  		(void *)&g_ExitGameMenuDialog,
  	},

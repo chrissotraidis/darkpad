@@ -28,6 +28,9 @@ typedef NS_ENUM(NSInteger, PDRomVerdict) {
 
 /** Classify a candidate file. Reads it once; safe on any thread. */
 + (PDRomCheck *)classifyFileAtPath:(NSString *)path;
+/** As classifyFileAtPath:, but a .v64/.n64 dump is checked as a temporary .z64
+    copy; *usable is the file to install (the original or that copy). */
++ (PDRomCheck *)checkRomAtPath:(NSString *)path usable:(NSString *_Nullable *_Nonnull)usable;
 
 /** The ROM the engine will load, if a valid one is already in place. */
 + (nullable NSString *)installedRomPath;

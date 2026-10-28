@@ -1,3 +1,8 @@
+> **Superseded (25 October 2026).** The shipping 0023 (from rebelancap 1.0.4, on
+> v3.15.1) keeps the iOS queue, gain and rate matcher and forces two output
+> channels on iOS, so 5.1 plays as Dolby Surround and Headphone Surround stays
+> two channels. The six-channel merge below was not needed.
+
 # Candidate audio merge findings
 
 Target engine: `3ee8ed0cd549b64350848655c43ae1568e449c6d`. Baseline: `90c8622e74b35be669d60d177effc6d7d2d7621c`. This is an unresolved integration, not an accepted patch.

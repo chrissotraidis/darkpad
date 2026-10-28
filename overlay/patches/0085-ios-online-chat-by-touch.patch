@@ -1,0 +1,88 @@
+Subject: iOS: the online match's chat line opened by touch; no key hint on a phone
+
+Online round 2 (D-105). In a live online match the chat line opens only from
+the keyboard (Net.ChatKey T, or Space when free: nethud.c netHudFrame), and the
+match starts with a "T: chat    hold P: players" hint. A phone has neither key,
+and a pad has no chat at all; the touch layer gets a chat chip (glyph only,
+shown only while a match is live online) that calls netHudIosChatOpen(), which
+opens the same line the chat key does (inputStartTextInput: the software
+keyboard comes up; its Return sends through overlay 0024's VK_RETURN; hiding
+it shuts the line). The players panel is the pause menu's Players page, which
+the touch layer's START chip already reaches. The key hint is left out on iOS.
+
+The Game Lobby and the Briefing Room need nothing: their Chat rows open the
+line by the menu pointer (netplay.md "F3 pass 38: the online menus").
+Entirely inside PLATFORM_IOS.
+
+--- a/port/include/net/net.h
++++ b/port/include/net/net.h
+@@ -365,6 +365,13 @@
+ s32 netHudAteEscape(void);      // this frame's ESC was the line's (for what reads inputKeyPressedThisFrame)
+ void netHudLobbyFrame(void);    // netlobbymenu.c: the Game Lobby is the dialog on screen this frame
+ s32 netHudLobbyChatOpen(void);  // netlobbymenu.c: the Game Lobby's Chat row opens the line (a keyboard or mouse press)
++#ifdef PLATFORM_IOS
++// iOS (Online round 2, D-105): the touch layer's chat chip. Available while a
++// match is live online; Open opens the match's chat line, as T does on a
++// keyboard (the software keyboard comes up with it). 1 when open or opened.
++s32 netHudIosChatAvailable(void);
++s32 netHudIosChatOpen(void);
++#endif
+ void netHudMainChatFrame(void); // netlobbymenu.c: the Briefing Room is, with the main menu's chat
+ s32 netHudChatLine(char *out, s32 size, s32 maxchars); // the line as typed (its tail, a cursor); 0 shut
+ void netHudSay(const char *text); // a line said from a menu (the pause menu's Players page)
+--- a/port/src/net/nethud.c
++++ b/port/src/net/nethud.c
+@@ -551,6 +551,14 @@
+ 		const s32 playersvk = netHudKey(s_PlayersKeyName, &s_PlayersVk);
+ 		char hint[NET_MAXCHAT + 1];
+ 
++#ifdef PLATFORM_IOS
++		// A phone has no T or P: the touch layer's chat chip opens the line
++		// and the pause menu's Players page is the panel (Online round 2,
++		// D-105), so a hint naming keys would be a hint at nothing
++		if (1) {
++			hint[0] = '\0';
++		} else
++#endif
+ 		if (chatkey[0] && playersvk > 0) {
+ 			snprintf(hint, sizeof(hint), "%s: chat    hold %s: players", chatkey, inputGetKeyName(playersvk));
+ 		} else if (chatkey[0]) {
+@@ -1517,4 +1525,38 @@
+ 	gdl = text0f153780(gdl);
+ 
+ 	return gdl;
++}
++
++#ifdef PLATFORM_IOS
++/**
++ * The touch layer's chat chip (iOS, Online round 2, D-105): shown while a
++ * match is live online, and a tap opens the match's chat line the way the
++ * chat key does - the software keyboard comes up with inputStartTextInput(),
++ * its Return sends (overlay 0024's VK_RETURN) and hiding it shuts the line
++ * (netHudChatType sees the typing stopped).
++ */
++s32 netHudIosChatAvailable(void)
++{
++	return g_NetMode != NETMODE_NONE && !g_NetDedicated && netSessionHudLive();
++}
++
++s32 netHudIosChatOpen(void)
++{
++	if (!netHudIosChatAvailable()) {
++		return 0;
++	}
++
++	if (s_ChatOpen != CHAT_SHUT) {
++		return 1;
++	}
++
++	if (inputIsTextInputActive() || g_MenuKeyboardPlayer >= 0) {
++		return 0;
++	}
++
++	netHudChatStart(CHAT_MATCH, NULL);
++	sysLogPrintf(LOG_NOTE, "net: the chat line opened by the touch layer's chip");
++
++	return 1;
+ }
++#endif

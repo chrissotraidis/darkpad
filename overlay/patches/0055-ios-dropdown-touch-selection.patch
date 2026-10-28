@@ -5,7 +5,7 @@ Retains controller behavior and does not change menu data allocation.
 
 --- a/src/game/menuitem.c
 +++ b/src/game/menuitem.c
-@@ -45,6 +45,17 @@
+@@ -46,6 +46,17 @@
  
  u8 g_MpSelectedPlayersForStats[MAX_PLAYERS];
  
@@ -23,7 +23,7 @@ Retains controller behavior and does not change menu data allocation.
  #if VERSION >= VERSION_NTSC_1_0
  s32 g_ScissorX1 = 0;
  s32 g_ScissorX2 = 0;
-@@ -351,6 +362,20 @@
+@@ -378,7 +389,21 @@
  	halfheight *= g_LineHeight;
  
  	itemdata->viewheight = context->height;
@@ -40,11 +40,12 @@ Retains controller behavior and does not change menu data allocation.
 +		g_IosDropdownHit[g_MpPlayerNum].halfheight = halfheight;
 +	}
 +#endif
-+
  
++
  	if (context->item->type == MENUITEMTYPE_DROPDOWN || context->item->type == MENUITEMTYPE_PLAYERSTATS) {
  		gdl = menugfxDrawDropdownBackground(gdl, context->x, context->y, context->x + context->width, context->y + context->height);
-@@ -905,6 +930,9 @@
+ 
+@@ -944,6 +969,9 @@
  	union handlerdata handlerdata;
  	union handlerdata handlerdata2;
  
@@ -54,7 +55,7 @@ Retains controller behavior and does not change menu data allocation.
  	data->dropdown.list.curoffsety = 0;
  	data->dropdown.list.index = 0;
  	data->dropdown.unk08 = 0;
-@@ -1036,6 +1064,33 @@
+@@ -1075,6 +1103,49 @@
  
  	if ((tickflags & MENUTICKFLAG_ITEMISFOCUSED) && item->handler) {
  		if (dialog->dimmed && item == dialog->focuseditem) {
@@ -71,7 +72,17 @@ Retains controller behavior and does not change menu data allocation.
 +						&& inputs->mousey < g_IosDropdownHit[n].y + g_IosDropdownHit[n].height) {
 +					const s32 rel = inputs->mousey - g_IosDropdownHit[n].y
 +						- g_IosDropdownHit[n].halfheight + g_IosDropdownHit[n].offset;
-+					const s32 index = menuitem0f0e5d2c(rel, item);
++					s32 index;
++					// menuitem0f0e5d2c() divides by g_LineHeight, which is
++					// whatever the last list drawn left it at. Use this
++					// list's own option height (rebelancap's overlay 0062).
++					if (item->flags & MENUITEMFLAG_LIST_CUSTOMRENDER) {
++						item->handler(MENUOP_GETOPTIONHEIGHT, item, &hd);
++						g_LineHeight = hd.list.value;
++					} else {
++						g_LineHeight = LINEHEIGHT;
++					}
++					index = menuitem0f0e5d2c(rel, item);
 +					item->handler(MENUOP_GETOPTIONCOUNT, item, &hd);
 +					if (rel >= 0 && index >= 0 && index < (s32)hd.list.value) {
 +						data->list.index = index;
@@ -80,8 +91,14 @@ Retains controller behavior and does not change menu data allocation.
 +						item->handler(MENUOP_LISTITEMFOCUS, item, &hd);
 +						hit = true;
 +					}
++				} else if (item->type == MENUITEMTYPE_DROPDOWN) {
++					// A tap outside an open dropdown closes it, nothing chosen.
++					dialog->dimmed = false;
++					inputs->select = false;
++					menuPlaySound(MENUSOUND_TOGGLEOFF);
++					return true;
 +				}
-+				// Outside the rendered choices: never commit the previous value.
++				// Never commit the previous value from a tap that missed.
 +				if (!hit) inputs->select = false;
 +			}
 +#endif

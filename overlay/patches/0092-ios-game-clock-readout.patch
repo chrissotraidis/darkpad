@@ -1,0 +1,53 @@
+Subject: iOS: the game clock and character positions, for the bridge
+
+DarkPad overlay 0092. Read-only, iOS-only accessors for measuring game speed
+above 60 Hz: g_Vars.lvframe240 / lvframenum, and the position of a character
+slot. The development bridge (compiled out of public builds) times walking
+NPCs and the player against the game clock and the wall clock.
+
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -9627,6 +9627,43 @@
+ 	return p && p->activemenumode != AMMODE_CLOSED;
+ }
+ 
++/**
++ * The game's own clock, for measuring game speed above 60 Hz (DarkPad 0092):
++ * lvframe240 counts 240ths of game time; lvframenum counts frames. Wall time
++ * against lvframe240, and distance against lvframe240, show whether the game
++ * runs at real speed at a given refresh rate. Read-only, iOS-only.
++ */
++s32 playerIosGetGameClock(s32 *lvframenum)
++{
++	if (lvframenum) *lvframenum = g_Vars.lvframenum;
++	return g_Vars.lvframe240;
++}
++
++/**
++ * Where character slot 'index' stands (DarkPad 0092), so the bridge can time
++ * an NPC's walk against the game clock: AI that runs once per frame instead
++ * of once per game tick walks faster above 60 Hz. 0 for an empty slot.
++ */
++s32 playerIosGetChrPos(s32 index, f32 *x, f32 *y, f32 *z)
++{
++	struct chrdata *chr;
++
++	if (index < 0 || index >= g_NumChrSlots || !g_ChrSlots) {
++		return 0;
++	}
++
++	chr = &g_ChrSlots[index];
++
++	if (chr->chrnum < 0 || !chr->prop) {
++		return 0;
++	}
++
++	if (x) *x = chr->prop->pos.x;
++	if (y) *y = chr->prop->pos.y;
++	if (z) *z = chr->prop->pos.z;
++	return 1;
++}
++
+ /** Shell chrome only: retain Start/menu while no playable camera exists. */
+ s32 playerIosIsCinematic(void)
+ {

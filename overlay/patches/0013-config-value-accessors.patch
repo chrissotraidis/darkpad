@@ -16,7 +16,7 @@ Nothing else in the tree calls them; with the iOS shell absent this is dead
 code of about sixty lines.
 
 diff --git a/port/include/config.h b/port/include/config.h
-index e979c0265..4a3a25c2c 100644
+index f50c1bb13..9b3c0dd22 100644
 --- a/port/include/config.h
 +++ b/port/include/config.h
 @@ -13,6 +13,12 @@ s32 configLoad(const char *fname);
@@ -33,10 +33,10 @@ index e979c0265..4a3a25c2c 100644
  u32 configDumpSection(const char *section, char *dst, u32 dstsize);
  
 diff --git a/port/src/config.c b/port/src/config.c
-index 06678ef36..8aae7d455 100644
+index 66a4de22c..202844379 100644
 --- a/port/src/config.c
 +++ b/port/src/config.c
-@@ -214,6 +214,65 @@ static void configSetFromString(const char *key, const char *val)
+@@ -215,6 +215,65 @@ static void configSetFromString(const char *key, const char *val)
  	}
  }
  

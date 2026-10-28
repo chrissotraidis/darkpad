@@ -82,6 +82,8 @@ cmake -S build/src -B "$BUILD" -G Ninja \
   -DPD_STATIC_LIB=ON \
   -DPD_GL_ANGLE=ON \
   -DPD_VULKAN=OFF \
+  -DPD_VERSION_HASH="$(cut -c1-9 UPSTREAM_PIN)" \
+  -DPD_VERSION_BRANCH=DarkPad \
   -DPD_ANGLE_DIR="$ROOT/$ANGLE" \
   -DPD_ANGLE_INCLUDE_DIR="$ROOT/work/angle-include" \
   -DPD_ANGLE_GLUE="$ROOT/app/gfx/gfx_angle_egl.mm" \

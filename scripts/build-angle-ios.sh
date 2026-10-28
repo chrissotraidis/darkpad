@@ -42,6 +42,12 @@ angle_assert_always_on = false
 angle_build_tests = false
 treat_warnings_as_errors = false
 ARGS
+# Xcode 27's iPhoneOS SDK stubs list arm64e.x1 targets that ANGLE's pinned lld
+# cannot parse ("malformed file"). Apple's linker reads them; the simulator SDK
+# does not use that target and keeps the pinned lld.
+if [[ "$KIND" == device ]]; then
+ echo 'use_lld = false' >> "$OUT/args.gn"
+fi
 buildtools/mac/gn gen "$OUT"
 "$NINJA" -C "$OUT" -j "${PD_BUILD_JOBS:-6}" libEGL libGLESv2
 for lib in libEGL libGLESv2; do

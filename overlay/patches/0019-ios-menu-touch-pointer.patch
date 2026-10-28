@@ -39,10 +39,10 @@ menuProcessInput() tests before touching the mouse at all.
 Nothing here is reachable off iOS: every hunk is inside PLATFORM_IOS.
 
 diff --git a/port/include/input.h b/port/include/input.h
-index 90915c648..043b1dd13 100644
+index 9ca05af95..3b43e0415 100644
 --- a/port/include/input.h
 +++ b/port/include/input.h
-@@ -244,6 +244,13 @@ void inputIosLookAddDegrees(f32 degx, f32 degy);
+@@ -248,6 +248,13 @@ void inputIosLookAddDegrees(f32 degx, f32 degy);
  void inputIosPadSet(u32 buttons, s32 stickx, s32 sticky);
  void inputIosPadSetButton(u32 button, s32 down);
  u32 inputIosPadGetButtons(void);
@@ -57,10 +57,10 @@ index 90915c648..043b1dd13 100644
  
  void inputMouseGetScaledDelta(f32 *dx, f32 *dy);
 diff --git a/port/src/input.c b/port/src/input.c
-index 2255b2149..21dc7d8d9 100644
+index 637654494..14f231ea4 100644
 --- a/port/src/input.c
 +++ b/port/src/input.c
-@@ -1195,6 +1195,10 @@ static inline s32 inputAxisScale(s32 x, const s32 deadzone, const f32 scale)
+@@ -1250,6 +1250,10 @@ static inline f32 inputAxisSens(const struct controllercfg *cfg, u32 axis)
   * many times the consumer asks for it - the same contract mouseDX/DY have.
   */
  static f32 iosLookPendingX = 0.f, iosLookPendingY = 0.f;
@@ -71,7 +71,7 @@ index 2255b2149..21dc7d8d9 100644
  static f32 iosLookFrameX = 0.f, iosLookFrameY = 0.f;
  static u32 iosPadButtons = 0;
  static s32 iosPadStickX = 0, iosPadStickY = 0;
-@@ -1244,6 +1248,7 @@ static void inputIosMergePad(OSContPad *npad)
+@@ -1299,6 +1303,7 @@ static void inputIosMergePad(OSContPad *npad)
  	if (!npad->stick_y && iosPadStickY) {
  		npad->stick_y = iosPadStickY;
  	}
@@ -79,7 +79,7 @@ index 2255b2149..21dc7d8d9 100644
  }
  
  static void inputIosLatchFrame(void)
-@@ -1252,6 +1257,70 @@ static void inputIosLatchFrame(void)
+@@ -1307,6 +1312,70 @@ static void inputIosLatchFrame(void)
  	iosLookFrameY = iosLookPendingY;
  	iosLookPendingX = 0.f;
  	iosLookPendingY = 0.f;
@@ -150,7 +150,7 @@ index 2255b2149..21dc7d8d9 100644
  }
  #endif
  
-@@ -1718,6 +1787,22 @@ s32 inputKeyPressed(u32 vk)
+@@ -1805,6 +1874,22 @@ s32 inputKeyPressed(u32 vk)
  	}
  
  	if (vk >= VK_MOUSE_BEGIN && vk < VK_JOY_BEGIN) {
@@ -173,7 +173,7 @@ index 2255b2149..21dc7d8d9 100644
  		return (mouseButtons & SDL_BUTTON(vk - VK_MOUSE_BEGIN + 1)) != 0;
  	}
  
-@@ -1787,6 +1872,16 @@ s32 inputMouseIsLocked(void)
+@@ -1874,6 +1959,16 @@ s32 inputMouseIsLocked(void)
  
  s32 inputMouseGetPosition(s32 *x, s32 *y)
  {
@@ -191,10 +191,10 @@ index 2255b2149..21dc7d8d9 100644
  	if (y) *y = mouseY * videoGetNativeHeight() / videoGetWindowHeight();
  	return (mouseDX != 0 || mouseDY != 0);
 diff --git a/src/game/menu.c b/src/game/menu.c
-index 74ae59a46..e71abb17e 100644
+index b8508edf8..b76e02969 100644
 --- a/src/game/menu.c
 +++ b/src/game/menu.c
-@@ -1518,6 +1518,22 @@ bool dialogChangeItemFocusWithMouse(struct menudialog *dialog, s32 mx, s32 my)
+@@ -1594,6 +1594,22 @@ bool dialogChangeItemFocusWithMouse(struct menudialog *dialog, s32 mx, s32 my)
  	return false;
  }
  

@@ -596,7 +596,7 @@ int pdVisionEyeActivate(void)
 	// the engine thread and off the compositor thread: all it does is
 	// decrement, and it must never be the thing a frame waits behind.
 	if (!s_listener) {
-		s_listenerQueue = dispatch_queue_create("com.rebelancap.perfectdark.eyeretire",
+		s_listenerQueue = dispatch_queue_create("com.chrissotraidis.darkpad.eyeretire",
 			DISPATCH_QUEUE_SERIAL);
 		s_listener = [[MTLSharedEventListener alloc] initWithDispatchQueue:s_listenerQueue];
 	}

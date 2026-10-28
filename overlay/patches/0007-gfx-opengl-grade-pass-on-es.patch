@@ -24,7 +24,7 @@ ANGLE-Metal. Desktop behaviour is unchanged: same shaders, same version line,
 same glBindFragDataLocation call.
 
 diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
-index 8349def05..58c2f416f 100644
+index 0eb89649a..972af9100 100644
 --- a/port/fast3d/gfx_opengl.cpp
 +++ b/port/fast3d/gfx_opengl.cpp
 @@ -1933,7 +1933,11 @@ static void gfx_opengl_start_frame(void) {

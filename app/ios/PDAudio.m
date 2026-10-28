@@ -36,7 +36,7 @@ static dispatch_queue_t pdAudioQueue(void)
 	static dispatch_queue_t q;
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
-		q = dispatch_queue_create("com.rebelancap.perfectdark.audio-session",
+		q = dispatch_queue_create("com.chrissotraidis.darkpad.audio-session",
 			dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
 	});
 	return q;
@@ -257,7 +257,7 @@ static void pdApplySessionMode(void)
 	// One sentence each, because "duck" and "mix" mean nothing to a player and
 	// a four-word label would not help. bean's sentences, this game's name.
 	return @[
-		@"Music and podcasts stop when Perfect Dark starts.",
+		@"Music and podcasts stop when DarkPad starts.",
 		@"Both play together, neither one quieter.",
 		@"Music and podcasts drop to the background; game audio stays full.",
 		@"Game audio drops to the background while another app is playing.",

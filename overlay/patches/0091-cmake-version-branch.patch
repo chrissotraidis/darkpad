@@ -1,0 +1,26 @@
+Subject: cmake: PD_VERSION_BRANCH, so the boot screen names DarkPad
+
+DarkPad overlay 0091. The legal screen shows "Perfect Dark (VERSION_BRANCH)"
+(title.c). VERSION_BRANCH is the git branch of CMAKE_SOURCE_DIR, which for
+build/src is the port checkout, so a working branch such as
+codex/readme-icon-controller-default ran off the screen. build-ios.sh passes
+PD_VERSION_BRANCH=DarkPad. Unset, the build is exactly upstream.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -177,6 +177,15 @@
+   set(VERSION_BRANCH "port-custom")
+ endif()
+ 
++# PD_VERSION_BRANCH (DarkPad overlay 0091): the name the title's legal screen
++# shows as "Perfect Dark (<branch>)" and the log's version line. build/src has
++# no .git, so the rev-parse above answers with the port checkout's branch -
++# a long working-branch name ran off the boot screen. Netplay compares
++# VERSION_HASH only (0083), never the branch.
++if(DEFINED PD_VERSION_BRANCH AND NOT PD_VERSION_BRANCH STREQUAL "")
++  set(VERSION_BRANCH "${PD_VERSION_BRANCH}")
++endif()
++
+ message(STATUS "Version: ${VERSION_ROMID}, hash ${VERSION_HASH}, branch ${VERSION_BRANCH}")
+ 
+ configure_file("${CMAKE_SOURCE_DIR}/port/include/versioninfo.h.in" "${CMAKE_BINARY_DIR}/port/include/versioninfo.h" @ONLY)

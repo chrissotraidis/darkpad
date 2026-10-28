@@ -12,10 +12,10 @@ With it, the file is added to SRC_PORT at -O2 and its directory goes on the
 include path so the patched engine files can #include "pd_frame_prof.h".
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0c5b821e2..3bc021b45 100644
+index 457861630..d4aa8321f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -678,6 +678,28 @@ if(PD_GL_ANGLE)
+@@ -679,6 +679,28 @@ if(PD_GL_ANGLE)
    set_source_files_properties("${PD_ANGLE_GLUE}" PROPERTIES COMPILE_OPTIONS "-O2")
  endif()
  

@@ -27,18 +27,18 @@ BELOW consumption, so the queue cannot run away with the governor raised, and
 `queueLimit` (16384 on iOS) is still the hard ceiling.
 
 diff --git a/port/src/audio.c b/port/src/audio.c
-index 63ed859b0..0b456cf27 100644
+index 3db3436df..763dd60d2 100644
 --- a/port/src/audio.c
 +++ b/port/src/audio.c
-@@ -6,6 +6,7 @@
- #include "audio.h"
+@@ -10,6 +10,7 @@
  #include "record.h"
  #include "system.h"
+ #include "video.h"
 +#include "lib/audiomgr.h"   /* g_AmgrThrottleSamples (overlay 0028) */
  
  static SDL_AudioDeviceID dev;
  static const s16 *nextBuf;
-@@ -637,5 +638,9 @@ PD_CONSTRUCTOR static void audioConfigInit(void)
+@@ -986,5 +987,9 @@ PD_CONSTRUCTOR static void audioConfigInit(void)
  	configRegisterInt("Audio.PrimeSamples", &primeSamples, 0, 32 * 1024);
  	configRegisterInt("Audio.RateMatch", &rateMatch, 0, 1);
  	configRegisterInt("Audio.RateMatchMaxPct", &rateMatchMaxPct, 0, PD_AUDIO_RATE_MAX_PCT);

@@ -39,7 +39,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Perfect Dark</string>
+	<string>DarkPad</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,7 +47,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Perfect Dark</string>
+	<string>DarkPad</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -92,9 +92,9 @@
 	     crash. pd_ios_main.m now overrides that hint off; if anything ever
 	     reaches CoreBluetooth anyway it must prompt, never abort. -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<string>DarkPad can connect to Bluetooth game controllers.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<string>DarkPad can connect to Bluetooth game controllers.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -103,7 +103,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.rebelancap.perfectdark</string>
+			<string>com.chrissotraidis.darkpad</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>

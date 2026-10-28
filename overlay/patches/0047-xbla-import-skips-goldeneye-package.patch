@@ -12,10 +12,10 @@ as the package). Perfect Dark's own package (584109C2) and archives are found
 exactly as before.
 
 diff --git a/port/src/xblaimport.c b/port/src/xblaimport.c
-index 15902a1ca..12d713639 100644
+index 4d2b45af9..cd42acccf 100644
 --- a/port/src/xblaimport.c
 +++ b/port/src/xblaimport.c
-@@ -227,7 +227,10 @@ static s32 xblaLooksLikePackage(const char *path)
+@@ -235,7 +235,10 @@ static s32 xblaLooksLikePackage(const char *path)
  			 !memcmp(magic, "PIRS", 4));
  	fclose(fp);
  
@@ -27,7 +27,7 @@ index 15902a1ca..12d713639 100644
  }
  
  static s32 xblaPathIsDir(const char *path)
-@@ -280,7 +283,8 @@ static void xblaScanForPackage(const char *name, void *arg)
+@@ -288,7 +291,8 @@ static void xblaScanForPackage(const char *name, void *arg)
  			 !archiveFindEntry(path, "files/new/char/") &&
  			 !archiveFindEntry(path, GEBEANCE_DIFF_ENTRY) &&
  			 !archiveFindEntry(path, ".xdelta") && !archiveFindEntry(path, ".vcdiff") &&

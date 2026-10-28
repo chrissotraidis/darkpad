@@ -100,7 +100,7 @@ Branch: `codex/perfect-dark-foundation`. Foundation checkpoint `3eab186`; ANGLE 
 
 ## Empty-cache bootstrap acceptance
 
-- `scripts/bootstrap-apple.sh` completed uninterrupted, exit 0, from clean managed worktree `/Users/chrissotraidis/.codex/worktrees/clean-bootstrap/darkpad` at `dc53fa0`, with no pre-existing work/build/vendor directories. Engine, SDL/curl (three SDKs), ANGLE (both iOS slices), Mac reference and both app bundles rebuilt. Both final Xcode builds succeeded. Log: `work/evidence/clean-bootstrap-dc53fa0.log`.
+- `scripts/bootstrap-apple.sh` completed uninterrupted, exit 0, from clean managed worktree `~/.codex/worktrees/clean-bootstrap/darkpad` at `dc53fa0`, with no pre-existing work/build/vendor directories. Engine, SDL/curl (three SDKs), ANGLE (both iOS slices), Mac reference and both app bundles rebuilt. Both final Xcode builds succeeded. Log: `work/evidence/clean-bootstrap-dc53fa0.log`.
 - No working-checkout dependency libraries or game assets copied into the clean tree. This proves an empty **project** cache on this Mac with installed prerequisites; system developer tools/vpython caches remain host dependencies. No claim of a second Mac test.
 - Installed the clean-produced simulator app after Documents/Library backup; all four ROM/save hashes match (`clean-build-update.json`). Only the existing dedicated simulator remained booted. Mission/save-reload acceptance proceeds on this clean build.
 
@@ -1198,3 +1198,126 @@ Dedicated simulator: **Darkpad P0 iPhone**, `D8BB419F-91F4-4919-9247-B7985F581EC
 - iPad and iPhone updates backed up3837/4591files; only4SplashBoard snapshots changed on each. Reports work/final-controls-{ipad,phone}-preservation.json. Only one simulator booted; final phonePID98236. iPad runtime check preceded final32pt additional ammo clearance; phone runtime uses final source. No physical-device tests.
 - Runtime phone: saved Investigation Agent star/Extraction unlock still present; loaded Extraction, Fire8→7, Reload7/42→8/41. Settings recognizes PD Forever Plus HD v0.10. Native Settings/Done, game Start/Back, editor entry/Done, enabled/disabled End Session and confirmed exit exercised. Screenshots work/final-ui-check. Existing HD Original/Enhanced comparisons and Defection/Investigation completion/reload evidence remain valid; no new full-mission claim from this smoke check.
 - Source/build: passed. Package/install: simulator passed, device unsigned. Physical gameplay/performance: not run per user. Release readiness: local preview only. Full campaign and successful co-op remain unverified and explicitly deferred by wrap-up. Existing continuation automation paused so it does not resume the deferred test loop.
+
+## Fresh-checkout rebuild, README, icon and controller default (24 October)
+
+- Fresh clone with no caches on Xcode 27.1 (iOS 27.1 SDK), 206 GiB free at start. `scripts/bootstrap-apple.sh` built SDL2/curl, the Mac reference, ANGLE and the Simulator engine; ANGLE's device link then failed because the iPhoneOS 27.1 SDK `.tbd` stubs list `arm64e.x1-ios`, which the pinned lld rejects as malformed. `scripts/build-angle-ios.sh` now adds `use_lld = false` for device builds only. Remaining steps then passed: device ANGLE (platform 2 check PASS), device engine, XCFrameworks, project generation, Simulator and unsigned device Debug builds. Logs: work/bootstrap-apple.log, work/bootstrap-resume.log.
+- New-install controller default: `PDController` applies the Goldenpad layout once on the first engine frame when no pd.ini existed before the engine started; installs with a pd.ini keep their bindings. Verified on a clean iPad Air 11-inch (M4) iOS 27.0 Simulator: log reports the layout applied and pd.ini holds RTRIGGER fire, LTRIGGER aim, LSHOULDER crouch, RSHOULDER/A/Y weapon, LSTICK reload, RSTICK alternate, BACK wheel.
+- Settings: Texture Packs now precedes Xbox 360 Art and GE Plus (follows the Original/Enhanced/Remaster order). Verified visually through the bridge.
+- App icon replaced with original DarkPad art (docs/ART.md); scripts/gen-icons.py now reads app/ios/icon/darkpad-icon-{source,mark}.png. The trademarked perfect-dark.ico was removed.
+- README rewritten in Goldenpad's public structure: inherited vs added features, multiplayer scope, graphics/texture options, controls, menu, settings reference, build, troubleshooting, limitations. No prebuilt IPA will be published.
+- Runtime: ROM (MD5 e03b088b…) copied into the Simulator app's Documents; app launched at 60 fps, intro played, Start reached the Perfect Dark file screen. Device Hub (Xcode 27's Simulator UI) accessibility timed out, so the ••• popover itself was not clicked this session. No physical-device tests.
+
+## Home-screen name and first physical iPad install (24 October)
+
+- App display/bundle name is now DarkPad (Info.plist and visionOS plist); the Documents folder therefore appears in Files as DarkPad, and in-app help, Bluetooth prompts and the README point there. Game-name references and the texture-pack marker string are unchanged.
+- Signed Release build with PD_PUBLIC=1 (console bridge compiled out), the owner's team, bundle ID com.chrissotraidis.darkpad passed at build time (the repo default com.rebelancap.perfectdark stays for Simulator builds). Log work/device-signed-build.log. codesign verify and iphoneos platform check pass; no ROM in the bundle.
+- Installed on Chris' iPad Pro 12.9-inch (6th gen), iPadOS 27.0.1, which had no previous DarkPad/Perfect Dark install. Copied the user's ROM to the app's Documents as pd.ntsc-final.z64; read-back MD5 e03b088b6ac9e0080440efed07c1e40f.
+- Launched via devicectl: process alive after 15 s; heartbeat frames=2268, pacing 119.9 Hz, overlay visible, thermal 0, footprint 260.8 MB. pd.ini holds the Goldenpad controller default. No hands-on menu/controls/gameplay acceptance yet; that is the user's test.
+
+## Public-release sanity check (24 October)
+
+- History and tree: no ROMs, saves, pd.ini, IPAs, signing files or credentials in any commit; pack 1.74 MiB; largest blobs are the icon PNGs. One private path and the team ID line removed from PROGRESS.md.
+- Fixed: the development console bridge bound to every interface (INADDR_ANY), exposing it on Wi-Fi from Debug device builds. It now binds loopback unless launched with PD_BRIDGE_LAN=1. Verified on the Simulator: answers on 127.0.0.1:8775, refuses the Mac's LAN address. PD_PUBLIC builds still omit it.
+- Added CONTRIBUTING.md and SECURITY.md (GoldenPad's structure). README: device row no longer implies a sideloading IPA exists; limitations mention the physical iPad launch; project map lists the new files.
+- Tests: texture_upscale, image_decoder_limits, texture_pack_prepare, input_clipboard and gyro_math (ASan/UBSan) pass against the current build tree.
+- Open for the owner: version number (VERSION 1.0.3 is inherited from upstream perfect-dark-ios), inherited docs/upstream screenshot showing Xbox 360 game art, default bundle ID com.rebelancap.perfectdark, LICENSE copyright line for DarkPad's own changes, merge to main, making the repository public, tagging. PadMint player-check does not apply until a PadMint recipe exists.
+
+## Version, bundle ID, license and screenshot (24 October)
+
+- VERSION is now 0.1.0 (DEV_ITERATION 0, so the app reports 0.1.0).
+- Default bundle ID is com.chrissotraidis.darkpad (project.yml iOS and visionOS targets, bundleIdPrefix, URL type names, dispatch queue labels, packaging/validation scripts, README). Historical docs under docs/upstream and docs/network-integration.md keep the IDs those builds actually used. Other developers still pass their own PRODUCT_BUNDLE_IDENTIFIER for device signing.
+- LICENSE adds "Copyright (c) 2026 Chris Sotraidis" beside rebelancap's line.
+- Removed docs/upstream/screenshots/vision-pro-airbase-xbla.jpg from the tree; it remains in history from 3eab186.
+- Simulator Debug build installed fresh under the new ID on iPad Air 11-inch (M4); ROM copied (MD5 e03b088b…); bridge reports version=0.1.0, engine=running. The old com.rebelancap.perfectdark Simulator install and its test data are left in place.
+
+## Controller look and 120 Hz speed fix (24 October)
+
+User report from the physical iPad Pro: both sticks seemed to look, controls felt finicky, and the game seemed sped up.
+
+- Added overlay 0071 (playerIosGetView: vv_theta/vv_verta) and bridge `player_view` plus `stick <left|right> X Y | stick off`, which writes the engine's stick fields through the shell merge seam honouring Input.PlayerN.SwapSticks. 58/58 patches apply.
+- Measured in the Carrington Institute (Simulator, iPad pd.ini settings, SwapSticks=1): the engine already maps the physical right stick to the N64 stick (CONTROLMODE_PC turn/pitch) and the left to movement. PDController additionally fed right-stick look degrees, which turned the OPPOSITE way at 180°/s: a full right push net-drifted ~35°/s, and pitch was compounded. Removed the shell's pad look and the Gamepad look speed setting. After: right stick +x turns right ~215°/s and returns exactly; pitch symmetric; left stick and D-pad (C-buttons) move/strafe only; no view change from either.
+- Speed: frame rate defaulted to the panel maximum (120 Hz on the iPad Pro) with Game.TickRateDivisor forced to 0; dabs-mod HANDOFF-f3 documents uncapped mode's "stock frame-rate dependence" (per-tick logic runs per frame). Default is now 60 Hz; 120 Hz is labelled experimental in Settings and the ••• menu. Game clock itself is real-time (osGetTime from microseconds); 60 Hz walk speed ~376 units/s both directions. 120 Hz behaviour was not reproducible on the 60 Hz Simulator.
+- Signed PD_PUBLIC Release 0.1.0 installed on the iPad Pro over the previous build; eeprom.bin, pd.ini, ROM preserved; no stored refresh preference, so it now boots at 60 Hz. Physical controller feel still needs the user's test.
+
+## Root cause of the physical-controller look bug (25 October)
+
+- Device trace (PD_PAD_TRACE=1, Xbox Wireless Controller, iPad Pro, iPadOS 27.0.1): SDL reads the pad correctly (left stick -> rstick, movement), but every left-stick or D-pad push also arrived as arrow-key presses (UIKit turns gamepad input into focus-navigation presses; SDL's view forwards them as SDL_SCANCODE arrows). pd.ini binds LEFT/RIGHT/UP/DOWN to STICK_* (the N64 stick, i.e. look under CONTROLMODE_PC), so the look stick went to full deflection (engine stick -128,127, buttons 0x00090000) whenever the left stick or D-pad moved. The Simulator injection test bypassed UIKit and could not show this.
+- Fix: PDController claims gamepad events with GCEventInteraction (handledEventTypes = GCUIEventTypeGamepad) on iOS 18+ as it already did on visionOS; the GoldenPad preset and a one-time migration (pd.controller.arrowsOffStick) remove arrow keys from STICK_* for all players, covering iOS 15-17. Simulator: claim logged, migration turned injected LEFT/RIGHT/DOWN/UP binds into NONE; live binds confirm. iPad: installed signed PD_PUBLIC build, launched with the trace; pd.ini now STICK_*=NONE, Goldenpad binds and eeprom intact. Physical play after the fix still to be confirmed from the next trace.
+
+## Release prep: menu wording, PadMint recipe, README (25 October)
+
+- Owner feedback after the controller fix: controls feel right on an Xbox Wireless Controller on the iPad Pro; menu system and add-ons were confusing; a pause after closing the ••• menu.
+- ••• menu: "Optional Add-ons" (subtitle "None included") with HD Texture Packs / Xbox 360 Remaster Art / GoldenEye Levels (GE Plus), each with a one-line source note; About now explains the engine and Dab's Mod main-menu entries.
+- Menu close timing is logged to lifecycle.txt. Simulator: first engine frame 4 ms after close, slowest frame 18 ms in the following second, so the pause did not reproduce there; device measurement pending.
+- PadMint: padmint.json (iOS, macos-arm64 experimental, in-app ROM, ~30 GB) running new scripts/build-personal-ipa.sh (device-only bootstrap, PD_PUBLIC Release, scripts/package-ipa.sh). Warm-cache run produced a 10 MB IPA in 58 s; padmint check-manifest OK, plan resolves, padmint audit PASS. Catalog entry catalog/darkpad.json committed locally in PadMint worktree ~/.codex/worktrees/padmint-catalog-darkpad (branch codex/catalog-darkpad, from origin/main 56f4132); 365 PadMint tests pass. Not pushed: DarkPad is private and has no release, which the catalog check requires. Cold player-check.sh not run yet.
+- README rewritten to the MeleePad/GoldenPad public structure.
+
+## Hardening pass: menu-close touch recovery, .v64/.n64 ROMs, GE Plus check (25 October)
+
+- PDTouchOverlay reassertTouchability skipped nothing while a controller hid the overlay, so every ••• close logged a false "unreachable-on-unhide" in touch-watchdog.txt on the iPad and ran makeKeyAndVisible recovery. The route probe and recovery now run only when the overlay is visible. Likely part of the reported pause after closing the menu; device timing still pending.
+- Byte-swapped (.v64) and little-endian (.n64) ROMs are now converted to a temporary .z64, validated, installed and the copy removed (PDOnboarding checkRomAtPath:usable:, used by loose-ROM adoption and the document picker). The README already promised this. Simulator: loose "My Perfect Dark.v64" adopted with MD5 e03b088b…; bridge `rom check` on .n64 and .v64 gives verdict 0, converted=1; a truncated .v64 gives the size error; tests/rom_classifier.py 14/14.
+- GE Plus on the Simulator with a GoldenEye (U) ROM: the black screen with two circles is the loading intro, then the folder menu, mission select, Dam briefing and gameplay load at 60 fps; left stick moves without turning, right stick turns.
+
+
+## Release gate run (25 October)
+
+- PadMint scripts/player-check.sh (Apple Python 3.9.6, empty PadMint folder, cold build) PASSED twice: on 1b76eee with PadMint 0.5.13 (880 s) and on af050a3 with PadMint main 37c2c50 / 0.5.14 (959 s). Each produced a 10 MB personal-only IPA. Logs: work/player-check-1b76eee-pass.log, work/player-check-head.log. The catalog branch codex/catalog-darkpad was rebased onto 37c2c50 (now f3844cc); 365 PadMint tests pass. Not pushed.
+- Shipping-build tests pass: input_clipboard (build/src input.c), gyro_math under ASan/UBSan with the Xcode SDK, texture_upscale, image_decoder_limits, texture_pack_prepare, frame_interval_report. Network-candidate audit at 3ee8ed0 applies 73/73 (work/upstream-audit.cFLquq); all eleven candidate tests pass against it (direct_session_cancel takes port/src/net/netsession.c, network_weapon_progress takes src/game/training.c).
+- Signed PD_PUBLIC Release (af050a3 app code) installed on the iPad Pro. Backup work/device-backup-20261025-125639 (2,932 files, SHA256SUMS); after install, Documents (save, pd.ini, both ROMs) and 2,905 Library files (GE Plus conversion, preferences) are byte-identical.
+- Simulator hang dump at 13:02 (work/evidence/sim-hang-20261025-1302-during-coldbuild.txt): main thread waited 5 s in an ANGLE occlusion-query read during GE Plus Dam, starting with the PadMint cold build; recovered to 60 fps. Treated as host GPU starvation, not changed. Watch for hang.txt on device in sunlit levels.
+- Simulator crash report 2026-10-24 22:43: SIGTERM timeout during exit() from gfx_sdl_handle_events while the system terminated the app for a reinstall. Teardown only; no gameplay impact.
+- No ROMs, saves or IPAs in tracked files or history; README/CONTRIBUTING/SECURITY links resolve.
+
+
+## Engine update: Dab's Mod v3.15.1 (25 October)
+
+- Target rechecked: v3.15.1 = a8c2ab2d7b1c99f6a96a2d9addee1fdf9630e379 is the latest stable tag (dabs-mod branch has one doc commit after it). 702 commits from v3.14.0: protocol 33 netplay with Online Lobbies, LAN and Direct Connect served by the host's game; Tomorrow Never Dies 64; above-60 FPS fixes (guns, doors, lifts, AI rate, HUD, outros); per-stage clean memory; texture packs decoded on a worker; surround; Goldfinger 64 converter 126; crash fixes.
+- rebelancap perfect-dark-ios v1.0.4 targets the same commit. Its patches 0001-0054 equal DarkPad's v3.14.0 versions byte for byte, so their v3.15.1 rebases were taken as they are. Added from 1.0.4: 0080/0081 visionOS stereo (stars/sun at infinity, motion blur per eye), 0083 PD_VERSION_HASH, 0084 local-player reads online, 0085 CHAT by touch, 0086 menu click pick width, 0088 account name/PIN length. Not taken: 0057 VR eye substitution (needs their PDVRImmersive shell, not in DarkPad) and 0062 dropdown tap (merged into DarkPad 0055 instead: its option-height fix and close-on-outside-tap).
+- DarkPad patches: 0055-0060, 0064, 0070-0072 apply unchanged; 0061 uses the candidate rebase around upstream's net/net.h include. From the candidate: 0068 (online results and weapon discoveries out of offline saves), 0073 (notice label line), 0076 (co-op spectators may leave). New: 0089 touch/gyro look online inside protocol 33 (replaces protocol 0x4431), 0090 local-player view/cinematic/wheel-slot reads (0084's wheel read used g_AmIndex, which setCurrentPlayerNum does not move), 0091 PD_VERSION_BRANCH=DarkPad (the boot screen showed the checkout's branch name), 0092 read-only game clock and character positions for the bridge. 73 patches, all apply at zero fuzz with no offsets.
+- Shell: CHAT chip (online matches only, editable), NSLocalNetworkUsageDescription, opt-in PD_MULTICAST entitlement, bridge kbd (from rebelancap) and clock commands, heartbeat mono_s/game_clock240/game_frames, ROM hack importer keeps Goldfinger 64 and TND64 side by side, wording for TND64.
+- Tests: network_touch_look (new; fails on the unpatched engine), network_local_player (new; fails before 0090), network_coop_results, network_weapon_progress, network_session_exit, input_clipboard, texture tests, image decoder, frame report, gyro: all pass on build/src. Candidate-only tests moved to tests/candidate/.
+- Builds: Simulator engine 617 steps, Simulator Release app, device engine and signed PD_PUBLIC Release app, stock macOS v3.15.1 reference (build/oracle-clang). Device binary: a8c2ab2d7 (arm64-ios), "Perfect Dark (DarkPad)", no bridge, no multicast entitlement.
+- Simulator (iPad Air 11 M4): boot screen reads Perfect Dark (DarkPad) / a8c2ab2d7; existing eeprom and pd.ini unchanged by the update; the iPad's save copied in loads as agent "Dark"; Perfect Menu shows GoldenEye and Online Game; Carrington Institute left stick walks without turning, right stick turns; GE Plus reconverted (geconvert 126) and Dam plays at 60 fps; leaving GoldenEye: watch Abort, then PREVIOUS or the BACK chip back to the Perfect Menu.
+- Game speed (--fixed-fps, which steps game time by 1/N per frame): game clock advances exactly 1/60 and 1/120 s per frame; player walk in Carrington Institute 424.0 units/s at 60 and 415.8 at 120 (2%). NPC paths in a Combat Simulator arena differ between runs, so NPC speed was not compared. Simulator only; the iPad at 120 Hz is unmeasured. Evidence work/evidence/v3151/.
+- Netplay: stock desktop host + DarkPad client (touch look applied by the host, no snap-back); DarkPad host + stock client (prediction 1125/1125, 0 corrections); two DarkPad Simulators through Online Game -> LAN -> Create Room, second joined by address (lobby 2/4). LAN room list empty without multicast. Not done: real devices, internet lobby, launching from the Game Lobby between two DarkPads, completed co-op.
+- iPad Pro: backup work/device-backup-20261025-204248 (2,928 files); signed Release installed twice; 2,911 save/settings/ROM/GE Plus files byte-identical afterwards. Hands-on play of this build is the owner's.
+
+- PadMint player-check (Apple Python 3.9, empty PadMint folder, PadMint main 37c2c50 / 0.5.14): PASS on 4bbcc0e (2184 s) and PASS on 8940d11 (2872 s), each a 10 MB personal-only IPA. One intermediate run on 8940d11 failed during the ANGLE download (depot_tools gsutil lock timeout, Errno 35) and passed on rerun; log kept as work/player-check-8940d11-fail-gsutil-lock.log.
+
+
+## Public release preparation (28 October)
+
+- Reorganized the README in the sibling-port style: native-game introduction, disclosure, icon/badges, features, platform table, PadMint/source setup, ROM requirements, controls, FAQ and credits. Moved the detailed menu/add-on reference into docs/PLAYER-GUIDE.md and developer instructions into docs/BUILDING.md.
+- Prepared 0.1.0 preview notes and docs/RELEASE-CHECKLIST.md. Release attachments remain recipe/checksum only; scripts/prepare-release.sh stages them from a clean checkout and refuses an existing output directory. No visibility, tag, public release or announcement changed.
+- Recipe status is experimental; the Apple Silicon Mac build route is verified by the recorded October 25 cold player checks. Current-main player check will be recorded after this candidate is committed. Current-engine hands-on iPad gameplay remains pending.
+- Fixed the personal IPA package guard to match the literal developer-console marker (the old regex interpreted square brackets and missed it); added synthetic Mach-O checks for ordinary packaging, console, ROM, provisioning profile and signature rejection. Fixed the escaped PD_MULTICAST variable so explicit opt-in works; generation verified both on and off, then restored the ordinary PD_PUBLIC project without the entitlement.
+- Reused the existing PadMint codex/catalog-darkpad worktree, rebased onto main 7e4c44c (0.5.22), and added sideloading/first-launch/update guidance. Eighteen catalog-route tests and the recipe/catalog consistency check pass. It remains local until the game release is public.
+- Documentation links, recipe schema and changed shell syntax checked. Updated stale acceptance headings to distinguish the current v3.15.1 engine from October 22 history.
+
+### October 28 preparation results
+
+- Mandatory player check PASS: DarkPad 26ac4bd14d05ef353d0544767ad6b97ee98dbdf6, PadMint main 7e4c44c22a0c289ccb104ae054dd2f7ae5e6f041 / 0.5.22, /usr/bin/python3 3.9.6, empty PadMint folder, 872.92 seconds. No ROM read. The private IPA is 11,140,422 bytes, SHA-256 b5230f1c51cd6c08bf396975e0d1aed76a000d9a9720b95c9c8061918aceeb3d.
+- Evidence preserved under ignored work/release-prep-20261028/: player-check.log, backend.log, record.json and DarkPad-v0.1.0-personal.ipa. Readback confirms com.chrissotraidis.darkpad / 0.1.0, iOS 15 minimum, scene manifest, no ROM or signing files and no developer-console marker. This is build/package evidence, not a new gameplay result.
+- dist/darkpad-v0.1.0 contains exactly darkpad-v0.1.0-padmint.json and SHA256SUMS. Both assets and the source ZIP pass current PadMint and the private reference release gate. Source/history filename and credential-pattern checks found no ROM, IPA, save or signing files and no matching credential patterns; no absolute home paths remain in current tracked files.
+- The packaging regression fails against the old script, which incorrectly packages the development-console fixture. The fixed check rejects it; public fixture, ROM/signing rejection and multicast opt-in/default-off checks pass.
+- Staged release discovery/checksum validation and the full single-game catalog audit passed using local response fixtures (not a claim that the private release is already downloadable). README links passed and the rendered header/badges/spacing were visually checked.
+- PadMint's existing codex/catalog-darkpad branch now also carries DarkPad's unchanged original icon and the compatibility/build record. It is not integrated or published; the game's release must be public before the catalog ships.
+- Remaining physical checks are disclosed preview limitations; no new device acceptance is claimed. Release instructions require a regular Latest GitHub release because PadMint begins at releases/latest, and retain the post-publication player check before announcement.
+- Follow-up changes after the checked candidate are documentation only; recipe/build inputs are unchanged. No pushes, visibility changes, tags, public releases, IPAs or announcements were made.
+
+
+## Second release sanity check (28 October)
+
+- Removed the app icon from the README at the owner's request. The installed app and PadMint library keep their existing icons.
+- Corrected the first-launch ROM description to list .z64, .v64 and .n64, matching the existing importer and documentation. No import behavior changed. A fresh current-main player check follows because the app text changed.
+- Release notes now use absolute links pinned to v0.1.0 so they remain valid when pasted into the GitHub release body. Before that tag exists those links intentionally cannot resolve publicly. Added temporary instructions for cloning the prepared branch while main still lacks the recipe, and clarified that manual signing follows the dependency/engine build.
+- GitHub recheck: repository remains private, Issues enabled, no release and no preparation PRs yet. The private-vulnerability-reporting status endpoint returned 404; confirm it after switching public rather than treating the reporting link as verified now.
+
+### Second sanity-check results
+
+- Fresh player-check PASS on c13d20d3b1a91518583955140868b6dd8f590995 with PadMint main 7e4c44c / 0.5.22, Apple Python 3.9.6 and an empty PadMint folder; 855.47 seconds. Private IPA: 11,140,514 bytes; SHA-256 9a282289ebd118caf6528f5f7e807b837b04d96e0070000928364d71224b2de9. Evidence and the private IPA are preserved under ignored work/release-sanity-20261028/. Readback confirms the new .z64/.v64/.n64 first-launch text, com.chrissotraidis.darkpad / 0.1.0, iOS 15 and scene manifest, without ROM/signing files or the console marker.
+- README icon removal is pushed and its GitHub blob matches the local file. Local documentation links/anchors and the destinations of the future v0.1.0 release-note links pass. The existing Discord invite returned HTTP 200. Recipe/checksum contents are unchanged and both assets plus the updated source snapshot pass both release gates.
+- Draft release PRs: https://github.com/chrissotraidis/darkpad/pull/2 and https://github.com/chrissotraidis/padmint/pull/213. Both reported mergeable. PadMint Mac Python and Windows package workflows passed. The live catalog audit reported 40 entries and exactly one failure: DarkPad releases/latest returns 404 while private/unreleased. No catalog bypass was added. Unrelated hosted-game jobs triggered by PadMint's existing PR workflow are separate from DarkPad's local player check.
+- Checked PadMint's player-facing data: Apple Silicon Mac offers iPhone/iPad only, with icon and tool setup, without asking for a build-time ROM. Intel Mac, Windows and Linux show it as unavailable for local building. The finish screen provides sideloading, all three formats, update preservation and the correct help link.
+- Remaining publication work is in docs/RELEASE-CHECKLIST.md: merge DarkPad, make it public and publish v0.1.0's recipe/checksum, confirm private vulnerability reporting, then merge and ship the PadMint listing and pass the post-publication player check before announcement. No new physical gameplay acceptance is claimed.

@@ -20,7 +20,8 @@ if [ "$DEVIT" = "0" ]; then MARKETING="$PUBVER"; else MARKETING="$PUBVER.$DEVIT"
 BUILDNUM="$(date -u +%Y%m%d%H%M)"
 
 test -d work/angle-xcframeworks/libEGL.xcframework || scripts/make-angle-xcframeworks.sh
-test -f work/deps-iphonesimulator/lib/libSDL2.a || { echo "FATAL: no simulator SDL2 (work/deps-PROVENANCE.md)" >&2; exit 1; }
+test -f work/deps-iphonesimulator/lib/libSDL2.a || test -f work/deps-iphoneos/lib/libSDL2.a \
+  || { echo "FATAL: no SDL2 for iphoneos or iphonesimulator (scripts/build-apple-deps.sh)" >&2; exit 1; }
 
 # PD_PUBLIC=1 compiles the :8775 console bridge out (charter: "compiled out of
 # public builds, on in every OTA build"). It is a preprocessor define on the
@@ -32,8 +33,20 @@ else
   PUBLIC_DEF=""
 fi
 
+# PD_MULTICAST=1 signs with com.apple.developer.networking.multicast, which the
+# LAN page's room finder needs for its UDP broadcast (Dab's Mod netlan.c).
+# Apple grants it per team on request, and a build that asks for it without a
+# matching provisioning profile does not sign, so it is off by default: the LAN
+# page then finds no rooms, while Direct Connect and Online Lobbies still work.
+if [ "${PD_MULTICAST:-0}" = "1" ]; then
+  ENTITLEMENTS="ios\/darkpad-multicast.entitlements"
+  echo "PD_MULTICAST=1: signing with the multicast entitlement"
+else
+  ENTITLEMENTS=""
+fi
+
 sed -e "s/PD_MARKETING_VERSION/$MARKETING/" -e "s/PD_BUILD_NUMBER/$BUILDNUM/" \
-    -e "s/PD_PUBLIC_FLAG/$PUBLIC_DEF/" \
+    -e "s/PD_PUBLIC_FLAG/$PUBLIC_DEF/" -e "s/PD_ENTITLEMENTS/$ENTITLEMENTS/" \
   app/project.yml > app/project.generated.yml
 
 ( cd app && xcodegen generate --spec project.generated.yml --project . >/dev/null )

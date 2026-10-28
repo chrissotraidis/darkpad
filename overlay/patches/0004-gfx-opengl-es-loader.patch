@@ -21,7 +21,7 @@ The proc loader also has to come from `eglGetProcAddress`: SDL_GL_GetProcAddress
 has no context to answer for.
 
 diff --git a/port/fast3d/gfx_opengl.cpp b/port/fast3d/gfx_opengl.cpp
-index 943741620..ccc08fa02 100644
+index 9f8c4da79..03d1f9eba 100644
 --- a/port/fast3d/gfx_opengl.cpp
 +++ b/port/fast3d/gfx_opengl.cpp
 @@ -1731,8 +1731,15 @@ static void gfx_opengl_log_info(void) {

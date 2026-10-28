@@ -156,7 +156,7 @@ static NSString *sUnpackNote;            // the last thing the engine's importer
 		return @"Optional: the Xbox 360 (XBLA) release. Put Perfect Dark.rar, a .7z, the bare "
 		        "Xbox 360 package, or a folder holding one, into the added-content folder (the one "
 		        "folder for every optional extra) here:\n"
-		        "    Files → On My iPhone → Perfect Dark → added-content\n"
+		        "    Files → On My iPhone/iPad → DarkPad → added-content\n"
 		        "Then the game draws 4J's high-resolution textures, meshes, rooms, font and "
 		        "explosions in place of the N64 art.";
 	}
@@ -1327,15 +1327,16 @@ static void pdScanGoldenEye(PDGoldenEyeFind **rom, PDGoldenEyeFind **xbla, PDGol
 			return @"That is the GoldenEye XBLA release. Add it with the GoldenEye XBLA row.";
 		}
 		if (n64) {
-			return @"That is an N64 ROM, but not Goldfinger 64.";
+			return @"That is an N64 ROM, but not Goldfinger 64 or Tomorrow Never Dies 64.";
 		}
-		return @"That is not Goldfinger 64. It comes as goldfinger64.zip, as the patch inside it "
-		        "(.xdelta), or as the Goldfinger 64 ROM already patched.";
+		return @"That is not a GoldenEye ROM hack DarkPad knows. Goldfinger 64 comes as goldfinger64.zip "
+		        "and Tomorrow Never Dies 64 as tnd64.zip, as the patch inside either (.xdelta), or as the "
+		        "hack's ROM already patched.";
 	}
 	if (hack) {
-		return hackPatch ? @"That is a ROM patch. A GoldenEye ROM hack's patch (goldfinger64.zip, or the .xdelta in it) "
-		                   "goes in with the Goldfinger 64 row."
-		                 : @"That is Goldfinger 64, a GoldenEye ROM hack. Add it with the Goldfinger 64 row.";
+		return hackPatch ? @"That is a ROM patch. A GoldenEye ROM hack's patch (goldfinger64.zip, tnd64.zip, or the "
+		                   ".xdelta in one) goes in with the ROM hacks row."
+		                 : @"That is a GoldenEye ROM hack. Add it with the ROM hacks row.";
 	}
 
 	if (kind == PDGoldenEyeRom) {
@@ -1497,7 +1498,9 @@ static void pdScanGoldenEye(PDGoldenEyeFind **rom, PDGoldenEyeFind **xbla, PDGol
 	// The old file of the same kind goes only now, with the new one complete and
 	// in place under its own name (D-075).
 	NSString *replaced = nil;
-	if (old.found && !old.isFolder && ![old.path isEqualToString:dst]
+	// A ROM hack is never replaced by another: Goldfinger 64 and Tomorrow Never
+	// Dies 64 are separate games with their own Perfect Menu rows.
+	if (kind != PDGoldenEyeHack && old.found && !old.isFolder && ![old.path isEqualToString:dst]
 	    && [NSFileManager.defaultManager fileExistsAtPath:old.path]) {
 		[NSFileManager.defaultManager removeItemAtPath:old.path error:NULL];
 		replaced = old.relativePath;
@@ -1518,8 +1521,8 @@ static void pdScanGoldenEye(PDGoldenEyeFind **rom, PDGoldenEyeFind **xbla, PDGol
 		msg = @"The next time you open the app, GoldenEye's missions and arenas are converted from it "
 		       "(a few seconds, once). Then choose GE Plus in the Perfect Menu.";
 	} else if (kind == PDGoldenEyeHack) {
-		msg = @"The next time you open the app, Goldfinger 64's missions and arenas are converted from it "
-		       "(a few seconds, once). Then choose Goldfinger 64 in the Perfect Menu.";
+		msg = @"The next time you open the app, the hack's missions and arenas are converted from it "
+		       "(a few seconds, once). Then choose Goldfinger 64 or Tomorrow Never Dies 64 in the Perfect Menu.";
 		BOOL isPatch = NO;
 		pdIsHackSource(dst, [NSFileManager.defaultManager attributesOfItemAtPath:dst error:NULL].fileSize, &isPatch);
 		if (isPatch && !sGeRom.found) {

@@ -1,0 +1,181 @@
+Subject: iOS: the shell's engine reads ask for this machine's player online
+
+Online round 2 (D-105). In an online match a client's own player is slot
+g_NetLocalSlot (1 for the first joiner); the host's numbering is kept on every
+machine (netplay.md "The shape"). The iOS reads the touch layer makes at the
+frame boundary assumed player 0 / g_Vars.currentplayer:
+
+- menuIosDialogIsOpen() (0019) asked g_Menus[0] only. A client's pause menu and
+  the match's end screen open in g_Menus[g_NetLocalSlot], so the touch layer
+  stayed in gameplay mode over them: no menu pointer, a tap on the end screen's
+  arrows was a look drag, and the end screen could not be paged or closed by a
+  finger. Found joining a macOS host from the lane-3 simulator.
+- The 0021/0052 accessors (position, pause, aim mode, the gun's second
+  function, the weapon wheel) read g_Vars.currentplayer, which outside the tick
+  is whichever player the last pass left current. They now read the local slot
+  by number, and the two that go through bgun/g_AmIndex make it current for the
+  read and put the previous one back.
+
+- dialogChangeItemFocusWithMouse() (upstream) only took the pointer for
+  menu->playernum 0, while menuProcessInput() gives the mouse to NET_LOCAL_UI's
+  player. On a client the pointer could press the focused row of its pause
+  menu but never move the focus: the Control page's End Game could not be
+  reached by a finger (nor, on desktop, by a mouse). NET_LOCAL_UI here too.
+  Not iOS-guarded (offline NET_LOCAL_UI(pn) is pn == 0, the same test); one
+  for upstream.
+
+Offline nothing changes: g_NetMode is NETMODE_NONE and both fall back to what
+they did. Everything but the focus-walk line is inside PLATFORM_IOS.
+
+--- a/src/game/menu.c
++++ b/src/game/menu.c
+@@ -1553,7 +1553,12 @@
+ 	s32 colwidth = 0;
+ 
+ 	// only allow mouse control of player 1 menus; ignore mouse if navigating with keyboard
+-	if (menu->playernum != 0 || !g_MenuUsingMouse) {
++	// (iOS overlay 0059: online, this machine's player's menus - NET_LOCAL_UI,
++	// which menuProcessInput already uses for the mouse's buttons. A client is
++	// slot 1, and with player 0 hard-coded here its pointer could press the
++	// focused row of its pause menu and end screen but never move the focus,
++	// so End Game was out of a finger's - and a desktop mouse's - reach)
++	if (!NET_LOCAL_UI(menu->playernum) || !g_MenuUsingMouse) {
+ 		return false;
+ 	}
+ 
+@@ -1606,6 +1611,17 @@
+  */
+ s32 menuIosDialogIsOpen(void)
+ {
++	// Online, a client's own menus are its slot's (g_NetLocalSlot: 1 for the
++	// first joiner), not player 0's: its pause menu and the end screen open
++	// there, and with only g_Menus[0] asked the touch layer stayed in gameplay
++	// mode over them - no pointer, so the end screen could not be paged or
++	// closed by a finger (Online round 2, D-105). The Online pages themselves
++	// are player 0's on every machine, so both are asked.
++	if (g_NetMode != NETMODE_NONE && g_NetLocalSlot > 0 && g_NetLocalSlot < MAX_PLAYERS
++			&& g_Menus[g_NetLocalSlot].curdialog != NULL) {
++		return 1;
++	}
++
+ 	return g_Menus[0].curdialog != NULL;
+ }
+ 
+--- a/src/game/player.c
++++ b/src/game/player.c
+@@ -9423,6 +9423,32 @@
+ }
+ 
+ #ifdef PLATFORM_IOS
++/*
++ * The player this machine's screen belongs to (Online round 2, D-105). Offline
++ * that is g_Vars.currentplayer, as it always was here. In an online match a
++ * client's own player is slot g_NetLocalSlot (1 for the first joiner), and
++ * outside the tick g_Vars.currentplayer is whichever player the last pass left
++ * current - so every read below asks for the local slot by number.
++ */
++static s32 playerIosLocalNum(void)
++{
++	if (g_NetMode != NETMODE_NONE && g_NetLocalSlot >= 0 && g_NetLocalSlot < MAX_PLAYERS
++			&& g_Vars.players[g_NetLocalSlot]) {
++		return g_NetLocalSlot;
++	}
++
++	return g_Vars.currentplayernum;
++}
++
++static struct player *playerIosLocal(void)
++{
++	if (g_NetMode != NETMODE_NONE && g_NetLocalSlot >= 0 && g_NetLocalSlot < MAX_PLAYERS) {
++		return g_Vars.players[g_NetLocalSlot];
++	}
++
++	return g_Vars.currentplayer;
++}
++
+ /**
+  * Where the player is standing, for the :8775 bridge.
+  *
+@@ -9434,7 +9460,7 @@
+  */
+ s32 playerIosGetPos(f32 *x, f32 *y, f32 *z)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (!p || !p->prop) {
+ 		return 0;
+@@ -9464,7 +9490,7 @@
+  */
+ s32 playerIosIsPaused(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (!p) {
+ 		return 1;
+@@ -9486,7 +9512,7 @@
+  */
+ s32 playerIosGetAimMode(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (!p) {
+ 		return 0;
+@@ -9522,7 +9548,7 @@
+  */
+ s32 playerIosGunHasSecondary(void)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (!p) {
+ 		return 0;
+@@ -9538,13 +9564,26 @@
+  */
+ s32 playerIosGunState(s32 *function)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
++	s32 weaponnum = -1;
++	s32 secondary = 0;
++
++	if (p) {
++		// bgun reads the current player: make it this machine's for the read
++		const s32 prev = g_Vars.currentplayernum;
++
++		setCurrentPlayerNum(playerIosLocalNum());
++		secondary = bgunIsUsingSecondaryFunction() ? 1 : 0;
++		weaponnum = bgunGetWeaponNum(HAND_RIGHT);
++		setCurrentPlayerNum(prev);
++	}
++
+ 	if (function) {
+-		*function = (p && bgunIsUsingSecondaryFunction()) ? 1 : 0;
++		*function = secondary;
+ 	}
+ 
+-	return p ? bgunGetWeaponNum(HAND_RIGHT) : -1;
++	return weaponnum;
+ }
+ 
+ /**
+@@ -9553,10 +9592,15 @@
+  */
+ s32 playerIosActiveMenu(s32 *slot)
+ {
+-	struct player *p = g_Vars.currentplayer;
++	struct player *p = playerIosLocal();
+ 
+ 	if (slot) {
++		// g_AmIndex follows the current player: this machine's, for the read
++		const s32 prev = g_Vars.currentplayernum;
++
++		setCurrentPlayerNum(playerIosLocalNum());
+ 		*slot = g_AmMenus[g_AmIndex].slotnum;
++		setCurrentPlayerNum(prev);
+ 	}
+ 
+ 	return p && p->activemenumode != AMMODE_CLOSED;

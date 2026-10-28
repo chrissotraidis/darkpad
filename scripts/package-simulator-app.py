@@ -18,7 +18,7 @@ app = args.app.resolve()
 info = plistlib.loads((app / 'Info.plist').read_bytes())
 if info.get('CFBundleSupportedPlatforms') != ['iPhoneSimulator']:
     raise SystemExit('Expected an iPhoneSimulator bundle')
-if info.get('CFBundleIdentifier') != 'com.rebelancap.perfectdark':
+if info.get('CFBundleIdentifier') != 'com.chrissotraidis.darkpad':
     raise SystemExit('Expected the main Darkpad app, not a network candidate')
 for path in app.rglob('*'):
     if path.is_file() and (path.suffix.lower() in {'.z64', '.v64', '.n64', '.zip', '.7z'}
@@ -42,7 +42,7 @@ This is a simulator app, not an iPhone IPA or a public release.
 Keep only one simulator booted. With that simulator already running:
 
   xcrun simctl install booted perfectdark.app
-  xcrun simctl launch booted com.rebelancap.perfectdark
+  xcrun simctl launch booted com.chrissotraidis.darkpad
 
 Installing over the same bundle ID retains the existing data container.
 Back up important saves first. A fresh install needs your own supported ROM;

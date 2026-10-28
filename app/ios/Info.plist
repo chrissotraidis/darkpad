@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Perfect Dark</string>
+	<string>DarkPad</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Perfect Dark</string>
+	<string>DarkPad</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -84,7 +84,7 @@
 	</array>
 	<!-- The ROM, xbla/, texture-packs/, pd.ini and the saves all live in
 	     Documents (overlay patch 0009). Both keys together are what makes that
-	     folder show up in Files as "Perfect Dark" and be editable in place. -->
+	     folder show up in Files as "DarkPad" and be editable in place. -->
 	<!-- Insurance, not a feature: nothing in this app scans for Bluetooth.
 	     SDL's iOS HIDAPI backend opens a CBCentralManager when the Steam
 	     HIDAPI hint is on (upstream input.c sets it), and iOS TERMINATES an app
@@ -94,9 +94,15 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Use device motion for optional gyro aiming while playing.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<string>DarkPad can connect to Bluetooth game controllers.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Perfect Dark can connect to Bluetooth game controllers.</string>
+	<string>DarkPad can connect to Bluetooth game controllers.</string>
+	<!-- Dab's Mod v3.15.1 netplay (UDP): Direct Connect and LAN rooms talk to
+	     other devices on the local network, which iOS gates behind the Local
+	     Network prompt. LAN room finding also needs the multicast entitlement
+	     (PD_MULTICAST=1, scripts/gen-app-project.sh). -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DarkPad uses the local network to find and join multiplayer games.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -123,7 +129,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.rebelancap.perfectdark</string>
+			<string>com.chrissotraidis.darkpad</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>

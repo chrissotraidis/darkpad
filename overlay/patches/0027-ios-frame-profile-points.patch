@@ -27,7 +27,7 @@ decode is wrapped at its five call sites for the same reason.
 left over. It goes to zero exactly when the game stops making the rate.
 
 diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
-index 934f4d252..91299e85f 100644
+index 3cc6c37e9..02a686c72 100644
 --- a/port/fast3d/gfx_pc.cpp
 +++ b/port/fast3d/gfx_pc.cpp
 @@ -41,6 +41,9 @@
@@ -40,7 +40,7 @@ index 934f4d252..91299e85f 100644
  
  uintptr_t gfxFramebuffer;
  
-@@ -1857,7 +1860,23 @@ static void gfx_replacement_alpha(uint8_t* rep, int32_t rep_width, int32_t rep_h
+@@ -1882,7 +1885,23 @@ static void gfx_replacement_alpha(uint8_t* rep, int32_t rep_width, int32_t rep_h
      }
  }
  
@@ -64,7 +64,7 @@ index 934f4d252..91299e85f 100644
      LoadedTexture& loaded_texture = rdp.loaded_texture[rdp.texture_tile[tile].tmem];
      const uint8_t fmt = rdp.texture_tile[tile].fmt;
      const uint8_t siz = rdp.texture_tile[tile].siz;
-@@ -8657,6 +8676,12 @@ uint32_t num_dls = 0;
+@@ -8816,6 +8835,12 @@ uint32_t num_dls = 0;
  
  extern "C" void gfx_run(Gfx* commands) {
      ++num_dls;
@@ -77,7 +77,7 @@ index 934f4d252..91299e85f 100644
      gfx_sp_reset();
  
      // puts("New frame");
-@@ -8680,10 +8705,18 @@ extern "C" void gfx_run(Gfx* commands) {
+@@ -8840,10 +8865,18 @@ extern "C" void gfx_run(Gfx* commands) {
      gfx_mark_state_dirty();
      gfx_readable_reset();
      gfx_mesh_start_frame();
@@ -96,7 +96,7 @@ index 934f4d252..91299e85f 100644
      gfxFramebuffer = 0;
  
      if (game_renders_to_framebuffer) {
-@@ -8716,6 +8749,10 @@ extern "C" void gfx_run(Gfx* commands) {
+@@ -8876,6 +8909,10 @@ extern "C" void gfx_run(Gfx* commands) {
          gfx_pre_swap_callback();
      }
  
@@ -107,7 +107,7 @@ index 934f4d252..91299e85f 100644
      gfx_wapi->swap_buffers_begin();
  }
  
-@@ -8772,8 +8809,15 @@ extern "C" int gfx_occlusion_result(int slot) {
+@@ -8932,8 +8969,15 @@ extern "C" int gfx_occlusion_result(int slot) {
  
  extern "C" void gfx_end_frame(void) {
      if (!dropped_frame) {
@@ -165,20 +165,20 @@ index 56df84d34..57cc42ac2 100644
      if (target_fps) {
          sync_framerate_with_timer();
 diff --git a/port/src/pdmain.c b/port/src/pdmain.c
-index 703ff6d6f..a1a0166f2 100644
+index 9e53de033..7a6256696 100644
 --- a/port/src/pdmain.c
 +++ b/port/src/pdmain.c
-@@ -87,6 +87,9 @@
- #include "gebean.h"
- #include "gexfront.h"
+@@ -92,6 +92,9 @@
+ #include "modmode.h"
  #include "simnav.h"
+ #include "net/net.h"
 +#ifdef PD_IOS_PROFILER
 +#include "pd_frame_prof.h"
 +#endif
  
  extern u8 *g_MempHeap;
  extern u32 g_MempHeapSize;
-@@ -654,9 +657,25 @@ void mainTick(void)
+@@ -758,9 +761,25 @@ void mainTick(void)
  	s32 i;
  
  	if (g_MainChangeToStageNum < 0) {
@@ -189,7 +189,7 @@ index 703ff6d6f..a1a0166f2 100644
 +		// it is simply missing from the frame.
 +		pdProfBegin(PDPROF_TICKGATE);
 +#endif
- 		frametimeCalculate();
+ 		if (g_NetPass) frametimeNetApplyPass(g_NetPass != NETPASS_PRESENT_ONLY); else frametimeCalculate();
 +#ifdef PD_IOS_PROFILER
 +		pdProfEnd(PDPROF_TICKGATE);
 +#endif
@@ -201,24 +201,24 @@ index 703ff6d6f..a1a0166f2 100644
 +		// and, inside it, the present - takes over.
 +		pdProfBegin(PDPROF_GAME);
 +#endif
- 		joyDebugJoy();
- 		schedSetCrashEnable2(false);
- 
-@@ -700,6 +719,9 @@ void mainTick(void)
+ 		if (g_NetPass == NETPASS_PRESENT_ONLY) netPresentBegin(); // netplay: a frame between ticks moves no aim (netlagcomp.c)
+ 		if (g_NetPass == NETPASS_PRESENT_ONLY) joyConsumeNone(); else { if (g_NetPass) netTickReadPad(); joyDebugJoy(); }
+ 		if (g_NetPass >= NETPASS_TICK) netTickBegin();
+@@ -815,6 +834,9 @@ void mainTick(void)
  			viUpdateMode();
  		}
  
 +#ifdef PD_IOS_PROFILER
 +		pdProfEnd(PDPROF_GAME);
 +#endif
- 		rdpCreateTask(gdlstart, gdl, 0, (uintptr_t) &msg);
+ 		if (g_NetPass != NETPASS_TICK) rdpCreateTask(gdlstart, gdl, 0, (uintptr_t) &msg);
  		memaPrint();
  		profileSetMarker(PROFILE_MAINTICK_END);
 diff --git a/port/src/pdsched.c b/port/src/pdsched.c
-index da6d3f44d..d3d043ceb 100644
+index d7f764840..5df323ee1 100644
 --- a/port/src/pdsched.c
 +++ b/port/src/pdsched.c
-@@ -250,11 +250,50 @@ void schedSubmitTask(OSSched *sc, OSScTask *t)
+@@ -251,11 +251,50 @@ void schedSubmitTask(OSSched *sc, OSScTask *t)
  #ifdef PLATFORM_IOS
  // app/ios/PDShell.m — the iOS shell's per-frame entry point.
  extern void pdIosFrameHook(void);
@@ -269,7 +269,7 @@ index da6d3f44d..d3d043ceb 100644
  }
  
  void schedAudioFrame(OSSched *sc)
-@@ -294,7 +333,18 @@ void schedEndFrame(OSSched *sc)
+@@ -307,7 +346,18 @@ void schedEndFrame(OSSched *sc)
  	// this frame rather than the next. Everything the shell does to the engine
  	// happens here; nothing else in the app touches engine state off-thread.
  	// app/ios/PDShell.m.
@@ -288,10 +288,10 @@ index da6d3f44d..d3d043ceb 100644
  #endif
  
  #if PAL
-@@ -335,7 +385,16 @@ void schedEndFrame(OSSched *sc)
+@@ -355,7 +405,16 @@ void schedEndFrame(OSSched *sc)
  	schedAudioFrame(sc);
  	schedRenderCrashPeriodically(sc->frameCount);
- 	videoSetFrameStep(g_Vars.diffframe240);
+ 	videoSetFrameStep(g_NetInStageLoop ? g_NetTicksThisFrame * 4 : g_Vars.diffframe240);
 +#ifdef PD_IOS_PROFILER
 +	// Ends before videoEndFrame() on purpose: what that does is ENDF, and a
 +	// row that contained another row would say nothing.
@@ -305,7 +305,7 @@ index da6d3f44d..d3d043ceb 100644
  
  	if (g_MainIsBooting == 0) {
  		schedConsiderScreenshot();
-@@ -343,6 +402,13 @@ void schedEndFrame(OSSched *sc)
+@@ -363,6 +422,13 @@ void schedEndFrame(OSSched *sc)
  
  	// check for vid mode changes
  	__scUpdateViMode();
@@ -320,7 +320,7 @@ index da6d3f44d..d3d043ceb 100644
  
  void schedInitArtifacts(void)
 diff --git a/port/src/xblatex.c b/port/src/xblatex.c
-index f7b834266..618ba3e88 100644
+index c16780844..23c67edbb 100644
 --- a/port/src/xblatex.c
 +++ b/port/src/xblatex.c
 @@ -145,6 +145,23 @@ static u32 xblaTexBE32(const u8 *p)
@@ -347,7 +347,7 @@ index f7b834266..618ba3e88 100644
  static void xblaTexCloseUp(void)
  {
  	x360StfsStreamClose(&stream);
-@@ -998,7 +1015,7 @@ u8 *xblaTexDecodeRecord(u32 record, s32 *outWidth, s32 *outHeight)
+@@ -1017,7 +1034,7 @@ u8 *xblaTexDecodeRecord(u32 record, s32 *outWidth, s32 *outHeight)
  		return NULL;
  	}
  
@@ -356,7 +356,7 @@ index f7b834266..618ba3e88 100644
  
  	SDL_UnlockMutex(lock);
  
-@@ -1274,7 +1291,7 @@ s32 xblaTexRecordIsSoft(u32 record)
+@@ -1293,7 +1310,7 @@ s32 xblaTexRecordIsSoft(u32 record)
  	if (softRecord[record] == XBLATEX_SOFT_UNKNOWN) {
  		// Decoded once here and thrown away; the render thread decodes it
  		// again when the list draws, which it would have done anyway.
@@ -365,7 +365,7 @@ index f7b834266..618ba3e88 100644
  
  		if (!rgba) {
  			SDL_UnlockMutex(lock);
-@@ -1340,7 +1357,8 @@ const u8 *xblaTexRecordAlphaMap(u32 record, s32 *outSize)
+@@ -1359,7 +1376,8 @@ const u8 *xblaTexRecordAlphaMap(u32 record, s32 *outSize)
  	}
  
  	if (!alphaTried[record]) {
@@ -375,7 +375,7 @@ index f7b834266..618ba3e88 100644
  
  		alphaTried[record] = 1;
  
-@@ -1562,7 +1580,7 @@ u8 *xblaTexLoadReplacement(const void *addr, s32 *outWidth, s32 *outHeight)
+@@ -1581,7 +1599,7 @@ u8 *xblaTexLoadReplacement(const void *addr, s32 *outWidth, s32 *outHeight)
  		return NULL;
  	}
  
@@ -384,7 +384,7 @@ index f7b834266..618ba3e88 100644
  
  	SDL_UnlockMutex(lock);
  
-@@ -1609,7 +1627,7 @@ u8 *xblaTexLoadNumbered(s32 texturenum, s32 *outWidth, s32 *outHeight)
+@@ -1628,7 +1646,7 @@ u8 *xblaTexLoadNumbered(s32 texturenum, s32 *outWidth, s32 *outHeight)
  		return NULL;
  	}
  

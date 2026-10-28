@@ -1,0 +1,100 @@
+Subject: the motion blur's captured frame, per eye, in the visionOS 3D mode (D-096)
+
+THE PROBLEM. bviewDrawMotionBlur() and bviewDrawZoomBlur() - night vision, the
+IR lens, the Farsight and the X-ray scanner, a combat boost - draw LAST frame's
+picture (g_BlurFb) over this one. The capture is not in the display list:
+pdsched.c copies "the screen" into g_BlurFb once a frame, after gfx_run, and in
+3D the screen is eye R's FBO by then. Both eyes blended eye R's previous frame,
+so the LEFT eye carried a ghost of the whole scene at the right eye's disparity
+- a double image one eye sees and the other does not.
+
+THE FIX. The left eye gets a twin of g_BlurFb, filled from its own FBO at the
+end of its own walk under pdsched.c's own condition (g_BlurFbCapTimer == 0),
+and G_SETTIMG_FB_EXT naming g_BlurFb during the left eye's walk samples the
+twin. The right eye and 2D are unchanged (pdsched.c still fills g_BlurFb from
+the last eye walked, which in 2D is the only one). Everything is under
+PD_VISION_STEREO, 0 on every other platform: the oracle is untouched.
+
+The menu's blurred backdrop (g_MenuBlurFb) is left alone: it is captured once
+and drawn FLAT behind a flat menu, where one eye's picture in both eyes is the
+right answer.
+
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index d2ff3e136..71d3b303a 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -2329,6 +2329,52 @@ static void gfx_matrix_mul(float res[4][4], const float a[4][4], const float b[4
+     memcpy(res, tmp, sizeof(tmp));
+ }
+ 
++#if PD_VISION_STEREO
++/*
++ * D-096: the motion blur's captured frame, per eye.
++ *
++ * bviewDrawMotionBlur() and bviewDrawZoomBlur() (night vision, the IR lens,
++ * the Farsight and X-ray scanner, a combat boost) draw LAST frame's picture,
++ * g_BlurFb, over this one. The capture is not in the display list: pdsched.c
++ * copies "the screen" into g_BlurFb once per frame, after gfx_run - by which
++ * time the screen is eye R's FBO. So both eyes blended eye R's previous frame,
++ * and the LEFT eye drew a ghost of the whole scene at the right eye's
++ * disparity: a double image that only one eye sees.
++ *
++ * The left eye gets a twin of g_BlurFb, filled from its own FBO at the end of
++ * its own walk under the same condition pdsched.c uses (g_BlurFbCapTimer == 0,
++ * set by this frame's list), and every G_SETTIMG_FB_EXT naming g_BlurFb during
++ * the left eye's walk samples the twin. The right eye and 2D are unchanged:
++ * pdsched.c's copy still fills g_BlurFb from eye R, as it always did.
++ */
++extern "C" int g_BlurFb;
++extern "C" int g_BlurFbCapTimer;
++static int pd_stereo_blur_twin = -1;
++static bool pd_stereo_eye_l_walk = false;
++
++static inline int gfx_stereo_fb_texture(int fb) {
++    if (pd_stereo_eye_l_walk && pd_stereo_blur_twin > 0 && g_BlurFb > 0 && fb == g_BlurFb) {
++        return pd_stereo_blur_twin;
++    }
++    return fb;
++}
++
++static void gfx_stereo_capture_blur_eye_l(void) {
++    if (g_BlurFb <= 0 || g_BlurFbCapTimer != 0) {
++        return;
++    }
++    if (pd_stereo_blur_twin < 0) {
++        // the same parameters pdsched.c gives g_BlurFb: the main fb's size,
++        // following it on a resize
++        pd_stereo_blur_twin = gfx_create_framebuffer(0, 0, false, true);
++    }
++    gfx_copy_framebuffer(pd_stereo_blur_twin, 0, -1, -1, false);
++}
++#define PD_FB_TEXTURE(fb) gfx_stereo_fb_texture((int)(fb))
++#else
++#define PD_FB_TEXTURE(fb) (fb)
++#endif
++
+ #if PD_VISION_STEREO
+ // ---------------------------------------------------------------------------
+ // THE DISPLAY LIST SAYS WHAT IT IS DRAWING (D-055, supersedes D-049's §2.4
+@@ -8935,7 +8981,7 @@ static void gfx_run_dl(Gfx* cmd) {
+             }
+             case G_SETTIMG_FB_EXT:
+                 gfx_flush_for(GFX_FLUSH_OTHER);
+-                gfx_rapi->select_texture_fb(cmd->words.w1);
++                gfx_rapi->select_texture_fb(PD_FB_TEXTURE(cmd->words.w1));
+                 rdp.textures_changed[0] = false;
+                 rdp.textures_changed[1] = false;
+                 gfx_mark_state_dirty();
+@@ -9566,7 +9612,12 @@ extern "C" void gfx_run(Gfx* commands) {
+     if (pdVisionEyesPerFrame() > 1) {
+         // Bounds the producer (frames in flight <= 2) and selects eye L.
+         pdVisionEyeBeginPair();
++        pd_stereo_eye_l_walk = true;
+         gfx_run_eye(commands);
++        pd_stereo_eye_l_walk = false;
++        // D-096: eye L's own copy for next frame's motion blur, while "the
++        // screen" is still eye L's FBO.
++        gfx_stereo_capture_blur_eye_l();
+         pdVisionSetEye(PD_EYE_RIGHT);
+     }
+ #endif

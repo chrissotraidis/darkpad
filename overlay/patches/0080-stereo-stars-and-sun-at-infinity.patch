@@ -1,0 +1,149 @@
+Subject: stars and the sun at infinity in the visionOS 3D mode (D-097)
+
+THE PROBLEM. starsRender() projects every star itself and draws it as a one-
+pixel gDPFillRectangle; skyRenderSuns() draws the sun's orb, and
+skyRenderArtifacts() the source glare of its lens flare, as texture rectangles
+at a screen position sky.c computed (func0f0b2150). None of them has a matrix,
+so the stereo fold (0030) never sees them and both eyes drew them in the same
+pixels: zero disparity, ON the panel, 7.6 m away - while the sky dome they hang
+in is folded skew-only (the SKY class) and sits at infinity. A star field in
+front of its own sky.
+
+THE FIX reuses D-060's depth tag. The payload's top value, 0x7fff, now means
+INFINITY: the renderer gives such a rectangle the fold's far asymptote
+(q = 0 in the glare arithmetic), which is exactly the disparity the sky's
+skew-only class gives the dome. The stars take it as a sticky span around
+their loop; the sun's orb, and the flare's source glare, as a closed span
+around their one rectangle (func0f0b2150 can draw nothing, and a one-rect tag
+would then fall on the next rectangle, the HUD's). The flare's six ghosts are
+the lens's, not the sky's, and stay on the panel; a teleport's flare opens no
+span and is unchanged.
+
+Tags are G_NOOPs under #ifndef PLATFORM_N64: 2D, the macOS oracle's gfx stream
+and the N64 build are unchanged. A release (XBLA) sky paints its own stars and
+starsRender() is not called under it (bg.c), so this is the N64 sky's star
+field.
+
+diff --git a/port/fast3d/gfx_pc.cpp b/port/fast3d/gfx_pc.cpp
+index 9e0994f9c..d2ff3e136 100644
+--- a/port/fast3d/gfx_pc.cpp
++++ b/port/fast3d/gfx_pc.cpp
+@@ -7981,7 +7981,12 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
+             pdVisionStereoNearLaw(&worldN, &gunN, &knee);
+             const float qm = (1.0f + worldN) / conv;
+             const float q0 = (1.0f + worldN * knee) / conv;
+-            const float q  = gfx_stereo_soft_q(1.0f / d, q0, qm, qm - q0);
++            // D-097: the payload's top value is INFINITY (stars, the sun):
++            // q = 0, the fold's own far asymptote, which is the disparity the
++            // sky dome gets from its skew-only class.
++            const float q  = (d >= (float)PD_DLTAG_DEPTH_INF)
++                                 ? 0.0f
++                                 : gfx_stereo_soft_q(1.0f / d, q0, qm, qm - q0);
+             const float dx = pd_stereo.world_a * eSigned * (1.0f / conv - q);
+             ulxf += dx;
+             lrxf += dx;
+diff --git a/src/game/sky.c b/src/game/sky.c
+index bc7cd02e5..b8688ef44 100644
+--- a/src/game/sky.c
++++ b/src/game/sky.c
+@@ -3630,7 +3630,20 @@ Gfx *skyRenderSuns(Gfx *gdl, bool xray)
+ 					sp12c[0] *=  SCREEN_ASPECT / videoGetAspect();
+ #endif
+ 
++#ifndef PLATFORM_N64
++					// D-097: the sun's orb at infinity in the visionOS 3D
++					// mode, like the sky it is painted on, instead of ON the
++					// panel. A closed span rather than a one-rect tag:
++					// func0f0b2150 draws nothing for a sprite wholly off the
++					// top or left, and a one-rect tag would then land on
++					// whatever rectangle came next (the HUD's).
++					gDPPdDlTag(gdl++, PD_DLTAG_DEPTH(PD_DLTAG_DEPTH_INF));
++					gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++#endif
+ 					func0f0b2150(&gdl, sp134, sp12c, g_TexLightGlareConfigs[5].width, g_TexLightGlareConfigs[5].height, 0, 1, 1, 1, 0, 1);
++#ifndef PLATFORM_N64
++					gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_END);
++#endif
+ 
+ 					gDPPipeSync(gdl++);
+ 					gDPSetColorDither(gdl++, G_CD_BAYER);
+@@ -3727,6 +3740,14 @@ Gfx *skyRenderFlare(Gfx *gdl, f32 x, f32 y, f32 intensityfrac, f32 size, s32 fla
+ 
+ 	func0f0b2150(&gdl, sp17c, sp174, g_TexLightGlareConfigs[6].width, g_TexLightGlareConfigs[6].height, 0, 1, 1, 1, 0, 1);
+ 
++#ifndef PLATFORM_N64
++	// D-097: the source glare above is the only part of a SUN's flare that
++	// skyRenderArtifacts() opened an infinity span for; the six ghosts below
++	// are the lens's and stay on the panel. A teleport's flare opens no span,
++	// and closing one that is not open is a no-op.
++	gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_END);
++#endif
++
+ 	// Render the other artifacts
+ 	texSelect(&gdl, &g_TexLightGlareConfigs[1], 4, 0, 2, 1, NULL);
+ 
+@@ -3964,6 +3985,12 @@ Gfx *skyRenderArtifacts(Gfx *gdl)
+ 			f32 intensityfrac = skyGetArtifactGroupIntensityFrac(artifacts);
+ 
+ 			if (intensityfrac > 0.0f) {
++#ifndef PLATFORM_N64
++				// D-097: the flare's SOURCE glare sits on the sun, so it is at
++				// infinity too; skyRenderFlare() closes the span after it.
++				gDPPdDlTag(gdl++, PD_DLTAG_DEPTH(PD_DLTAG_DEPTH_INF));
++				gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++#endif
+ 				gdl = skyRenderFlare(gdl, g_SunScreenXPositions[i], g_SunScreenYPositions[i], intensityfrac, sun->orb_size, g_SunFlareTimers240[i], g_SunAlphaFracs[i]);
+ 			}
+ 		}
+diff --git a/src/game/stars.c b/src/game/stars.c
+index e70ef17c7..b696f6e56 100644
+--- a/src/game/stars.c
++++ b/src/game/stars.c
+@@ -287,6 +287,17 @@ Gfx *starsRender(Gfx *gdl)
+ 
+ 	gDPSetRenderMode(gdl++, G_RM_CLD_SURF, G_RM_CLD_SURF2);
+ 
++#ifndef PLATFORM_N64
++	// D-097: every star is a one-pixel rectangle this function projected
++	// itself, so the visionOS stereo fold never sees it and both eyes drew it
++	// in the same place - ON the panel, nearer than the sky dome it hangs in
++	// (which the fold puts at infinity). The sticky depth span gives every
++	// star the far asymptote's disparity. A tag is a G_NOOP: 2D and the
++	// oracle's gfx stream are unchanged.
++	gDPPdDlTag(gdl++, PD_DLTAG_DEPTH(PD_DLTAG_DEPTH_INF));
++	gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_BEGIN);
++#endif
++
+ 	for (i = 0; i < 6; i++) {
+ 		if (g_StarsBelowHorizon || i != 2) {
+ 			f32 f0;
+@@ -351,6 +362,10 @@ Gfx *starsRender(Gfx *gdl)
+ 		}
+ 	}
+ 
++#ifndef PLATFORM_N64
++	gDPPdDlTag(gdl++, PD_DLSPAN_DEPTH_END);
++#endif
++
+ 	gdl = text0f153838(gdl);
+ 
+ 	return gdl;
+diff --git a/src/include/gbiex.h b/src/include/gbiex.h
+index a92cd6bfc..0826d4d24 100644
+--- a/src/include/gbiex.h
++++ b/src/include/gbiex.h
+@@ -290,6 +290,14 @@
+  */
+ #define PD_DLTAG_DEPTH_BIT    0x8000u
+ #define PD_DLTAG_DEPTH(d)     (PD_DLTAG_DEPTH_BIT | ((unsigned int)(d) & 0x7fffu))
++/*
++ * D-097: the depth payload's largest value means INFINITY, not 32767 units.
++ * The star field (stars.c) and the sun (sky.c) are 2D rectangles PD projects
++ * itself, like a glare, but what they stand for is at infinity: the renderer
++ * gives a rectangle tagged with this the far asymptote of the world fold
++ * (the same disparity the sky dome's skew-only class has), not a depth.
++ */
++#define PD_DLTAG_DEPTH_INF    0x7fffu
+ #define PD_DLTAG_SCALE_BIT    0x4000u
+ #define PD_DLTAG_SCALE_SHIFT  1024.0f
+ #define PD_DLTAG_SCALE(s)     (PD_DLTAG_SCALE_BIT | \

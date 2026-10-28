@@ -13,8 +13,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 /** Show it (main thread). Idempotent. */
 + (void)present;
-/** Goldenpad-inspired utilities, using the same focus-safe native window. */
-+ (void)presentUtilities;
+/** Show a full-window controller (the ••• menu) in the focus-safe settings window. */
++ (void)presentPanel:(UIViewController *)panel;
+/** Present an alert or share sheet from the ••• menu in the focus-safe settings
+    window, over a clear host. Call +dismiss when the flow is finished. */
++ (void)presentModal:(UIViewController *)modal;
+/** Apply NSUserDefaults changes made outside the page, exactly as a row does. */
++ (void)applyDefaultsChange;
 /** Engine-frame hook: preserve prior pause state across native UI, editing and iOS inactivity. */
 + (void)updateNativePause;
 /** Hide it. */
