@@ -4,6 +4,20 @@ The first public release is **source and recipe only**. Preparing this checklist
 or its assets does not authorize publication. Keep personal IPAs and all build
 outputs private.
 
+## Prepared on 28 October
+
+- The repository is public. [PR #2](https://github.com/chrissotraidis/darkpad/pull/2)
+  is merged into `main`; the README has no app icon or temporary branch-clone
+  instructions. Issues and private vulnerability reporting are enabled.
+- The [DarkPad 0.1.0 draft](https://github.com/chrissotraidis/darkpad/releases/tag/untagged-3f11c22ee81e5036397d)
+  contains exactly the recipe and `SHA256SUMS`.
+- The [PadMint 0.5.23 draft](https://github.com/chrissotraidis/padmint/releases/tag/untagged-51b816560b31848b3546)
+  contains its three platform ZIPs and `SHA256SUMS`. All files passed both release
+  gates, and the ZIPs match the independent Windows CI build byte for byte.
+  Its catalog change remains in [PR #213](https://github.com/chrissotraidis/padmint/pull/213).
+- Both releases are drafts. No public IPA or game data was uploaded. The public
+  recipe lookup and post-publication player check still require publication.
+
 ## Before tagging
 
 1. Review the [release notes](releases/v0.1.0.md), README and
@@ -38,13 +52,13 @@ outputs private.
 
 ## Publication order, when the owner releases it
 
-1. Review and merge [DarkPad PR #2](https://github.com/chrissotraidis/darkpad/pull/2)
-   into `main`. Reconcile any intervening changes and repeat affected checks
+1. Confirm the DarkPad draft targets the intended `main` commit. PR #2 is
+   already merged. Reconcile any intervening changes and repeat affected checks
    before tagging.
 2. The owner has made the repository public. Update the README's
    preparation notice and the release notes to describe the actual published
-   state; remove the temporary preparation-branch clone instructions and the
-   prepared-notes notice. Confirm Issues and private vulnerability reporting
+   state; remove the prepared-notes notice. The temporary branch instructions
+   have already been removed. Confirm Issues and private vulnerability reporting
    remain enabled at publication. Do not announce availability ahead of publication.
 3. Tag the checked release commit `v0.1.0` and publish it as a regular GitHub
    release marked Latest, with **only** the recipe and checksum attachments.
@@ -55,9 +69,7 @@ outputs private.
 4. Review and merge [PadMint PR #213](https://github.com/chrissotraidis/padmint/pull/213)
    after the public release is readable. Its catalog entry must keep the build Mac-only,
    request the ROM **in the app**, link to `#get-darkpad`, and include sideloading
-   and first-launch instructions. Make it available through the normal PadMint
-   release/update route; merging a catalog file alone does not update already
-   downloaded PadMint copies. Its current live catalog audit reports exactly
+   and first-launch instructions. Its current live catalog audit reports exactly
    one problem: DarkPad releases/latest returns 404 before its first release.
    Rerun that audit after publication and require it to pass before shipping
    the PadMint update.
@@ -69,7 +81,11 @@ outputs private.
 
    This must fetch the published recipe, verify its checksum and build the
    tagged source through the player route. A failure blocks announcement.
-6. Confirm the public README/help links, release attachments and PadMint listing
+6. After that check passes, publish PadMint 0.5.23 through its normal release
+   route. Its draft targets PR #213's checked commit; reconcile the target and
+   assets if that PR changes. Merging a catalog file alone does not update
+   already downloaded PadMint copies. Update both projects' preparation notices
+   and confirm public README/help links, release attachments and the listing
    are reachable without maintainer authentication. Announce only after the
    post-publication player check passes.
 
