@@ -45,6 +45,9 @@
 #ifndef TARGET_OS_VISION
 #define TARGET_OS_VISION 0
 #endif
+#if TARGET_OS_MACCATALYST
+#import <UIKit/UIKit.h>
+#endif
 
 #if TARGET_OS_VISION
 /*
@@ -206,12 +209,58 @@ static int pdAngleApplyRenderScale(void)
 	return 1;
 }
 
+#if TARGET_OS_MACCATALYST
+/**
+ * SDL 2 creates its UIKit view before the shell attaches the window to a scene.
+ * Catalyst can then resize the window without updating that original root view.
+ * Use the current window bounds, not iOS orientation or screen dimensions, before
+ * the renderer measures its surface. SDL's layout callback publishes the resize.
+ */
+static void pdAngleSyncMacWindow(void)
+{
+	UIView *host = (__bridge UIView *)s_view;
+	UIWindow *window = host.window;
+	UIView *root = window.rootViewController.view;
+	if (!window || !root || window.bounds.size.width <= 0 || window.bounds.size.height <= 0) {
+		return;
+	}
+	if (!CGRectEqualToRect(root.frame, window.bounds)) {
+		root.frame = window.bounds;
+		[root setNeedsLayout];
+		[root layoutIfNeeded];
+	}
+	if (host != root && host.superview && !CGRectEqualToRect(host.frame, host.superview.bounds)) {
+		host.frame = host.superview.bounds;
+		[host setNeedsLayout];
+		[host layoutIfNeeded];
+	}
+
+	// The window may move between Retina and standard-density displays. Apply
+	// the same settings as iOS against its current screen, including 100%.
+	double scale = pdAngleRenderScale();
+	if (scale <= 0) {
+		double fraction = pdAngleRenderFraction();
+		scale = window.screen.nativeScale * (fraction > 0 ? fraction : 1.0);
+	}
+	if (scale > 0 && s_layer.contentsScale != scale) {
+		s_layer.contentsScale = scale;
+	}
+	int width = (int)lround(host.bounds.size.width * s_layer.contentsScale);
+	int height = (int)lround(host.bounds.size.height * s_layer.contentsScale);
+	pdAngleForcedSize(&width, &height);
+	CGSize size = CGSizeMake(width, height);
+	if (!CGSizeEqualToSize(s_layer.drawableSize, size)) {
+		s_layer.drawableSize = size;
+	}
+}
+#endif
+
 extern "C" int pdAngleInit(SDL_Window *wnd, char *errbuf, int errlen)
 {
 #define FAIL(...) do { snprintf(errbuf, errlen, __VA_ARGS__); return 0; } while (0)
 
 	s_wnd = wnd;
-#if TARGET_OS_IOS && !TARGET_OS_VISION
+#if TARGET_OS_IOS && !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	// SDL's UIKit backend derives status-bar visibility from these flags.
 	// Desktop window preferences must not expose the bar over phone gameplay,
 	// including when onboarding has already presented a UIKit window.
@@ -417,6 +466,9 @@ extern "C" void pdAngleResyncWindowDrawable(void)
 
 extern "C" void pdAngleGetDrawableSize(int *w, int *h)
 {
+#if TARGET_OS_MACCATALYST
+	pdAngleSyncMacWindow();
+#endif
 #if TARGET_OS_VISION
 	// In 3D the render resolution is the EYE's, not the window's: the window is
 	// parked to a 480-pt card from M4 on, and the picture has to stay the

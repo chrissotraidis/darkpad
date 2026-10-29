@@ -16,10 +16,16 @@ SLICES="ios-device ios-simulator"
 case "${1:-}" in
   --simulator-only) SLICES="ios-simulator" ;;
   --device-only) SLICES="ios-device" ;;
+  --catalyst-only) SLICES="ios-catalyst" ;;
   --visionos) SLICES="$SLICES visionos-device visionos-simulator" ;;
   "") ;;
-  *) echo "usage: $0 [--visionos|--simulator-only|--device-only]" >&2; exit 2 ;;
+  *) echo "usage: $0 [--visionos|--simulator-only|--device-only|--catalyst-only]" >&2; exit 2 ;;
 esac
+# Keep a locally built Mac slice available when regenerating the normal iOS
+# frameworks. A fresh iPhone checkout never has to build it.
+if [ "${1:-}" != --catalyst-only ] && [ -d work/angle-ios-catalyst/libEGL.framework ]; then
+  SLICES="$SLICES ios-catalyst"
+fi
 
 for s in $SLICES; do
   for lib in libEGL libGLESv2; do

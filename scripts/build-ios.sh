@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-ios.sh [device|simulator|visionos|xrsimulator] [-- extra cmake args] —
+# build-ios.sh [device|simulator|catalyst|visionos|xrsimulator] [-- extra cmake args] —
 # cross-build the engine as libpd.a for iOS and visionOS.
 #
 # CMake owns the engine build; Xcode owns the bundle (D-009). Output:
@@ -41,10 +41,14 @@ shift || true
 case "$KIND" in
   device)      SYS=iOS;       SYSROOT=iphoneos;        MINOS=15.0; DEPS=work/deps-iphoneos;        ANGLE=work/angle-ios-device;         BUILD=build/ios-device ;;
   simulator)   SYS=iOS;       SYSROOT=iphonesimulator; MINOS=15.0; DEPS=work/deps-iphonesimulator; ANGLE=work/angle-ios-simulator;      BUILD=build/ios-simulator ;;
+  catalyst)    SYS=iOS;       SYSROOT=macosx;          MINOS=15.0; DEPS=work/deps-maccatalyst;      ANGLE=work/angle-ios-catalyst;       BUILD=build/ios-catalyst ;;
   visionos)    SYS=visionOS;  SYSROOT=xros;            MINOS=26.0; DEPS=work/deps-xros;            ANGLE=work/angle-visionos-device;    BUILD=build/visionos ;;
   xrsimulator) SYS=visionOS;  SYSROOT=xrsimulator;     MINOS=26.0; DEPS=work/deps-xrsimulator;     ANGLE=work/angle-visionos-simulator; BUILD=build/xrsimulator ;;
-  *) echo "usage: $0 [device|simulator|visionos|xrsimulator]" >&2; exit 1 ;;
+  *) echo "usage: $0 [device|simulator|catalyst|visionos|xrsimulator]" >&2; exit 1 ;;
 esac
+if [ "$KIND" = catalyst ]; then
+  cmake -P "$ROOT/scripts/check-catalyst-cmake.cmake"
+fi
 
 # Another session mid-build will fight us for cores and for DerivedData.
 # `|| true` on the second pgrep is load-bearing: the process it matched a
@@ -65,6 +69,7 @@ test -d build/src                        || { echo "FATAL: no overlay tree — r
 # The curl slice is named after the SDK, which is why there is no case row for
 # it: work/curl-iphoneos, -iphonesimulator, -xros, -xrsimulator.
 CURL="work/curl-$SYSROOT"
+if [ "$KIND" = catalyst ]; then CURL=work/curl-maccatalyst; fi
 test -f "$CURL/lib/libcurl.a"            || { echo "FATAL: no $CURL/lib/libcurl.a (see work/curl-PROVENANCE.md)" >&2; exit 1; }
 test -f "$CURL/include/curl/curl.h"      || { echo "FATAL: no $CURL/include/curl/curl.h (see work/curl-PROVENANCE.md)" >&2; exit 1; }
 
@@ -72,6 +77,10 @@ test -f "$CURL/include/curl/curl.h"      || { echo "FATAL: no $CURL/include/curl
 # is the deps prefix rather than Homebrew's because the tree mixes <SDL.h> and
 # <SDL2/SDL.h> and needs both the prefix and its SDL2/ subdir on the path.
 PARITY="-ffp-contract=off -fno-builtin-sinf -fno-builtin-cosf -I$ROOT/$DEPS/include -I$ROOT/$DEPS/include/SDL2"
+if [ "$KIND" = catalyst ]; then
+  SUPPORT="$(xcrun --sdk macosx --show-sdk-path)/System/iOSSupport"
+  PARITY="$PARITY -isystem $SUPPORT/usr/include -iframework $SUPPORT/System/Library/Frameworks"
+fi
 
 cmake -S build/src -B "$BUILD" -G Ninja \
   -DCMAKE_SYSTEM_NAME="$SYS" \
@@ -97,7 +106,7 @@ cmake -S build/src -B "$BUILD" -G Ninja \
   -DCMAKE_OBJCXX_FLAGS="$PARITY" \
   "$@"
 
-cmake --build "$BUILD" -j10
+cmake --build "$BUILD" -j "${PD_BUILD_JOBS:-6}"
 
 LIB="$BUILD/libpd.a"
 test -f "$LIB" || { echo "FATAL: no $LIB" >&2; exit 1; }
@@ -108,10 +117,13 @@ test -f "$LIB" || { echo "FATAL: no $LIB" >&2; exit 1; }
 # (No `exit` in the awk: under `set -o pipefail` an early-exiting awk SIGPIPEs
 # otool and the substitution comes back non-zero.)
 case "$KIND" in
-  device) WANT=2 ;; simulator) WANT=7 ;; visionos) WANT=11 ;; xrsimulator) WANT=12 ;;
+  device) WANT=2 ;; simulator) WANT=7 ;; catalyst) WANT=6 ;; visionos) WANT=11 ;; xrsimulator) WANT=12 ;;
 esac
 GOT=$(otool -l "$LIB" 2>/dev/null | awk '/LC_BUILD_VERSION/{f=1} f&&/ platform /&&!p{print $2;p=1}')
 [ "$GOT" = "$WANT" ] || { echo "FATAL: $LIB reports platform=$GOT, expected $WANT ($KIND)" >&2; exit 1; }
+if [ "$KIND" = catalyst ]; then
+  python3 scripts/check-apple-platform.py maccatalyst "$LIB"
+fi
 
 lipo -info "$LIB"
 echo "engine OK -> $LIB (platform $GOT, minos $MINOS)"

@@ -150,6 +150,10 @@ typedef NS_ENUM(NSInteger, PDXblaKind) {
  */
 + (void)runUnpackUntilReady;
 
+/** Pre-engine preparation without a nested run loop. File work runs on a
+    worker; progress and completion run on the main thread. */
++ (void)prepareWithCompletion:(dispatch_block_t)completion;
+
 @property (class, readonly) BOOL unpacking;
 @property (class, readonly) NSTimeInterval unpackElapsed;
 /** 0-100, from the bytes on disk against the archive's size. -1 when idle. */

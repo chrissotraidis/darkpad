@@ -3,7 +3,7 @@
 import re
 import subprocess
 import sys
-platforms = {'macosx': '1', 'iphoneos': '2', 'iphonesimulator': '7'}
+platforms = {'macosx': '1', 'iphoneos': '2', 'maccatalyst': '6', 'iphonesimulator': '7'}
 if len(sys.argv) < 3 or sys.argv[1] not in platforms:
     sys.exit('usage: check-apple-platform.py SDK BINARY...')
 expected = platforms[sys.argv[1]]

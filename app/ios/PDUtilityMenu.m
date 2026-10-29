@@ -16,6 +16,7 @@
 #import "PDDefaults.h"
 #import "PDGyro.h"
 #import "PDSettingsViewController.h"
+#import "PDMac.h"
 #import "PDShell.h"
 #import "PDTouchOverlay.h"
 #import "PDVision.h"
@@ -390,6 +391,7 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	PDMenuNode *displayMenu = pdSubmenu(@"Display", @"display", @[ display ]);
 
 	// Controls
+#if !TARGET_OS_MACCATALYST
 	PDMenuNode *edit = pdAction(@"Edit Touch Controls", @"hand.draw", ^{
 		pdAfterMenu(^{ [PDTouchOverlay.current beginLayoutEditing]; });
 	});
@@ -398,6 +400,11 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	PDMenuNode *touchSettings = pdAction(@"Touch Control Settings…", @"slider.horizontal.3", ^{
 		pdOpenSettings(@"Touch Controls");
 	});
+#else
+	PDMenuNode *mouseSettings = pdAction(@"Keyboard & Mouse Settings…", @"keyboard", ^{
+		pdOpenSettings(@"Keyboard & Mouse");
+	});
+#endif
 	PDMenuNode *preset = pdAction(@"Use GoldenPad Controller Layout…", @"gamecontroller", ^{
 		pdAfterMenu(^{ [PDUtilityMenu confirmControllerLayout]; });
 	});
@@ -405,10 +412,14 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 		pdOpenSettings(@"Controller");
 	});
 	NSMutableArray<NSArray<PDMenuNode *> *> *controls = [NSMutableArray arrayWithArray:@[
+#if TARGET_OS_MACCATALYST
+		@[ mouseSettings ],
+#else
 		@[ edit, onScreen, touchSettings ],
+#endif
 		@[ preset, controllerSettings ],
 	]];
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	PDMenuNode *gyro = pdToggle(@"Gyro While Aiming", @"gyroscope", PDDefGyroEnabled);
 	gyro.subtitle = @"Experimental";
 	PDMenuNode *recenter = pdAction(@"Recenter Gyro", @"scope", ^{ [PDGyro.shared recenter]; });
@@ -432,6 +443,7 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	}
 	PDMenuNode *volumeMenu = pdSubmenu(@"Main Volume", @"speaker.wave.2", @[ levels ]);
 	volumeMenu.subtitle = [NSString stringWithFormat:@"%ld%%", (long)volume];
+#if !TARGET_OS_MACCATALYST
 	NSMutableArray<PDMenuNode *> *modes = [NSMutableArray array];
 	NSInteger mode = PDDefInt(PDDefAudioSessionMode);
 	for (NSUInteger i = 0; i < PDAudio.modeTitles.count; i++) {
@@ -446,15 +458,23 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	}
 	PDMenuNode *otherAudio = pdSubmenu(@"Other App Audio", @"music.note", @[ modes ]);
 	otherAudio.subtitle = mode >= 0 && mode < (NSInteger)PDAudio.modeTitles.count ? PDAudio.modeTitles[(NSUInteger)mode] : nil;
+#endif
 	PDMenuNode *audioMenu = pdSubmenu(@"Audio", @"speaker.wave.2", @[ @[
-		volumeMenu, pdToggle(@"Mute Game Audio", @"speaker.slash", PDDefAudioMute), otherAudio,
+		volumeMenu, pdToggle(@"Mute Game Audio", @"speaker.slash", PDDefAudioMute),
+#if !TARGET_OS_MACCATALYST
+		otherAudio,
+#endif
 	] ]);
 
 	// Add-ons and game data
 	// Every add-on is optional and none is included; the subtitles say so,
 	// because the names alone read like built-in content.
 	PDMenuNode *packs = pdAction(@"HD Texture Packs…", @"photo.stack", ^{ pdOpenSettings(@"Texture Packs"); });
+#if TARGET_OS_MACCATALYST
+	packs.subtitle = @"Packs you add to the DarkPad data folder";
+#else
 	packs.subtitle = @"Community packs you add in Files";
+#endif
 	PDMenuNode *xbla = pdAction(@"Xbox 360 Remaster Art…", @"sparkles", ^{ pdOpenSettings(@"Xbox 360 Art"); });
 	xbla.subtitle = @"From your own copy of the 2010 release";
 	PDMenuNode *geplus = pdAction(@"GoldenEye Levels (GE Plus)…", @"star.circle", ^{ pdOpenSettings(@"GoldenEye"); });
@@ -558,7 +578,7 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 + (void)presentAbout
 {
 	NSString *message = [NSString stringWithFormat:
-		@"%@\n%s\n\nPerfect Dark's decompiled source, compiled as a native iPhone and iPad app. No emulator.\n\nThe engine is Dab's Mod v3.15.1, which adds Ghost Trials, the Randomizer, GoldenEye levels (GE Plus, Goldfinger 64, Tomorrow Never Dies 64) and Online Game to the main menu. To leave GoldenEye, press B or BACK on its folder's first page, or tap PREVIOUS. Built on the Perfect Dark decompilation and PC port, Dab's Mod, rebelancap's perfect-dark-ios, SDL2, curl and ANGLE; each keeps its own license.\n\nNo game data is included. DarkPad is not affiliated with Rare, Microsoft or Nintendo.",
+		@"%@\n%s\n\nPerfect Dark's decompiled source, compiled as a native app for iPhone, iPad and Mac. No emulator.\n\nThe engine is Dab's Mod v3.15.1, which adds Ghost Trials, the Randomizer, GoldenEye levels (GE Plus, Goldfinger 64, Tomorrow Never Dies 64) and Online Game to the main menu. To leave GoldenEye, press B or BACK on its folder's first page, or tap PREVIOUS. Built on the Perfect Dark decompilation and PC port, Dab's Mod, rebelancap's perfect-dark-ios, SDL2, curl and ANGLE; each keeps its own license.\n\nNo game data is included. DarkPad is not affiliated with Rare, Microsoft or Nintendo.",
 		[self versionLine], PD_IOS_BUILD_STAMP];
 	UIAlertController *about = [self alert:@"About DarkPad" message:message];
 	[about addAction:[UIAlertAction actionWithTitle:@"View on GitHub" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
@@ -612,8 +632,12 @@ static NSString *pdTail(NSString *path, NSUInteger limit)
 	NSMutableString *s = [NSMutableString string];
 	[s appendFormat:@"App: %@\nShell build: %s\n", [self versionLine], PD_IOS_BUILD_STAMP];
 	[s appendFormat:@"Device: %@ (%@)\nOS: %@ %@\n", pdMachine(),
+#if TARGET_OS_MACCATALYST
+		@"Mac", @"macOS", NSProcessInfo.processInfo.operatingSystemVersionString];
+#else
 		device.userInterfaceIdiom == UIUserInterfaceIdiomPad ? @"iPad" : @"iPhone",
 		device.systemName, device.systemVersion];
+#endif
 	[s appendFormat:@"Thermal state: %ld\nLow Power Mode: %@\n", (long)NSProcessInfo.processInfo.thermalState,
 		NSProcessInfo.processInfo.lowPowerModeEnabled ? @"on" : @"off"];
 	NSArray *profiles = @[ @"Original", @"Enhanced", @"Remaster" ];
@@ -644,7 +668,7 @@ static NSString *pdTail(NSString *path, NSUInteger limit)
 			answers.count > 1 && answers[1].length ? answers[1] : @"(not given)"];
 	}
 	[report appendFormat:@"== Technical context ==\n%@\n", [self technicalSummary]];
-	NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+	NSString *docs = PDShell.shared.documentsPath;
 	// The shell's own records. The ROM, saves, pd.ini and imported art are never read.
 	for (NSString *name in @[ @"heartbeat.txt", @"crash.txt", @"hang.txt", @"touch-watchdog.txt",
 			@"launch-beacon.txt", @"lifecycle.txt", @"pd.log" ]) {

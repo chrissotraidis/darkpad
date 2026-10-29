@@ -5,6 +5,10 @@
 #import "PDWatchdog.h"
 
 @interface PDPacing ()
+#if TARGET_OS_MACCATALYST
+- (void)scheduleMacFrames:(void (*)(void))frame;
+#endif
+- (int)notePresent;
 - (void)fillSnapshot:(PDPacingSnap *)out;
 /** D-050: one compositor frame's worth of "you may draw now". */
 - (void)signalExternal;
@@ -25,6 +29,10 @@
 	NSThread *_thread;
 	dispatch_semaphore_t _sem;
 	BOOL _bypass;
+#if TARGET_OS_MACCATALYST
+    void (*_macFrame)(void);
+    BOOL _macInFrame;
+#endif
 
 	// The instrument. Written by the link thread, read by anyone; plain 64-bit
 	// counters, so a torn read is not possible on arm64 and a lock would only
@@ -139,6 +147,11 @@ static inline uint64_t pdNowNs(void)
 - (void)startWithBypass:(BOOL)bypass
 {
 	_bypass = bypass;
+#if TARGET_OS_MACCATALYST
+    // Catalyst uses a main-run-loop display-link callback, never a nested
+    // event loop or a semaphore wait on the UI thread.
+    return;
+#endif
 	if (bypass) {
 		NSLog(@"perfectdark: pacing BYPASS (a --fixed-step/--exit-frame run paces itself)");
 		return;
@@ -151,6 +164,22 @@ static inline uint64_t pdNowNs(void)
 	_thread.qualityOfService = NSQualityOfServiceUserInteractive;
 	[_thread start];
 }
+
+#if TARGET_OS_MACCATALYST
+- (void)scheduleMacFrames:(void (*)(void))frame
+{
+    NSAssert(NSThread.isMainThread, @"Mac frames belong to the UI/game thread");
+    _macFrame = frame;
+    _link = [CADisplayLink displayLinkWithTarget:self selector:@selector(linkFired:)];
+    [self applyLinkRate];
+    [_link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+void pdMacScheduleFrames(void (*frame)(void))
+{
+    [PDPacing.shared scheduleMacFrames:frame];
+}
+#endif
 
 - (void)linkThread
 {
@@ -202,7 +231,14 @@ static inline uint64_t pdNowNs(void)
 		return;
 	}
 
+#if TARGET_OS_MACCATALYST
+    if (_macFrame && !_macInFrame && _presentAllowed) {
+        _macInFrame = YES;
+        @try { _macFrame(); } @finally { _macInFrame = NO; }
+    }
+#else
 	[self releaseWaiter];
+#endif
 }
 
 /**
@@ -520,7 +556,11 @@ static void pdWakeSourcePerform(void *info)
 	// D-056: the panel's maximum, whatever it is. `maxHz >= 120 ? 120 : 60` gave
 	// this Vision Pro a 60 Hz range on a 90 Hz panel, which is the 2D half of
 	// the user's "set to 120, locked at 60".
+#if TARGET_OS_MACCATALYST
+    const NSInteger want = MIN(PDPanelHighHz(), MAX(60, _targetHz));
+#else
 	const NSInteger want = PDPanelHighHz();
+#endif
 	if (want == _appliedLinkHz) {
 		return;
 	}
@@ -600,6 +640,9 @@ static void pdWakeSourcePerform(void *info)
  */
 - (void)waitAtFrameStart
 {
+#if TARGET_OS_MACCATALYST
+    return; // The display-link callback already began this frame.
+#endif
 	if (!_earlyWait || _bypass) {
 		return;
 	}
@@ -608,6 +651,9 @@ static void pdWakeSourcePerform(void *info)
 
 - (int)waitForPresent
 {
+#if TARGET_OS_MACCATALYST
+    return _presentAllowed ? [self notePresent] : 0;
+#endif
 	if (_bypass) {
 		return 1;
 	}
@@ -721,6 +767,11 @@ static void pdWakeSourcePerform(void *info)
 		NSLog(@"perfectdark: pacing wait timed out (link stalled?)");
 	}
 
+    return [self notePresent];
+}
+
+- (int)notePresent
+{
 	atomic_fetch_add(&_presents, 1);
 
 	// The cadence instrument: how far apart consecutive presents actually are.
@@ -840,8 +891,12 @@ static int pdCmpFloat(const void *a, const void *b)
 		 "pacing_wait_mode=%@\npacing_wake_n=%u\npacing_wake_us_p50=%.0f\n"
 		 "pacing_wake_us_p95=%.0f\npacing_wake_us_max=%.0f\n"
 		 "pacing_external_signals=%llu\n",
+#if TARGET_OS_MACCATALYST
+        @"mac-displaylink",
+#else
 		_bypass ? @"bypass"
 			: (atomic_load(&_external) ? @"compositor" : @"displaylink"),
+#endif
 		(unsigned long long)atomic_load(&_links),
 		(unsigned long long)atomic_load(&_presents),
 		(unsigned long long)atomic_load(&_dropped),

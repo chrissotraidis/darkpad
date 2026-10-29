@@ -156,7 +156,11 @@ static NSString *sUnpackNote;            // the last thing the engine's importer
 		return @"Optional: the Xbox 360 (XBLA) release. Put Perfect Dark.rar, a .7z, the bare "
 		        "Xbox 360 package, or a folder holding one, into the added-content folder (the one "
 		        "folder for every optional extra) here:\n"
+#if TARGET_OS_MACCATALYST
+		        "    Settings → Texture Packs → Open DarkPad data folder → added-content\n"
+#else
 		        "    Files → On My iPhone/iPad → DarkPad → added-content\n"
+#endif
 		        "Then the game draws 4J's high-resolution textures, meshes, rooms, font and "
 		        "explosions in place of the N64 art.";
 	}
@@ -454,15 +458,77 @@ static PDXblaFind *sCachedScan;
 + (void)showPreparingNote:(NSString *)text
 {
 	[PDXblaProgressWindow showText:text];
+#if !TARGET_OS_MACCATALYST
 	// The note is a UIKit view and nothing else is turning the run loop yet;
 	// one pass gets it on screen before the caller starts blocking.
 	[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode
 	                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+#endif
 }
 
 + (void)hidePreparingNote
 {
 	[PDXblaProgressWindow hide];
+}
+
++ (void)clearUnfinishedUnpackIn:(NSString *)dir
+{
+	[NSFileManager.defaultManager createDirectoryAtPath:dir
+	                        withIntermediateDirectories:YES attributes:nil error:NULL];
+
+	// A cache that has files in it but no marker is a previous attempt that was
+	// killed (the app swiped away mid-unpack, or the gate's terminate). Start
+	// clean rather than extracting over the top of half a package.
+	NSArray *leftovers = [NSFileManager.defaultManager contentsOfDirectoryAtPath:dir error:NULL];
+	if (leftovers.count) {
+		NSLog(@"perfectdark: [xbla] clearing %lu leftovers from an unfinished unpack",
+			(unsigned long)leftovers.count);
+		[NSFileManager.defaultManager removeItemAtPath:dir error:NULL];
+		[NSFileManager.defaultManager createDirectoryAtPath:dir
+		                        withIntermediateDirectories:YES attributes:nil error:NULL];
+	}
+
+}
+
++ (BOOL)finishUnpackIn:(NSString *)dir extracted:(BOOL)extracted
+{
+	// A success marker is only valid when a complete package was found.
+	if (!extracted || ![self scanDir:dir archives:NO depth:kScanDepth]) return NO;
+	return [NSFileManager.defaultManager createFileAtPath:[dir stringByAppendingPathComponent:kDoneFile]
+		contents:[NSData data] attributes:nil];
+}
+
++ (void)prepareWithCompletion:(dispatch_block_t)completion
+{
+	NSAssert(NSThread.isMainThread, @"pre-engine, UIKit's thread");
+	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		PDXblaFind *found = self.scan;
+		BOOL ready = !found.found || found.kind == PDXblaPackage || self.isUnpacked;
+		NSString *directory = ready ? nil : self.cacheDir;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if (ready) { completion(); return; }
+			sUnpacking = YES;
+			sUnpackStarted = NSDate.timeIntervalSinceReferenceDate;
+			sUnpackArchiveBytes = found.bytes;
+			sUnpackNote = @"unpacking";
+			[PDXblaProgressWindow show];
+			NSTimeInterval started = sUnpackStarted;
+			dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+				[self clearUnfinishedUnpackIn:directory];
+				BOOL extracted = archiveExtract(found.path.fileSystemRepresentation, directory.fileSystemRepresentation) > 0;
+				BOOL ready = [self finishUnpackIn:directory extracted:extracted];
+				NSTimeInterval elapsed = NSDate.timeIntervalSinceReferenceDate - started;
+				dispatch_async(dispatch_get_main_queue(), ^{
+					sLastUnpackSeconds = elapsed;
+					sUnpacking = NO;
+					sUnpackNote = ready ? @"ready" : @"failed";
+					NSLog(@"perfectdark: [xbla] preparation %@ after %.1fs", sUnpackNote, elapsed);
+					[PDXblaProgressWindow hide];
+					completion();
+				});
+			});
+		});
+	});
 }
 
 + (void)runUnpackUntilReady
@@ -478,20 +544,7 @@ static PDXblaFind *sCachedScan;
 	}
 
 	NSString *dir = self.cacheDir;
-	[NSFileManager.defaultManager createDirectoryAtPath:dir
-	                        withIntermediateDirectories:YES attributes:nil error:NULL];
-
-	// A cache that has files in it but no marker is a previous attempt that was
-	// killed (the app swiped away mid-unpack, or the gate's terminate). Start
-	// clean rather than extracting over the top of half a package.
-	NSArray *leftovers = [NSFileManager.defaultManager contentsOfDirectoryAtPath:dir error:NULL];
-	if (leftovers.count) {
-		NSLog(@"perfectdark: [xbla] clearing %lu leftovers from an unfinished unpack",
-			(unsigned long)leftovers.count);
-		[NSFileManager.defaultManager removeItemAtPath:dir error:NULL];
-		[NSFileManager.defaultManager createDirectoryAtPath:dir
-		                        withIntermediateDirectories:YES attributes:nil error:NULL];
-	}
+	[self clearUnfinishedUnpackIn:dir];
 
 	sUnpacking = YES;
 	sUnpackStarted = NSDate.timeIntervalSinceReferenceDate;
@@ -525,12 +578,7 @@ static PDXblaFind *sCachedScan;
 
 	sLastUnpackSeconds = NSDate.timeIntervalSinceReferenceDate - sUnpackStarted;
 
-	if (ok && [self scanDir:dir archives:NO depth:kScanDepth]) {
-		// The marker is what says "finished" to both sides. Written only after
-		// a package has actually been found under it, so a truncated archive
-		// cannot leave a cache that reads as ready for ever.
-		[NSFileManager.defaultManager createFileAtPath:[dir stringByAppendingPathComponent:kDoneFile]
-		                                      contents:[NSData data] attributes:nil];
+	if ([self finishUnpackIn:dir extracted:ok]) {
 		sUnpackNote = @"ready";
 		NSLog(@"perfectdark: [xbla] unpacked in %.1fs", sLastUnpackSeconds);
 	} else {
@@ -926,7 +974,7 @@ static const uint8_t kTitleGoldenEye[4]   = { 0x58, 0x41, 0x08, 0xa9 };
 - (NSString *)rowText
 {
 	if (!self.found) {
-		return @"none in Documents/added-content";
+		return @"No file in added-content";
 	}
 	NSString *size = self.isFolder ? @"folder"
 		: [NSString stringWithFormat:@"%.0f MB", (double)self.bytes / (1024.0 * 1024.0)];
@@ -1397,7 +1445,7 @@ static void pdScanGoldenEye(PDGoldenEyeFind **rom, PDGoldenEyeFind **xbla, PDGol
 	}
 	if (pdIsArchiveExt(path) && archiveFindEntry(path.fileSystemRepresentation, kCeUpdateEntry.UTF8String)) {
 		return @"That is the GoldenEye XBLA Community Edition updater, not the release itself. "
-		        "Add the release here; the updater can go in the same added-content folder with the Files app.";
+		        "Add the release here; the updater can go in the same added-content folder.";
 	}
 	if (pdIsArchiveExt(path)) {
 		return @"That archive does not hold the GoldenEye XBLA release (neither its files nor its "

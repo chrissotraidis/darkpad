@@ -51,7 +51,7 @@ extern int lvIsPaused(void);
 
 - (void)tick
 {
-#if TARGET_OS_VISION
+#if TARGET_OS_VISION || TARGET_OS_MACCATALYST
     return; // Handset motion is not headset aiming.
 #else
     int wheelSlot = 0;

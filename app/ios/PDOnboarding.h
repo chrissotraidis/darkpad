@@ -42,6 +42,10 @@ typedef NS_ENUM(NSInteger, PDRomVerdict) {
  */
 + (void)runUntilRomPresent;
 
+/** Start onboarding and return to the application event loop. Completion is
+    called on the main thread only after a valid ROM has been installed. */
++ (void)beginWithCompletion:(dispatch_block_t)completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

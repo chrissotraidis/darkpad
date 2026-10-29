@@ -44,8 +44,12 @@ static dispatch_queue_t pdAudioQueue(void)
 
 static int pdCurrentMode(void)
 {
+#if TARGET_OS_MACCATALYST
+	return 1; // macOS mixes applications; retain the shared master gain/mute.
+#else
 	NSInteger m = PDDefInt(PDDefAudioSessionMode);
 	return (m < 0 || m > 4) ? 2 : (int)m;
+#endif
 }
 
 /**
@@ -201,6 +205,10 @@ static void pdKickStalledDevice(AVAudioSession *s)
 /** Set the category and options if they are not already ours. PDAudio's queue. */
 static void pdApplySessionMode(void)
 {
+#if TARGET_OS_MACCATALYST
+	atomic_store_explicit(&sDuck, 1.0f, memory_order_relaxed);
+	pdRecomputeGain();
+#else
 	AVAudioSession *s = AVAudioSession.sharedInstance;
 	const int mode = pdCurrentMode();
 	const AVAudioSessionCategoryOptions want = pdOptionsForMode(mode);
@@ -240,6 +248,7 @@ static void pdApplySessionMode(void)
 
 	pdRecomputeDuck(s);
 	sArmed = YES;
+#endif
 }
 
 @implementation PDAudio
@@ -267,6 +276,9 @@ static void pdApplySessionMode(void)
 
 + (void)begin
 {
+#if TARGET_OS_MACCATALYST
+	pdApplySessionMode();
+#else
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
 		pdRecomputeGain();
@@ -331,6 +343,7 @@ static void pdApplySessionMode(void)
 		NSLog(@"perfectdark: [audio] session armed — playback, mode %d, re-asserted on drift",
 			pdCurrentMode());
 	});
+#endif
 }
 
 + (void)gainChanged
@@ -359,7 +372,11 @@ static void pdApplySessionMode(void)
 
 + (NSString *)stateLines
 {
+#if TARGET_OS_MACCATALYST
+	AVAudioSession *s = nil;
+#else
 	AVAudioSession *s = AVAudioSession.sharedInstance;
+#endif
 	AVAudioSessionPortDescription *out = s.currentRoute.outputs.firstObject;
 	return [NSString stringWithFormat:
 		@"audio_category=%@\naudio_options=%#lx\naudio_route=%@\naudio_rate=%.0f\n"

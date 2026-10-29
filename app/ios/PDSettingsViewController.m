@@ -22,6 +22,7 @@
 #import "PDXbla.h"
 #import "PDAudio.h"
 #import "PDWatchdog.h"
+#import "PDMac.h"
 #import "PDUtilityMenu.h"
 #if TARGET_OS_VISION
 #import "PDVision3D.h"   // the 3D rows (D-082); vision3d/ is on this target's path only
@@ -235,7 +236,8 @@ static PDRow *pdChoiceRow(NSString *title, NSString *(^info)(void), void (^actio
     [super viewDidLayoutSubviews];
     BOOL utility = ![self.navigation.topViewController isKindOfClass:PDSettingsViewController.class];
     CGRect bounds = self.view.bounds;
-    BOOL sheet = !utility && self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad
+    BOOL sheet = !utility && (self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomPad
+        || self.traitCollection.userInterfaceIdiom == UIUserInterfaceIdiomMac)
         && bounds.size.width >= 700;
     if (sheet) {
         UIEdgeInsets safe = self.view.safeAreaInsets;
@@ -310,6 +312,7 @@ static CFTimeInterval sPresentStarted;
 	// (Control Center, calls) before the app actually enters the background.
 	wanted |= UIApplication.sharedApplication.applicationState != UIApplicationStateActive;
 #endif
+	PDMacSetInputBlocked(wanted);
 	if (wanted && !sUtilityOwnsPause && !lvIsPaused()) {
 		sUtilityOwnsPause = YES;
 		lvSetPaused(1);
@@ -495,6 +498,7 @@ static CFTimeInterval sPresentStarted;
 	sHost = [PDSettingsHostController new];
 	sHost.navigation = nav;
 	sWindow.rootViewController = sHost;
+	PDMacInstallSettingsCommand(sHost);
 	sWindow.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
 	sWindow.hidden = YES;
 	NSLog(@"perfectdark: [settings] built frame=%@ scene=%@",
@@ -692,7 +696,11 @@ static CFTimeInterval sPresentStarted;
 			if (!weakSelf.view.window) return;
 			UIAlertController *picker = [UIAlertController alertControllerWithTitle:@"Choose Texture Pack"
 				message:names.count ? @"Choose the artwork used by the Enhanced profile."
+#if TARGET_OS_MACCATALYST
+					: @"Add a pack folder or archive to texture-packs in the DarkPad data folder. Restart the app to prepare new archives."
+#else
 					: @"Add a pack folder or archive in Files → DarkPad → texture-packs. Restart the app to prepare new archives."
+#endif
 				preferredStyle:UIAlertControllerStyleAlert];
 			for (NSString *name in names) {
 				[picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -703,7 +711,7 @@ static CFTimeInterval sPresentStarted;
 							[weakSelf refreshTexturePackStatus];
 							if (!selected && weakSelf.view.window) {
 								UIAlertController *error = [UIAlertController alertControllerWithTitle:@"Pack Unavailable"
-									message:@"This pack is no longer installed. Choose another pack or add it again in Files."
+									message:@"This pack is no longer installed. Choose another pack or add it again to texture-packs."
 									preferredStyle:UIAlertControllerStyleAlert];
 								[error addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
 								[[weakSelf topPresenter] presentViewController:error animated:YES completion:nil];
@@ -950,8 +958,14 @@ static CFTimeInterval sPresentStarted;
 {
 	__weak typeof(self) weakSelf = self;
 
-	_sections = @[ @"Graphics", @"Touch Controls", @"Controller",
-#if !TARGET_OS_VISION
+	_sections = @[ @"Graphics",
+#if TARGET_OS_MACCATALYST
+        @"Keyboard & Mouse",
+#else
+        @"Touch Controls",
+#endif
+        @"Controller",
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
         @"Motion Aiming",
 #endif
         @"Audio", @"Texture Packs", @"Xbox 360 Art", @"GoldenEye 007 (GE Plus)", @"Diagnostics" ];
@@ -998,6 +1012,15 @@ static CFTimeInterval sPresentStarted;
 #endif
 			pdSwitchRow(@"Show FPS", PDDefShowFPS),
 		],
+#if TARGET_OS_MACCATALYST
+		@[
+			pdSliderRow(@"Mouse sensitivity", PDDefMouseSensitivity, 0.1f, 10.0f),
+			pdSwitchRow(@"Invert mouse look (vertical)", PDDefMouseInvertY),
+			pdSegRow(@"Control style", PDDefControlStyle,
+				@[ @"Dual analogue", @"N64 (digital)" ], @[ @0, @1 ]),
+			pdInfoRow(@"Settings shortcut", ^NSString *{ return @"⌘, or the DarkPad menu button"; }),
+		],
+#else
 		@[
 			// bean's names, and his 0.30 - the 0.20 seed was the family's
 			// starting point for a tuning round and this is the round (Q-004).
@@ -1028,7 +1051,11 @@ static CFTimeInterval sPresentStarted;
 				});
 			}),
 		],
+#endif
 		@[
+#if TARGET_OS_MACCATALYST
+			pdSwitchRow(@"Double-flick stick to roll", PDDefDoubleTapRoll),
+#endif
 			pdButtonRow(@"Use Goldenpad Controller Layout…", ^{
 				UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"Goldenpad Controller Layout"
 					message:@"RT fire • LT aim • LB crouch\nA/Y/RB weapon • B/X interact\nLeft-stick click reload • Right-stick click alternate fire • View/Back weapon wheel\n\nReplaces controller button bindings for all players. Keyboard and D-pad bindings stay unchanged."
@@ -1047,7 +1074,7 @@ static CFTimeInterval sPresentStarted;
 				[[weakSelf topPresenter] presentViewController:confirm animated:YES completion:nil];
 			}),
 		],
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 		@[
             pdSwitchRow(@"Gyro while aiming (experimental)", PDDefGyroEnabled),
             pdSliderRow(@"Gyro sensitivity", PDDefGyroSensitivity, 0.25f, 3.0f),
@@ -1057,6 +1084,9 @@ static CFTimeInterval sPresentStarted;
 		],
 #endif
 		@[
+#if TARGET_OS_MACCATALYST
+			pdInfoRow(@"Other App Audio", ^NSString *{ return @"macOS mixes game audio with other apps"; }),
+#else
 			// the user: "the main point is the game volume and the Other App Audio
 			// option". Three rows, bean's three, in his order (D-033). The
 			// game's own Sound / Music / Sound Mode are the eeprom's and stay in
@@ -1080,10 +1110,14 @@ static CFTimeInterval sPresentStarted;
 				nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
 				[[weakSelf topPresenter] presentViewController:nav animated:YES completion:nil];
 			}),
+#endif
 			pdPercentSliderRow(@"Volume", PDDefAudioMasterVolume),
 			pdSwitchRow(@"Mute", PDDefAudioMute),
 		],
 		@[
+#if TARGET_OS_MACCATALYST
+			pdButtonRow(@"Open DarkPad data folder…", ^{ PDMacOpenDataFolder(); }),
+#endif
 			pdInfoRow(@"Selected pack", ^NSString *{ return weakSelf.texturePackStatus ?: @"Checking installed packs…"; }),
 			pdInfoRow(@"Art selection", ^NSString *{ return @"Choose Enhanced under Graphics → Art profile"; }),
 			pdButtonRow(@"Choose texture pack…", ^{ [weakSelf chooseTexturePack]; }),
@@ -1105,7 +1139,7 @@ static CFTimeInterval sPresentStarted;
 				// runs on every dequeue of this cell (D-032).
 				PDXblaFind *f = PDXbla.cachedScan;
 				if (!f.found) {
-					return @"none in Documents/added-content";
+					return @"No package in added-content";
 				}
 				if (PDXbla.unpacking) {
 					return [NSString stringWithFormat:@"%@ — unpacking %d%%",
@@ -1421,6 +1455,9 @@ static CFTimeInterval sPresentStarted;
     if ([_sections[(NSUInteger)s] isEqualToString:@"Touch Controls"]) {
         return @"Move with the left stick and drag the right side to look. Edit the layout to move, resize or hide buttons. Auto hides gameplay controls when a controller connects, while keeping menus touchable. In game menus, tap to select and drag to scroll.";
     }
+    if ([_sections[(NSUInteger)s] isEqualToString:@"Keyboard & Mouse"]) {
+        return @"Use the keyboard and mouse or a connected controller. Change action bindings in the game's Options. Escape opens the game menu and releases the pointer; ⌘, opens DarkPad settings. Device gyro and touchscreen layout settings apply on iPhone and iPad.";
+    }
     if ([_sections[(NSUInteger)s] isEqualToString:@"Controller"]) {
         return @"Left stick moves and strafes; right stick turns and looks; the D-pad steps and strafes. The Goldenpad preset maps fire to RT, aim to LT, crouch to LB, interact to B/X and weapon switching to A/Y/RB. Stick clicks handle reload and alternate fire; View/Back opens the weapon wheel. Applying the preset replaces controller bindings for all players.";
     }
@@ -1428,7 +1465,11 @@ static CFTimeInterval sPresentStarted;
         return @"Original uses N64 art. Enhanced enables texture filtering and installed texture packs. Remaster uses your imported Xbox 360 assets, with N64 art as the fallback. Resolution changes apply after restarting the app.";
     }
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Audio"]) {
+#if TARGET_OS_MACCATALYST
+		return @"Volume and Mute control only DarkPad. macOS manages audio from other apps; the iOS audio-interruption policies do not apply.";
+#else
 		return @"Game volume and how Perfect Dark shares the speaker with other apps.";
+#endif
 	}
     if ([_sections[(NSUInteger)s] isEqualToString:@"Xbox 360 Art"]) {
         return @"Import your own Xbox 360 assets, then choose Remaster in Graphics. Newly enabled room art appears when you load the next level. The original N64 ROM is still required.";
@@ -1438,7 +1479,7 @@ static CFTimeInterval sPresentStarted;
 		        "arenas become playable here: choose GE Plus in the Perfect Menu. Add the GoldenEye "
 		        "XBLA release too and GE Plus uses its HD art — as its .7z or .zip, or as the Xbox 360 "
 		        "package (on its own, or in a .7z or .zip). Both go in the "
-		        "added-content folder under any name — with these rows, or with the Files app. "
+		        "added-content folder under any name using these import buttons. "
 		        "Turn GoldenEye XBLA off to play GE Plus in GoldenEye's original N64 look; the "
 		        "file stays where it is. Perfect Dark's selected art profile is not affected. "
 		        "Goldfinger 64, the GoldenEye ROM hack, gets a Perfect Menu row of its own: add "
@@ -1446,7 +1487,11 @@ static CFTimeInterval sPresentStarted;
 		        "Changes here take effect the next time you open the app.";
 	}
 	if ([_sections[(NSUInteger)s] isEqualToString:@"Texture Packs"]) {
+#if TARGET_OS_MACCATALYST
+		return @"Open the DarkPad data folder and add your pack folder or archive to texture-packs. Restart the app to prepare new archives, then choose Enhanced in Graphics. Choose texture pack switches between installed packs; Reload refreshes textures. Without a pack, Enhanced still provides 2× texture filtering.";
+#else
 		return @"In Files, open On My iPhone/iPad → DarkPad → texture-packs and add your pack folder or archive. Restart the app to prepare new archives, then choose Enhanced in Graphics. Use Choose texture pack to switch between installed packs. Reload refreshes installed textures. Without a pack, Enhanced still provides 2× texture filtering.";
+#endif
 	}
 	return nil;
 }

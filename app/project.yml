@@ -34,20 +34,21 @@ settings:
     # dylib: "Undefined symbols: _main". Off, so Debug and Release link the same
     # way and a Debug .app is a real .app that simctl can install.
     ENABLE_DEBUG_DYLIB: "NO"
+    PD_DEPS_SDK: "$(PLATFORM_NAME)"
     OTHER_CFLAGS: "-fno-strict-aliasing -Wno-deprecated-declarations"
     HEADER_SEARCH_PATHS:
       - "$(DERIVED_FILE_DIR)"
       - "$(SRCROOT)/ios"
-      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include"
-      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/include/SDL2"
+      - "$(SRCROOT)/../work/deps-$(PD_DEPS_SDK)/include"
+      - "$(SRCROOT)/../work/deps-$(PD_DEPS_SDK)/include/SDL2"
     # $(PLATFORM_NAME) is iphoneos / iphonesimulator / xros / xrsimulator, and
     # the work/deps-* prefixes are named to match on all four — so the header
     # paths above need no visionOS case at all. The library path below is iOS's
     # only because the engine build dirs are build/ios-*; the visionOS target
     # overrides it with build/{visionos,xrsimulator}.
     LIBRARY_SEARCH_PATHS:
-      - "$(SRCROOT)/../work/deps-$(PLATFORM_NAME)/lib"
-      - "$(SRCROOT)/../work/curl-$(PLATFORM_NAME)/lib"
+      - "$(SRCROOT)/../work/deps-$(PD_DEPS_SDK)/lib"
+      - "$(SRCROOT)/../work/curl-$(PD_DEPS_SDK)/lib"
       - "$(SRCROOT)/../build/ios-$(PD_SLICE)"
 targets:
   perfectdark:
@@ -59,6 +60,7 @@ targets:
       # console stays out of public builds.
       - path: ios/pd_ios_main.m
       - path: ios/PDShell.m
+      - path: ios/PDMac.m
       - path: ios/PDGeometry.m
       - path: ios/PDCrash.m
       - path: ios/PDWatchdog.m
@@ -95,9 +97,15 @@ targets:
     settings:
       base:
         SDKROOT: iphoneos
+        SUPPORTS_MACCATALYST: "YES"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: "NO"
+        MACOSX_DEPLOYMENT_TARGET: "12.0"
+        PD_DEPS_SDK[sdk=macosx*]: maccatalyst
         TARGETED_DEVICE_FAMILY: "1,2"
         PRODUCT_BUNDLE_IDENTIFIER: com.chrissotraidis.darkpad
         PRODUCT_NAME: perfectdark
+        PRODUCT_NAME[sdk=macosx*]: DarkPad
         INFOPLIST_FILE: ios/Info.plist
         CODE_SIGN_ENTITLEMENTS: "PD_ENTITLEMENTS"
         MARKETING_VERSION: "PD_MARKETING_VERSION"
@@ -106,6 +114,7 @@ targets:
         GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) PD_PUBLIC_FLAG"
         PD_SLICE: device
         PD_SLICE[sdk=iphonesimulator*]: simulator
+        PD_SLICE[sdk=macosx*]: catalyst
         # -lz for the SDK's zlib; SDL2main is NOT linked (the shell owns main()
         # and calls SDL_UIKitRunApp itself, which is all SDL2main would do).
         # -lcurl is the static curl 8.11.0 from work/curl-$(PLATFORM_NAME)
@@ -125,6 +134,7 @@ targets:
         embed: true
         codeSign: true
       - sdk: OpenGLES.framework
+        platformFilter: iOS
       - sdk: QuartzCore.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
@@ -156,6 +166,7 @@ targets:
     sources:
       - path: ios/pd_ios_main.m
       - path: ios/PDShell.m
+      - path: ios/PDMac.m
       - path: ios/PDGeometry.m
       - path: ios/PDCrash.m
       - path: ios/PDWatchdog.m

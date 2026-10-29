@@ -20,6 +20,17 @@ This section supersedes the older engine and candidate status below. DarkPad
 The [release checklist](RELEASE-CHECKLIST.md) records publication and both required
 player checks. Private evidence stays under ignored `work/`.
 
+## Mac Catalyst source target (October 29)
+
+This is the shared DarkPad app for Apple Silicon, separate from the desktop
+OpenGL reference and from the published v0.1.0 iOS recipe. See
+[the Mac guide](MACOS.md#validation-status) for current scope and limitations.
+The personal-build script, Catalyst platform checks, 17 Mac package cases,
+5 existing IPA package cases, asynchronous texture preparation, modal-input
+suppression and iOS simulator settings regression pass. Native ROM import,
+Settings/menu/Finder actions, resizing and settings persistence were checked
+on macOS 26.6.2. No Mac release or prebuilt game binary is published by this work.
+
 ## Historical evidence through October 22
 
 The notes below describe the older solo engine and retired network candidate.

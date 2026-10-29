@@ -91,6 +91,12 @@
 		(long)scene.activationState);
 	NSLog(@"perfectdark: [scene] connected %@ (role %@, state %ld)",
 		session.persistentIdentifier, session.role, (long)scene.activationState);
+#if TARGET_OS_MACCATALYST
+	if ([scene isKindOfClass:UIWindowScene.class]) {
+		((UIWindowScene *)scene).sizeRestrictions.minimumSize = CGSizeMake(800, 450);
+		scene.title = @"DarkPad";
+	}
+#endif
 
 	pdGraftSDLWindows();
 

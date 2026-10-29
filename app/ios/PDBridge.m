@@ -1522,7 +1522,7 @@ static NSString *pdErr(NSString *fmt, ...)
 			}
 			if ([sub isEqualToString:@"dump"]) {
 				NSString *name = argv.count > 3 ? argv[3] : @"audio-trace.csv";
-				NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+				NSString *docs = PDShell.shared.documentsPath;
 				NSString *dst = [docs stringByAppendingPathComponent:name.lastPathComponent];
 				const unsigned n = g_PdAudioTraceCount;
 				const unsigned len = PD_AUDIO_TRACE_LEN;

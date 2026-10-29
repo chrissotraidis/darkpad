@@ -23,6 +23,8 @@ NSString *const PDDefGraphicsProfile = @"pd.graphics.profile";
 NSString *const PDDefLookDegPerPoint  = @"pd.look.degPerPoint";
 NSString *const PDDefLookDegPerPointY = @"pd.look.degPerPointY";
 NSString *const PDDefInvertY          = @"pd.look.invertY";
+NSString *const PDDefMouseSensitivity = @"pd.mouse.sensitivity";
+NSString *const PDDefMouseInvertY = @"pd.mouse.invertY";
 
 NSString *const PDDefTouchMode        = @"pd.touch.mode";
 NSString *const PDDefButtonScale      = @"pd.touch.buttonScale";
@@ -65,8 +67,14 @@ void PDDefaultsRegister(void)
 		PDDefLookDegPerPoint: @0.30f,
 		PDDefLookDegPerPointY: @0.30f,
 		PDDefInvertY: @NO,
+		PDDefMouseSensitivity: @2.5f,
+		PDDefMouseInvertY: @NO,
 
+#if TARGET_OS_MACCATALYST
+		PDDefTouchMode: @2,
+#else
 		PDDefTouchMode: @(0),   // auto
+#endif
 		PDDefButtonScale: @1.0f,
 		// bean's own number, tuned on his device over a shipping port's life
 		// (touch_overlay_uikit.mm:48). The chips are drawn bean's way now - a
@@ -201,6 +209,11 @@ void PDDefaultsApplyToEngine(void)
 		(long)PDDefInt(PDDefRefreshHz), (int)PDSettingsViewController.isPresented);
 
 	NSInteger profile = PDDefInt(PDDefGraphicsProfile);
+#if TARGET_OS_MACCATALYST
+	extern void inputMouseSetSpeed(float x, float y);
+	const float sensitivity = fminf(10.0f, fmaxf(0.1f, PDDefFloat(PDDefMouseSensitivity)));
+	inputMouseSetSpeed(sensitivity, PDDefBool(PDDefMouseInvertY) ? -sensitivity : sensitivity);
+#endif
 	if (profile < 0 || profile > 2) profile = 0;
 	const BOOL enhanced = profile == 1;
 	const BOOL remaster = profile == 2;

@@ -61,6 +61,11 @@ static NSString *const kArrowsOffStick = @"pd.controller.arrowsOffStick";
  */
 static void pdRemoveArrowStickBinds(void)
 {
+#if TARGET_OS_MACCATALYST
+	// Physical keyboard controls are part of the desktop game. The iOS
+	// controller-to-arrow workaround must not erase the player's bindings.
+	return;
+#else
 	static const char *const stickKeys[] = { "STICK_XNEG", "STICK_XPOS", "STICK_YNEG", "STICK_YPOS" };
 	static const char *const arrows[] = { "LEFT", "RIGHT", "DOWN", "UP" };
 	for (int player = 0; player < 4; player++) {
@@ -75,6 +80,7 @@ static void pdRemoveArrowStickBinds(void)
 		}
 	}
 	inputSaveBinds();
+#endif
 }
 
 @implementation PDController {
@@ -138,7 +144,7 @@ static void pdRemoveArrowStickBinds(void)
 	// Before the engine starts, pd.ini's absence means nobody has bindings yet.
 	NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
 	if (![defaults boolForKey:kDefaultLayoutDecided]) {
-		NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+		NSString *docs = PDShell.shared.documentsPath;
 		_applyDefaultLayout = ![NSFileManager.defaultManager
 			fileExistsAtPath:[docs stringByAppendingPathComponent:@"pd.ini"]];
 		if (!_applyDefaultLayout) [defaults setBool:YES forKey:kDefaultLayoutDecided];
@@ -274,7 +280,7 @@ static void pdPadTrace(GCExtendedGamepad *gp)
 		const char *e = getenv("PD_PAD_TRACE");
 		enabled = e && !strcmp(e, "1");
 		if (enabled) {
-			NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+			NSString *docs = PDShell.shared.documentsPath;
 			out = fopen([docs stringByAppendingPathComponent:@"pad-trace.txt"].fileSystemRepresentation, "w");
 			enabled = out != NULL;
 		}
@@ -318,12 +324,14 @@ static void pdPadTrace(GCExtendedGamepad *gp)
 
 - (void)tick
 {
+#if !TARGET_OS_MACCATALYST
 	if (![NSUserDefaults.standardUserDefaults boolForKey:kArrowsOffStick]) {
 		pdRemoveArrowStickBinds();
 		configSave("$S/pd.ini");
 		[NSUserDefaults.standardUserDefaults setBool:YES forKey:kArrowsOffStick];
 		NSLog(@"perfectdark: [pad] arrow keys removed from the N64 stick binds");
 	}
+#endif
 	if (_applyDefaultLayout) {
 		_applyDefaultLayout = NO;
 		NSString *result = [PDController applyGoldenpadLayout];

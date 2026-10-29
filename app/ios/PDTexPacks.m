@@ -167,7 +167,20 @@ static BOOL pdNameIsRightWayUpPlusHd(NSString *name)
 + (NSArray<NSString *> *)prepare
 {
 	NSAssert(NSThread.isMainThread, @"pre-engine, UIKit's thread");
+	return [self prepareOnWorker:NO];
+}
 
++ (void)prepareWithCompletion:(dispatch_block_t)completion
+{
+	NSAssert(NSThread.isMainThread, @"pre-engine, UIKit's thread");
+	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		[self prepareOnWorker:YES];
+		dispatch_async(dispatch_get_main_queue(), completion);
+	});
+}
+
++ (NSArray<NSString *> *)prepareOnWorker:(BOOL)worker
+{
 	NSString *dir = self.dropDir;
 	NSMutableArray<NSString *> *log = [NSMutableArray array];
 
@@ -188,27 +201,36 @@ static BOOL pdNameIsRightWayUpPlusHd(NSString *name)
 		unsigned long long bytes = [[NSFileManager.defaultManager
 			attributesOfItemAtPath:src error:NULL][NSFileSize] unsignedLongLongValue];
 		NSLog(@"perfectdark: [texpack] unpacking %@ (%llu bytes) into %@", name, bytes, dir);
-		[PDXbla showPreparingNote:[NSString stringWithFormat:@"Unpacking the texture pack\n%@", name]];
-
-		__block BOOL ok = NO;
-		dispatch_group_t extraction = dispatch_group_create();
-		dispatch_group_async(extraction, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-			// Absolute paths go through fsFullPath() untouched (fs.c:115), so
-			// this needs no fsInit() - the same property D-020 leans on.
-			ok = archiveExtract(src.fileSystemRepresentation, dir.fileSystemRepresentation) > 0;
-		});
+		dispatch_block_t show = ^{
+			[PDXbla showPreparingNote:[NSString stringWithFormat:@"Unpacking the texture pack\n%@", name]];
+		};
+		if (worker) dispatch_async(dispatch_get_main_queue(), show);
+		else show();
 
 		NSTimeInterval started = NSDate.timeIntervalSinceReferenceDate;
-		// Completion synchronizes the worker result before we inspect it. A
-		// plain shared BOOL races and can strand launch during a large import.
-		while (dispatch_group_wait(extraction, DISPATCH_TIME_NOW) != 0) {
-			@autoreleasepool {
-				[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode
-				                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+		__block BOOL ok = NO;
+		if (worker) {
+			ok = archiveExtract(src.fileSystemRepresentation, dir.fileSystemRepresentation) > 0;
+		} else {
+			dispatch_group_t extraction = dispatch_group_create();
+			dispatch_group_async(extraction, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+				// Absolute paths go through fsFullPath() untouched (fs.c:115), so
+				// this needs no fsInit() - the same property D-020 leans on.
+				ok = archiveExtract(src.fileSystemRepresentation, dir.fileSystemRepresentation) > 0;
+			});
+
+			// Completion synchronizes the worker result before we inspect it. A
+			// plain shared BOOL races and can strand launch during a large import.
+			while (dispatch_group_wait(extraction, DISPATCH_TIME_NOW) != 0) {
+				@autoreleasepool {
+					[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode
+					                    beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+				}
 			}
 		}
 		NSTimeInterval secs = NSDate.timeIntervalSinceReferenceDate - started;
-		[PDXbla hidePreparingNote];
+		if (worker) dispatch_async(dispatch_get_main_queue(), ^{ [PDXbla hidePreparingNote]; });
+		else [PDXbla hidePreparingNote];
 
 		if (ok) {
 			[@"" writeToFile:done atomically:YES encoding:NSUTF8StringEncoding error:NULL];

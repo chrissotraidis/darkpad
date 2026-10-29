@@ -1,0 +1,59 @@
+Mac Catalyst compatibility for the pinned ANGLE revision.
+
+Use the existing Metal device-name vendor detection because the IOKit vendor
+helper is desktop-macOS-only. Link IOKit for the existing Catalyst machine-model
+query. Load framework entry points from Contents/Frameworks next to the app's
+Contents/MacOS executable directory. iOS and desktop macOS paths are unchanged.
+
+diff --git a/BUILD.gn b/BUILD.gn
+index ecaf0f3..c80bcb0 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -770,6 +770,9 @@ angle_static_library("angle_gpu_info_util") {
+       frameworks += [ "IOKit.framework" ]
+       sources += libangle_gpu_info_util_mac_sources
+     }
++    if (is_ios && target_environment == "catalyst") {
++      frameworks += [ "IOKit.framework" ]
++    }
+     if (is_ios && !angle_enable_cgl) {
+       sources += libangle_gpu_info_util_ios_sources
+     }
+diff --git a/src/common/system_utils_posix.cpp b/src/common/system_utils_posix.cpp
+index 7b0b868..eab7635 100644
+--- a/src/common/system_utils_posix.cpp
++++ b/src/common/system_utils_posix.cpp
+@@ -198,7 +198,10 @@ void *OpenSystemLibraryWithExtensionAndGetError(const char *libraryName,
+     std::string directory;
+     if (searchType == SearchType::ModuleDir)
+     {
+-#if ANGLE_PLATFORM_IOS_FAMILY
++#if ANGLE_PLATFORM_MACCATALYST
++        // Catalyst executables live in Contents/MacOS, alongside Contents/Frameworks.
++        directory = GetExecutableDirectory() + "/../Frameworks/";
++#elif ANGLE_PLATFORM_IOS_FAMILY
+         // On iOS, shared libraries must be loaded from within the app bundle.
+         directory = GetExecutableDirectory() + "/Frameworks/";
+ #elif ANGLE_PLATFORM_FUCHSIA
+diff --git a/src/libANGLE/renderer/metal/mtl_utils.mm b/src/libANGLE/renderer/metal/mtl_utils.mm
+index 6912d1c..b41a6ad 100644
+--- a/src/libANGLE/renderer/metal/mtl_utils.mm
++++ b/src/libANGLE/renderer/metal/mtl_utils.mm
+@@ -284,7 +284,7 @@ uint32_t GetDeviceVendorIdFromName(id<MTLDevice> metalDevice)
+     }
+ }
+ 
+-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
++#if TARGET_OS_OSX
+ uint32_t GetDeviceVendorIdFromIOKit(id<MTLDevice> device)
+ {
+     return angle::GetVendorIDFromMetalDeviceRegistryID(device.registryID);
+@@ -823,7 +823,7 @@ MTLScissorRect GetScissorRect(const gl::Rectangle &rect, NSUInteger screenHeight
+ uint32_t GetDeviceVendorId(id<MTLDevice> metalDevice)
+ {
+     uint32_t vendorId = 0;
+-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
++#if TARGET_OS_OSX
+     vendorId = GetDeviceVendorIdFromIOKit(metalDevice);
+ #endif
+     if (!vendorId)
