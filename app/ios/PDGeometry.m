@@ -387,11 +387,13 @@ void pdGeoFrame(void)
 	UIWindow *hudWindow = hudHost.window;
 	UIEdgeInsets hudInsets = hudWindow.safeAreaInsets;
 	CGFloat hudHeight = hudHost.bounds.size.height;
+#if !TARGET_OS_MACCATALYST
 	if (hudWindow.bounds.size.width > hudWindow.bounds.size.height && hudInsets.top > 24
 		&& hudInsets.left == 0 && hudInsets.right == 0) {
 		// SDL can retain portrait insets after its window rotates.
 		hudInsets.left = hudInsets.right = MAX(hudInsets.top, hudInsets.bottom);
 	}
+#endif
 	sHudSideInset[0] = hudHeight > 0 ? MIN(.25, hudInsets.left / hudHeight) : 0;
 	sHudSideInset[1] = hudHeight > 0 ? MIN(.25, hudInsets.right / hudHeight) : 0;
 	// The renderer is about to ask the EGL surface for its size. On an iPhone

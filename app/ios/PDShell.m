@@ -25,6 +25,7 @@ extern void *pdAngleGetHostView(void);
 extern int lvIsPaused(void);
 #import "PDWatchdog.h"
 #import "PDGeometry.h"
+#import "PDMac.h"
 
 #include <stdatomic.h>
 #include <mach/mach.h>
@@ -62,10 +63,29 @@ extern int lvIsPaused(void);
 		_queue = [NSMutableArray array];
 		_deepLinks = [NSMutableArray array];
 		_lock = [NSLock new];
-		NSArray *d = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		NSArray *d = NSSearchPathForDirectoriesInDomains(
+#if TARGET_OS_MACCATALYST
+			NSApplicationSupportDirectory,
+#else
+			NSDocumentDirectory,
+#endif
+			NSUserDomainMask, YES);
 		NSArray *c = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
 		_documentsPath = d.count ? d[0] : NSTemporaryDirectory();
 		_cachesPath = c.count ? c[0] : NSTemporaryDirectory();
+#if TARGET_OS_MACCATALYST
+		// A personal Mac build may be unsandboxed. Never place game data or
+		// temporary engine files directly in the user's Documents/Caches root.
+		_documentsPath = [_documentsPath stringByAppendingPathComponent:@"DarkPad"];
+		_cachesPath = [_cachesPath stringByAppendingPathComponent:@"DarkPad"];
+		for (NSString *path in @[ _documentsPath, _cachesPath ]) {
+			NSError *error = nil;
+			if (![NSFileManager.defaultManager createDirectoryAtPath:path
+				withIntermediateDirectories:YES attributes:nil error:&error]) {
+				NSLog(@"DarkPad: cannot prepare %@: %@", path, error.localizedDescription);
+			}
+		}
+#endif
 	}
 	return self;
 }
@@ -405,6 +425,11 @@ static UIWindowScene *pdForegroundScene(void)
 		if (![sc isKindOfClass:UIWindowScene.class]) {
 			continue;
 		}
+#if TARGET_OS_MACCATALYST
+		// Only our configured window scene can host the game. Catalyst also
+		// creates transient scenes for menus and other native windows.
+		if (![sc.delegate isKindOfClass:PDSceneDelegate.class]) continue;
+#endif
 		if (sc.activationState == UISceneActivationStateForegroundActive) {
 			return (UIWindowScene *)sc;
 		}
@@ -485,7 +510,13 @@ static void pdInstallOverlayOnce(void)
 	}
 
 	UIWindow *win = nil;
-#if TARGET_OS_VISION
+#if TARGET_OS_MACCATALYST
+	// The renderer owns the game window; other native windows may be visible
+	// while Catalyst restores fullscreen or presents a system panel.
+	pdGraftSDLWindows();
+	win = ((__bridge UIView *)pdAngleGetHostView()).window;
+	if (!win) return;
+#elif TARGET_OS_VISION
 	// visionOS only, and it has to come FIRST here (D-047). Under the SwiftUI
 	// entry there are TWO normal-level windows on the scene - SwiftUI's own
 	// WindowGroup window, which hosts PDHostViewController and the ornament,
@@ -545,6 +576,7 @@ static void pdInstallOverlayOnce(void)
 		NSStringFromCGRect(win.bounds), win.windowScene ? @"yes" : @"NO",
 		NSStringFromClass(win.rootViewController.class));
 	[PDTouchOverlay installInWindow:win];
+	PDMacConfigureWindow(win);
 	// visionOS: without this the pad's buttons become gaze-pinch events and the
 	// game never sees them (a no-op on iOS). PDController.m explains.
 	[PDController claimGamepadEventsInWindow:win];

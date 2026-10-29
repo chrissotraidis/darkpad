@@ -38,7 +38,14 @@ python3 tests/network_coop_results.py build/src/src/game/endscreen.c
 python3 tests/network_weapon_progress.py build/src/src/game/training.c
 python3 tests/network_session_exit.py build/src
 python3 tests/public_package.py
+python3 tests/macos_package.py
+python3 tests/macos_input.py
 ```
+
+For Mac Catalyst changes, build the personal app with
+`scripts/build-personal-macos.sh /tmp/DarkPad-Mac.zip` and check first launch,
+window resizing/fullscreen, restart, settings and gameplay input on macOS.
+The older desktop reference build does not exercise the shared app.
 
 When you move UPSTREAM_PIN, apply the overlay with scripts/apply-overlay.sh and
 fix any patch that fails by rebasing it; never drop a fix to make the series

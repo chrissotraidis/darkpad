@@ -21,7 +21,8 @@ BUILDNUM="$(date -u +%Y%m%d%H%M)"
 
 test -d work/angle-xcframeworks/libEGL.xcframework || scripts/make-angle-xcframeworks.sh
 test -f work/deps-iphonesimulator/lib/libSDL2.a || test -f work/deps-iphoneos/lib/libSDL2.a \
-  || { echo "FATAL: no SDL2 for iphoneos or iphonesimulator (scripts/build-apple-deps.sh)" >&2; exit 1; }
+  || test -f work/deps-maccatalyst/lib/libSDL2.a \
+  || { echo "FATAL: no SDL2 for iOS or Mac Catalyst (scripts/build-apple-deps.sh)" >&2; exit 1; }
 
 # PD_PUBLIC=1 compiles the :8775 console bridge out (charter: "compiled out of
 # public builds, on in every OTA build"). It is a preprocessor define on the

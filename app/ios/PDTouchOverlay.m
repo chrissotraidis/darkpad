@@ -494,7 +494,7 @@ static const PDButtonSpec kMenuButtons[] = {
 	BOOL _clickQueued;
 	CGPoint _clickQueuedPoint;
 
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	// UIImpactFeedbackGenerator is unavailable on visionOS — the headset has no
 	// haptics. The Haptics setting row still exists and still persists; it just
 	// drives nothing there.
@@ -1638,7 +1638,7 @@ static const CGFloat kWheelRadius = 32.0;
 	if (sel && _hideBadge && !_hideBadge.hidden
 			&& hypot(p.x - _hideBadge.center.x, p.y - _hideBadge.center.y) <= kHideBadgeRadius + 4.0) {
 		[self toggleHiddenForChip:sel];
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 		[_haptics impactOccurred];
 #endif
 		return [NSString stringWithFormat:@"badge:%@ hidden=%d", sel.label, (int)[self userHid:sel]];
@@ -1656,7 +1656,7 @@ static const CGFloat kWheelRadius = 32.0;
 	_dragStartUnit = _dragUnit;
 	chip.held = YES;
 	[self placeHideBadge];
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	[_haptics impactOccurred];
 #endif
 	return [NSString stringWithFormat:@"select:%@ badge=%d", chip.label, (int)(_hideBadge && !_hideBadge.hidden)];
@@ -1737,7 +1737,7 @@ static const CGFloat kWheelRadius = 32.0;
 	// Each labeled chip carries its own opacity; keep the view fully opaque -
 	// dimming the whole layer would take the stick and the editor with it.
 	self.alpha = 1.0;
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	_haptics = PDDefBool(PDDefHaptics)
 		? [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight] : nil;
 #endif
@@ -1776,7 +1776,13 @@ static const CGFloat kWheelRadius = 32.0;
 	// Otherwise taps bypass the normalized pointer and reach SDL mouse input.
 	// Connection notifications can arrive during editing. Keep Done reachable;
 	// endLayoutEditing reapplies the selected visibility mode.
+#if TARGET_OS_MACCATALYST
+	// The utility button is a sibling, so hiding touch input keeps settings
+	// reachable while mouse/keyboard events go straight to SDL.
+	BOOL hide = YES;
+#else
 	BOOL hide = !_editing && ((mode == 2) || (mode == 0 && self.padConnected && !_menuOpen));
+#endif
 	const BOOL wasHidden = self.hidden;
 	self.hidden = hide;
 	if (!hide) {
@@ -2315,7 +2321,7 @@ static const CGFloat kWheelRadius = 32.0;
 			_wheelOrigin = p;
 			_wheelStick = CGVectorMake(0, 0);
 		}
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 		[_haptics impactOccurred];
 #endif
 		return;
@@ -2940,7 +2946,7 @@ static CGVector pdStickCurve(CGVector raw)
 	}
 	_rollDir = (dir < 0) ? -1 : +1;
 	_rollFrames = kRollFrames;
-#if !TARGET_OS_VISION
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
 	[_haptics impactOccurred];
 #endif
 	NSLog(@"perfectdark: [touch] roll %@ (%@)", _rollDir < 0 ? @"LEFT" : @"RIGHT", source);

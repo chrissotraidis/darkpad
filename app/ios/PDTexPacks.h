@@ -51,6 +51,10 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (NSArray<NSString *> *)prepare;
 
+/** Prepare on a worker without spinning the main run loop. Completion and
+    progress UI run on the main thread, before the engine starts. */
++ (void)prepareWithCompletion:(dispatch_block_t)completion;
+
 /** The name the shell would select — a pack folder, or nil. */
 + (nullable NSString *)preferredPack;
 

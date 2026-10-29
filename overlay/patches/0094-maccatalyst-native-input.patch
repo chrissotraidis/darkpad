@@ -1,0 +1,168 @@
+Mac Catalyst: native panels own game input while they are open.
+
+GCKeyboard updates SDL independently of UIKit's responder, and pausing level
+simulation does not pause the game's menus. Neutralize engine input reads while
+the native shell is modal or inactive, preserving controller device events and
+consuming text/relative motion rather than replaying them when the panel closes.
+The compile-time zero leaves the iOS, visionOS and desktop paths unchanged.
+
+--- a/port/src/input.c
++++ b/port/src/input.c
+@@ -13,6 +13,14 @@
+ #include "utils.h"
+ #include "system.h"
+ #include "fs.h"
++
++#if defined(PLATFORM_IOS) && TARGET_OS_MACCATALYST
++// Native settings must also block SDL's independent keyboard/controller path.
++extern int PDMacInputBlocked(void);
++#define inputShellBlocked() PDMacInputBlocked()
++#else
++#define inputShellBlocked() 0
++#endif
+ 
+ #if !SDL_VERSION_ATLEAST(2, 0, 14)
+ // this was added in 2.0.14
+@@ -507,6 +515,17 @@
+ 
+ static int inputEventFilter(void *data, SDL_Event *event)
+ {
++	if (inputShellBlocked()) {
++		switch (event->type) {
++			case SDL_MOUSEWHEEL:
++			case SDL_MOUSEBUTTONDOWN:
++			case SDL_KEYDOWN:
++			case SDL_CONTROLLERBUTTONDOWN:
++			case SDL_CONTROLLERAXISMOTION:
++			case SDL_TEXTINPUT:
++				return 0;
++		}
++	}
+ 	switch (event->type) {
+ 		case SDL_CONTROLLERDEVICEADDED:
+ 			for (s32 i = firstController; i < INPUT_MAX_CONTROLLERS; ++i) {
+@@ -1437,6 +1456,11 @@
+ 		return -1;
+ 	}
+ 
++	if (inputShellBlocked()) {
++		memset(npad, 0, sizeof(*npad));
++		return 0;
++	}
++
+ 	npad->button = 0;
+ 
+ 	// Typing: the keyboard's keys are letters, not buttons. A controller
+@@ -1569,6 +1593,12 @@
+ 	mouseX = mx;
+ 	mouseY = my;
+ 
++	if (inputShellBlocked()) {
++		mouseDX = mouseDY = 0;
++		mouseButtons = 0;
++		return;
++	}
++
+ 	// if MLOCK_AUTO is enabled, disable cursor if mouse is unlocked
+ 	// and we haven't moved it for a few seconds
+ 	if (mouseLockMode == MLOCK_AUTO && !mouseLocked) {
+@@ -1603,6 +1633,13 @@
+ 	}
+ 
+ 	inputMouseApplyCursor();
++
++	if (inputShellBlocked()) {
++		lastKey = 0;
++		textQueueHead = textQueueLen = 0;
++		// A key used in a native panel stays consumed until it is released.
++		memcpy(keyLatched, SDL_GetKeyboardState(NULL), sizeof(keyLatched));
++	}
+ 
+ 	memcpy(vkLastFrameState, vkFrameState, sizeof(vkFrameState));
+ 
+@@ -1909,6 +1946,8 @@
+ 
+ s32 inputKeyPressed(u32 vk)
+ {
++	if (inputShellBlocked()) return 0;
++
+ 	if (vk >= VK_KEYBOARD_BEGIN && vk < VK_MOUSE_BEGIN) {
+ 		const u8 *state = SDL_GetKeyboardState(NULL);
+ 		const u32 sc = vk - VK_KEYBOARD_BEGIN;
+@@ -1973,6 +2012,8 @@
+ 
+ s32 inputKeyPressedThisFrame(u32 vk)
+ {
++	if (inputShellBlocked()) return 0;
++
+ 	if (vk < VK_KEYBOARD_BEGIN || vk >= VK_JOY_BEGIN) {
+ 		return 0;
+ 	}
+@@ -2000,6 +2041,7 @@
+ 
+ void inputLockMouse(s32 lock)
+ {
++	if (inputShellBlocked()) lock = 0;
+ 	mouseLocked = !!lock;
+ 	SDL_SetRelativeMouseMode(mouseLocked);
+ }
+@@ -2028,12 +2070,22 @@
+ 
+ void inputMouseGetRawDelta(s32 *dx, s32 *dy)
+ {
++	if (inputShellBlocked()) {
++		if (dx) *dx = 0;
++		if (dy) *dy = 0;
++		return;
++	}
+ 	if (dx) *dx = mouseDX;
+ 	if (dy) *dy = mouseDY;
+ }
+ 
+ void inputMouseGetScaledDelta(f32* dx, f32* dy)
+ {
++	if (inputShellBlocked()) {
++		if (dx) *dx = 0;
++		if (dy) *dy = 0;
++		return;
++	}
+ 	f32 mdx = 0.f, mdy = 0.f;
+ 	s32 rawdx = mouseDX, rawdy = mouseDY;
+ 	if (g_NetMode != NETMODE_NONE) netInputMouseRaw(&rawdx, &rawdy);
+@@ -2058,6 +2110,11 @@
+ 
+ void inputMouseGetAbsScaledDelta(f32* dx, f32* dy)
+ {
++	if (inputShellBlocked()) {
++		if (dx) *dx = 0;
++		if (dy) *dy = 0;
++		return;
++	}
+ 	f32 mdx = 0.f, mdy = 0.f;
+ 	s32 rawdx = mouseDX, rawdy = mouseDY;
+ 	if (g_NetMode != NETMODE_NONE) netInputMouseRaw(&rawdx, &rawdy);
+@@ -2089,7 +2146,7 @@
+ 
+ s32 inputMouseIsEnabled(void)
+ {
+-	return mouseEnabled;
++	return mouseEnabled && !inputShellBlocked();
+ }
+ 
+ void inputMouseEnable(s32 enabled)
+@@ -2212,6 +2269,7 @@
+ 
+ s32 inputGetLastKey(void)
+ {
++	if (inputShellBlocked()) lastKey = 0;
+ 	return lastKey;
+ }
+ 
+@@ -2237,6 +2295,7 @@
+ 
+ char inputGetLastTextChar(void)
+ {
++	if (inputShellBlocked()) textQueueHead = textQueueLen = 0;
+ 	return textQueueLen > 0 ? textQueue[textQueueHead] : 0;
+ }
+ 

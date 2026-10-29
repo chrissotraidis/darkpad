@@ -65,6 +65,14 @@
 // app/gfx/gfx_angle_egl.mm
 extern void pdAngleSuspend(void);
 extern void pdAngleResume(void);
+#if TARGET_OS_MACCATALYST
+extern void *pdAngleGetHostView(void);
+
+static UIWindowScene *pdMacGameScene(void)
+{
+	return ((__bridge UIView *)pdAngleGetHostView()).window.windowScene;
+}
+#endif
 
 static BOOL pdReplayRun = NO;
 
@@ -161,6 +169,18 @@ static int pdSDLEventWatch(void *userdata, SDL_Event *event)
 	return 0;
 }
 
+static BOOL pdHandlesSceneLifecycle(UIScene *scene)
+{
+#if TARGET_OS_MACCATALYST
+	// Catalyst also posts notifications for menu and temporary native windows.
+	// Their retirement must not stop the game window's display link.
+	return scene != nil && scene == pdMacGameScene();
+#else
+	(void)scene;
+	return YES;
+#endif
+}
+
 static void pdRegisterLifecycle(void)
 {
 	NSNotificationCenter *nc = NSNotificationCenter.defaultCenter;
@@ -171,6 +191,10 @@ static void pdRegisterLifecycle(void)
 	[nc addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil
 		usingBlock:^(NSNotification *note) {
 			(void)note;
+#if TARGET_OS_MACCATALYST
+			UIWindowScene *gameScene = pdMacGameScene();
+			if (gameScene && gameScene.activationState == UISceneActivationStateForegroundActive) return;
+#endif
 			PDLifecycle("app BACKGROUND -> pdAngleSuspend + pacer suspend");
 			NSLog(@"perfectdark: background — pausing the pacer and the renderer");
 			pdAngleSuspend();
@@ -180,6 +204,10 @@ static void pdRegisterLifecycle(void)
 	[nc addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:nil
 		usingBlock:^(NSNotification *note) {
 			(void)note;
+#if TARGET_OS_MACCATALYST
+			UIWindowScene *gameScene = pdMacGameScene();
+			if (gameScene && gameScene.activationState == UISceneActivationStateBackground) return;
+#endif
 			PDLifecycle("app FOREGROUND -> pdAngleResume + pacer resume");
 			NSLog(@"perfectdark: foreground — resuming");
 			pdAngleResume();
@@ -196,11 +224,13 @@ static void pdRegisterLifecycle(void)
 	// no-op when they are already in that state, so the doubling costs nothing
 	// and the save surviving is what matters (swipe-kill is SIGKILL).
 	[nc addObserverForName:UISceneWillDeactivateNotification object:nil queue:nil
-		usingBlock:^(NSNotification *note) { (void)note; pdSaveConfigNow(); }];
+		usingBlock:^(NSNotification *note) {
+			if (pdHandlesSceneLifecycle(note.object)) pdSaveConfigNow();
+		}];
 
 	[nc addObserverForName:UISceneDidEnterBackgroundNotification object:nil queue:nil
 		usingBlock:^(NSNotification *note) {
-			(void)note;
+			if (!pdHandlesSceneLifecycle(note.object)) return;
 			PDLifecycle("scene BACKGROUND -> pdAngleSuspend + pacer suspend");
 			NSLog(@"perfectdark: scene background — pausing the pacer and the renderer");
 			pdAngleSuspend();
@@ -209,12 +239,101 @@ static void pdRegisterLifecycle(void)
 
 	[nc addObserverForName:UISceneWillEnterForegroundNotification object:nil queue:nil
 		usingBlock:^(NSNotification *note) {
-			(void)note;
+			if (!pdHandlesSceneLifecycle(note.object)) return;
 			PDLifecycle("scene FOREGROUND -> pdAngleResume + pacer resume");
 			NSLog(@"perfectdark: scene foreground — resuming");
 			pdAngleResume();
 			[PDPacing.shared resume];
 		}];
+}
+
+static int pdStartEngine(int argc, char *argv[])
+{
+	@autoreleasepool {
+		// Before SDL's audio device opens (videoInit/audioInit are inside
+		// pdEngineMain): SDL configures the session as `.ambient`, which the
+		// Ring/Silent switch mutes, so ours is set first and re-asserted on
+		// drift afterwards, off the game thread (D-033). Not in a replay -
+		// those run --no-sound and an active session there is a device opened
+		// for nothing.
+		if (!pdReplayRun) {
+			[PDAudio begin];
+		}
+
+#ifndef PD_PUBLIC
+		// Before the unpack, not after: the unpack is the longest thing that
+		// happens before the engine exists, and it is the one the gate most
+		// needs to be able to watch. `state` answers without an engine.
+		[PDBridge start];
+#endif
+
+		// The one-time XBLA unpack, before the engine and with a progress
+		// screen up (D-020). After this the engine's own xblaImportGetStfsPath()
+		// is a scan and a stat rather than a quarter of a gigabyte on the
+		// thread UIKit draws from.
+#if !TARGET_OS_MACCATALYST
+		[PDXbla runUnpackUntilReady];
+#endif
+		// GE Plus's two files: looked for once now, on a background queue, so the
+		// settings page has an answer the first time it opens (D-072).
+		[PDXbla warmGoldenEyeScan:nil];
+
+		// A texture pack dropped into Files: unpack it and write the row-order
+		// marker BEFORE the engine's first texture load, for the same reason
+		// the XBLA unpack is here (D-020). See PDTexPacks.h.
+#if !TARGET_OS_MACCATALYST
+		[PDTexPacks prepare];
+#endif
+
+		// Upstream's inputInit() (input.c:846-873) turns on every SDL HIDAPI
+		// driver hint, Steam included. On iOS SDL's HIDAPI backend is
+		// src/hidapi/ios/hid.m, and with SDL_HINT_JOYSTICK_HIDAPI_STEAM set it
+		// creates a CBCentralManager the moment the game-controller subsystem
+		// starts - and iOS aborts any app that touches CoreBluetooth without
+		// NSBluetoothAlwaysUsageDescription (the 0.0.0.2/0.0.0.3 device crash,
+		// "Abort trap: 6" under CoreBluetooth on a dispatch queue; the sim does
+		// not enforce it, so the gate stayed green). Pads arrive through
+		// GCController (PDController) and SDL's own iOS joystick backend;
+		// HIDAPI on iOS only ever meant Steam Controllers over BLE. OVERRIDE
+		// priority outranks the engine's later plain SDL_SetHint calls.
+		SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_HIDAPI, "0", SDL_HINT_OVERRIDE);
+		SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0", SDL_HINT_OVERRIDE);
+
+		// Half of the keyboard trap (D-033, the user on device): creating a
+		// profile offers "type with the iOS keyboard", and once it was up there
+		// was no way down - force-quit. SDL only calls SDL_StopTextInput() from
+		// textFieldShouldReturn: when this hint is set, and nothing set it
+		// (SDL_uikitviewcontroller.m:587-596). The other half is overlay 0024,
+		// which makes the same Return ACCEPT the name rather than be dropped on
+		// the floor by inputTextHandler().
+		SDL_SetHintWithPriority(SDL_HINT_RETURN_KEY_HIDES_IME, "1", SDL_HINT_OVERRIDE);
+
+#if !TARGET_OS_VISION && !TARGET_OS_MACCATALYST
+		// The "picture squeezed into the left of the screen until relaunch"
+		// fault (D-077). The engine's window is RESIZABLE, so with no hint
+		// SDL's view controller claims portrait as well as landscape
+		// (UIKit_GetSupportedOrientations). And on EVERY keyboard notification
+		// in the process - the Files picker's search field raises one - SDL's
+		// view controller recomputes its view frame (updateKeyboard ->
+		// UIKit_ComputeViewFrame), deciding landscape vs portrait from
+		// UIApplication.statusBarOrientation, which under the UIScene life
+		// cycle is Unknown. Unknown plus "portrait is supported" = portrait:
+		// SDL laid its view out 420x912 on a 912x420 scene and kept it. The
+		// app is landscape-only on iPhone and iPad (Info.plist); saying so to
+		// SDL makes that computation answer landscape whatever the status bar
+		// claims. PDGeometry.m repairs any portrait shape that still gets in.
+		SDL_SetHintWithPriority(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight", SDL_HINT_OVERRIDE);
+#endif
+
+		[PDPacing.shared startWithBypass:pdReplayRun];
+		PDPacing.shared.targetHz = PDDefInt(PDDefRefreshHz) >= 120 ? 120 : 60;
+		[PDController.shared start];
+
+		PDShell.shared.replayRun = pdReplayRun;
+		PDShell.shared.engineRunning = YES;
+	}
+
+	return pdEngineMain(argc, (const char **)argv);
 }
 
 int pdSDLMain(int argc, char *argv[])
@@ -248,88 +367,23 @@ int pdSDLMain(int argc, char *argv[])
 		// romdataInit() (romdata.c:204-238) and a phone has nowhere to put an
 		// SDL message box. This returns only once a ROM the engine will accept
 		// is in Documents.
-		[PDOnboarding runUntilRomPresent];
-
-		// Before SDL's audio device opens (videoInit/audioInit are inside
-		// pdEngineMain): SDL configures the session as `.ambient`, which the
-		// Ring/Silent switch mutes, so ours is set first and re-asserted on
-		// drift afterwards, off the game thread (D-033). Not in a replay -
-		// those run --no-sound and an active session there is a device opened
-		// for nothing.
-		if (!pdReplayRun) {
-			[PDAudio begin];
-		}
-
-#ifndef PD_PUBLIC
-		// Before the unpack, not after: the unpack is the longest thing that
-		// happens before the engine exists, and it is the one the gate most
-		// needs to be able to watch. `state` answers without an engine.
-		[PDBridge start];
+#if TARGET_OS_MACCATALYST
+        // Return to AppKit between startup steps; spinning NSRunLoop here
+        // draws UIKit but never dispatches the Mac's clicks or keyboard.
+        [PDOnboarding beginWithCompletion:^{
+            [PDXbla prepareWithCompletion:^{
+                [PDTexPacks prepareWithCompletion:^{ pdStartEngine(argc, argv); }];
+            }];
+        }];
+#else
+        [PDOnboarding runUntilRomPresent];
 #endif
-
-		// The one-time XBLA unpack, before the engine and with a progress
-		// screen up (D-020). After this the engine's own xblaImportGetStfsPath()
-		// is a scan and a stat rather than a quarter of a gigabyte on the
-		// thread UIKit draws from.
-		[PDXbla runUnpackUntilReady];
-		// GE Plus's two files: looked for once now, on a background queue, so the
-		// settings page has an answer the first time it opens (D-072).
-		[PDXbla warmGoldenEyeScan:nil];
-
-		// A texture pack dropped into Files: unpack it and write the row-order
-		// marker BEFORE the engine's first texture load, for the same reason
-		// the XBLA unpack is here (D-020). See PDTexPacks.h.
-		[PDTexPacks prepare];
-
-		// Upstream's inputInit() (input.c:846-873) turns on every SDL HIDAPI
-		// driver hint, Steam included. On iOS SDL's HIDAPI backend is
-		// src/hidapi/ios/hid.m, and with SDL_HINT_JOYSTICK_HIDAPI_STEAM set it
-		// creates a CBCentralManager the moment the game-controller subsystem
-		// starts - and iOS aborts any app that touches CoreBluetooth without
-		// NSBluetoothAlwaysUsageDescription (the 0.0.0.2/0.0.0.3 device crash,
-		// "Abort trap: 6" under CoreBluetooth on a dispatch queue; the sim does
-		// not enforce it, so the gate stayed green). Pads arrive through
-		// GCController (PDController) and SDL's own iOS joystick backend;
-		// HIDAPI on iOS only ever meant Steam Controllers over BLE. OVERRIDE
-		// priority outranks the engine's later plain SDL_SetHint calls.
-		SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_HIDAPI, "0", SDL_HINT_OVERRIDE);
-		SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0", SDL_HINT_OVERRIDE);
-
-		// Half of the keyboard trap (D-033, the user on device): creating a
-		// profile offers "type with the iOS keyboard", and once it was up there
-		// was no way down - force-quit. SDL only calls SDL_StopTextInput() from
-		// textFieldShouldReturn: when this hint is set, and nothing set it
-		// (SDL_uikitviewcontroller.m:587-596). The other half is overlay 0024,
-		// which makes the same Return ACCEPT the name rather than be dropped on
-		// the floor by inputTextHandler().
-		SDL_SetHintWithPriority(SDL_HINT_RETURN_KEY_HIDES_IME, "1", SDL_HINT_OVERRIDE);
-
-#if !TARGET_OS_VISION
-		// The "picture squeezed into the left of the screen until relaunch"
-		// fault (D-077). The engine's window is RESIZABLE, so with no hint
-		// SDL's view controller claims portrait as well as landscape
-		// (UIKit_GetSupportedOrientations). And on EVERY keyboard notification
-		// in the process - the Files picker's search field raises one - SDL's
-		// view controller recomputes its view frame (updateKeyboard ->
-		// UIKit_ComputeViewFrame), deciding landscape vs portrait from
-		// UIApplication.statusBarOrientation, which under the UIScene life
-		// cycle is Unknown. Unknown plus "portrait is supported" = portrait:
-		// SDL laid its view out 420x912 on a 912x420 scene and kept it. The
-		// app is landscape-only on iPhone and iPad (Info.plist); saying so to
-		// SDL makes that computation answer landscape whatever the status bar
-		// claims. PDGeometry.m repairs any portrait shape that still gets in.
-		SDL_SetHintWithPriority(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight", SDL_HINT_OVERRIDE);
+    }
+#if TARGET_OS_MACCATALYST
+    return 0;
+#else
+    return pdStartEngine(argc, argv);
 #endif
-
-		[PDPacing.shared startWithBypass:pdReplayRun];
-		PDPacing.shared.targetHz = PDDefInt(PDDefRefreshHz) >= 120 ? 120 : 60;
-		[PDController.shared start];
-
-		PDShell.shared.replayRun = pdReplayRun;
-		PDShell.shared.engineRunning = YES;
-	}
-
-	return pdEngineMain(argc, (const char **)argv);
 }
 
 /**

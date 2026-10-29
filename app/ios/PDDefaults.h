@@ -26,6 +26,9 @@ extern NSString *const PDDefGyroInvertY;
 extern NSString *const PDDefLookDegPerPoint;   // float, degrees of view per point of drag
 extern NSString *const PDDefLookDegPerPointY;  // float, the vertical axis on its own
 extern NSString *const PDDefInvertY;           // bool
+// Desktop pointer settings; touch aiming remains independent.
+extern NSString *const PDDefMouseSensitivity;
+extern NSString *const PDDefMouseInvertY;
 
 // Touch layer
 // 0 = auto (hidden while a pad is connected), 1 = always on, 2 = off.

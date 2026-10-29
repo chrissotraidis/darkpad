@@ -5,11 +5,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/dependencies/pins.env"
 cd "$ROOT"
 SDK="${1:-iphonesimulator}"
+SYSROOT="$SDK"
 case "$SDK" in
  iphoneos|iphonesimulator) SYSTEM=iOS; MINOS=15.0 ;;
  macosx) SYSTEM=Darwin; MINOS=12.0 ;;
- *) echo 'usage: build-apple-deps.sh [iphoneos|iphonesimulator|macosx]' >&2; exit 1 ;;
+ maccatalyst) SYSTEM=iOS; SYSROOT=macosx; MINOS=15.0 ;;
+ *) echo 'usage: build-apple-deps.sh [iphoneos|iphonesimulator|macosx|maccatalyst]' >&2; exit 1 ;;
 esac
+if [[ "$SDK" == maccatalyst ]]; then
+ cmake -P "$ROOT/scripts/check-catalyst-cmake.cmake"
+fi
 mkdir -p work/dependencies work/downloads
 SRC="$ROOT/work/dependencies/SDL"
 if [[ ! -d "$SRC/.git" ]]; then
@@ -17,10 +22,22 @@ if [[ ! -d "$SRC/.git" ]]; then
 fi
 [[ "$(git -C "$SRC" rev-parse HEAD)" == "$SDL_COMMIT" ]] || { echo 'SDL pin mismatch' >&2; exit 1; }
 [[ -z "$(git -C "$SRC" status --porcelain)" ]] || { echo 'SDL source has local changes' >&2; exit 1; }
-COMMON=(-G Ninja -DCMAKE_SYSTEM_NAME="$SYSTEM" -DCMAKE_OSX_SYSROOT="$SDK"
+COMMON=(-G Ninja -DCMAKE_SYSTEM_NAME="$SYSTEM" -DCMAKE_OSX_SYSROOT="$SYSROOT"
  -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET="$MINOS" -DCMAKE_BUILD_TYPE=Release)
+SDL_OPTIONS=(-DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF)
+if [[ "$SDK" == maccatalyst ]]; then
+ # CMake's iOS + macOS SDK combination emits the Mac Catalyst target triple.
+ # UIKit and its companion frameworks live in the SDK's iOSSupport directory.
+ SUPPORT="$(xcrun --sdk macosx --show-sdk-path)/System/iOSSupport"
+ CATALYST_FLAGS="-isystem $SUPPORT/usr/include -iframework $SUPPORT/System/Library/Frameworks"
+ COMMON+=(-DCMAKE_C_FLAGS="$CATALYST_FLAGS" -DCMAKE_CXX_FLAGS="$CATALYST_FLAGS"
+  -DCMAKE_OBJC_FLAGS="$CATALYST_FLAGS" -DCMAKE_OBJCXX_FLAGS="$CATALYST_FLAGS"
+  -DCMAKE_EXE_LINKER_FLAGS="-F$SUPPORT/System/Library/Frameworks -L$SUPPORT/usr/lib")
+ # ANGLE owns GLES on Catalyst. SDL supplies the UIKit CAMetalLayer and input.
+ SDL_OPTIONS+=(-DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF -DSDL_HIDAPI=OFF)
+fi
 cmake -S "$SRC" -B "work/dependencies/sdl-$SDK" "${COMMON[@]}" \
- -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF \
+ "${SDL_OPTIONS[@]}" \
  -DCMAKE_INSTALL_PREFIX="$ROOT/work/deps-$SDK"
 cmake --build "work/dependencies/sdl-$SDK" -j "${PD_BUILD_JOBS:-6}"
 cmake --install "work/dependencies/sdl-$SDK"

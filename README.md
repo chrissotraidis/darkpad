@@ -1,6 +1,6 @@
 # DarkPad
 
-DarkPad brings **Perfect Dark to iPhone and iPad as a native ARM64 app**, built
+DarkPad brings **Perfect Dark to iPhone, iPad and Apple Silicon Mac as a native ARM64 app**, built
 from [Dab's Mod](https://github.com/DabDavis/perfect-dark-dabs-mod) and the
 [Perfect Dark PC port](https://github.com/perfect-dark-pc-port/perfect_dark).
 It adds touch controls, controller support, a native settings menu, optional
@@ -13,9 +13,9 @@ actually been checked. This describes DarkPad's workflow, not the authorship
 of its upstream projects.
 
 <p align="center">
-  <strong>Perfect Dark, native on iPhone and iPad.</strong><br>
+  <strong>Perfect Dark, native on iPhone, iPad and Mac.</strong><br>
   Campaign missions, Combat Simulator bots, and optional GoldenEye levels.<br>
-  Touch or controller. Your own game. No emulator or JIT.
+  Touch, keyboard/mouse or controller. Your own game. No emulator or JIT.
 </p>
 
 <p align="center">
@@ -39,13 +39,13 @@ of its upstream projects.
 > [!IMPORTANT]
 > **Build your own copy on an Apple Silicon Mac.** DarkPad releases contain a
 > PadMint recipe and checksums, with source available in the repository. No
-> prebuilt IPA or game data is distributed. Supply your own **Perfect Dark
+> prebuilt app or game data is distributed. Supply your own **Perfect Dark
 > (USA) Rev 1 / v1.1** ROM after installing the app.
 
 ## Highlights
 
-- **Native iPhone and iPad play.** Decompiled game code runs directly on ARM64;
-  OpenGL ES rendering reaches Metal through ANGLE.
+- **Native ARM64 play.** iPhone/iPad and Mac Catalyst builds share the DarkPad
+  interface and settings. OpenGL ES rendering reaches Metal through ANGLE.
 - **Touch and controllers.** Editable touch layouts, dual-stick controls,
   Xbox/PlayStation/MFi support, and automatic touch hiding with a controller.
 - **A familiar ••• menu.** Display, controls, audio, optional add-ons, diagnostics
@@ -64,10 +64,13 @@ of its upstream projects.
 | Platform or route | Status |
 |---|---|
 | iPhone / iPad, iOS 15+ | Personal unsigned IPA built on an Apple Silicon Mac |
-| PadMint | Personal builds with PadMint 0.5.23 or newer |
-| Apple Silicon Mac gameplay | Developer reference build; no packaged Mac app |
+| PadMint | Released iPhone/iPad builds with PadMint 0.5.23 or newer |
+| Apple Silicon Mac, macOS 12+ | Experimental Mac Catalyst app from source; [Mac guide and validation status](docs/MACOS.md) |
 | Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
-| App Store, TestFlight, prebuilt IPA | Not offered |
+| App Store, TestFlight, prebuilt apps | Not offered |
+
+The published **v0.1.0 recipe targets iPhone/iPad**. The Mac app is a newer
+source-build target and has a separate [validation status](docs/MACOS.md#validation-status).
 
 **DarkPad 0.1.0 is a preview.** The previous engine was played on an iPad Pro
 with an Xbox controller. The current Dab's Mod v3.15.1 build has been built,
@@ -85,11 +88,13 @@ You need:
 
 - An **Apple Silicon Mac**, full **Xcode with the iOS platform**, and Homebrew.
 - At least **30 GB free after installing the tools** for the first build.
-- An iPhone or iPad running **iOS/iPadOS 15 or newer**.
-- Your own supported Perfect Dark ROM and a way to sign and install a personal
-  IPA, such as AltStore Classic, SideStore, Sideloadly or Xcode.
+- Your own supported Perfect Dark ROM.
+- For iOS: an iPhone/iPad running **iOS/iPadOS 15 or newer**, and a way to sign
+  and install a personal IPA, such as AltStore Classic, SideStore, Sideloadly or Xcode.
+- For Mac play: **macOS 12 or newer**. The Mac app uses local signing and does
+  not need an iOS sideloading tool.
 
-### Build with PadMint
+### Build for iPhone/iPad with PadMint
 
 Use **PadMint 0.5.23 or newer**. Older downloads do not include DarkPad;
 extract the new ZIP and open the launcher in that new folder to update.
@@ -115,10 +120,18 @@ cd darkpad
 scripts/build-personal-ipa.sh ~/Downloads/DarkPad.ipa
 ```
 
-This builds the same personal unsigned IPA as PadMint. For Xcode setup,
-signing, Simulator builds and troubleshooting, see [Build DarkPad](docs/BUILDING.md).
+This builds the same personal unsigned IPA as PadMint. To build the Mac app
+from the same checkout instead, use CMake 3.31 or newer:
 
-**Updating:** install over your existing app with the same signing setup to
+```sh
+scripts/build-personal-macos.sh ~/Downloads/DarkPad-Mac.zip
+```
+
+Unzip the result and open `DarkPad.app`. See the [Mac guide](docs/MACOS.md) for
+installation, settings and file locations. For Xcode setup, signing, Simulator
+builds and troubleshooting, see [Build DarkPad](docs/BUILDING.md).
+
+**Updating iOS:** install over your existing app with the same signing setup to
 preserve its data. Deleting DarkPad removes its saves, settings and imported
 content; back up first if an uninstall is unavoidable.
 
@@ -138,6 +151,10 @@ cannot supply the file. No ROM, extracted game assets, saves, signing identity
 or provisioning profile is included in this repository or its release downloads.
 
 ## Controls
+
+On Mac, use keyboard/mouse or a controller. Open **•••** for the shared menu or
+press **Command-comma** for Settings. Touch editing and device gyro options
+remain specific to iPhone/iPad; see the [Mac guide](docs/MACOS.md#settings-and-controls).
 
 | Action | Controller | Touch |
 |---|---|---|
@@ -223,10 +240,11 @@ reproduce the problem. Never attach ROMs, extracted assets, saves or signing fil
 | Path | Purpose |
 |---|---|
 | [Player guide](docs/PLAYER-GUIDE.md) | Controls, menus, artwork, GoldenEye and multiplayer |
-| [Build guide](docs/BUILDING.md) | Personal IPA, signing and development builds |
+| [Build guide](docs/BUILDING.md) | Personal IPA/Mac app, signing and development builds |
+| [Mac guide](docs/MACOS.md) | Mac installation, settings parity, controls and storage |
 | [Acceptance record](docs/acceptance.md) | Test evidence and remaining work |
 | [Release checklist](docs/RELEASE-CHECKLIST.md) | PadMint checks and publication order |
-| [`app/ios/`](app/ios/) | Native shell, controls, settings and ROM import |
+| [`app/ios/`](app/ios/) | Shared iOS/Mac Catalyst shell, controls, settings and ROM import |
 | [`overlay/patches/`](overlay/patches/) | Patches applied to the pinned engine |
 | [`padmint.json`](padmint.json) | PadMint build recipe |
 | [`tests/`](tests/) | Focused input, networking, texture and save tests |

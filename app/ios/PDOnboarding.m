@@ -312,6 +312,57 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	return dst;
 }
 
++ (UIWindow *)showOnboardingWithCompletion:(dispatch_block_t)completion
+{
+	PDOnboardingViewController *vc = [PDOnboardingViewController new];
+	vc.onAccepted = completion;
+	UIWindowScene *scene = nil;
+	for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
+		if ([s isKindOfClass:UIWindowScene.class]) {
+			scene = (UIWindowScene *)s;
+			break;
+		}
+	}
+	UIWindow *win = scene ? [[UIWindow alloc] initWithWindowScene:scene]
+	                      : [[UIWindow alloc] initWithFrame:PDVisionFallbackWindowFrame()];
+	win.windowLevel = UIWindowLevelAlert + 1;
+	win.rootViewController = vc;
+#if TARGET_OS_MACCATALYST
+	scene.sizeRestrictions.minimumSize = CGSizeMake(800, 450);
+	scene.title = @"DarkPad";
+#endif
+	[win makeKeyAndVisible];
+	PDShell.shared.overlayWindow = win;
+	NSLog(@"perfectdark: [onboard] window frame=%@ scene=%@",
+		NSStringFromCGRect(win.frame), scene ? @"yes" : @"no");
+
+	return win;
+}
+
++ (void)beginWithCompletion:(dispatch_block_t)completion
+{
+	NSAssert(NSThread.isMainThread, @"onboarding is UIKit");
+	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		BOOL ready = [self installedRomPath] != nil || [self adoptLooseRom] != nil;
+		NSString *candidate = ready ? nil : [self existingRomCandidate];
+		NSString *problem = candidate ? [self classifyFileAtPath:candidate].explanation : nil;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if (ready) { completion(); return; }
+			__block BOOL completed = NO;
+			UIWindow *win = [self showOnboardingWithCompletion:^{
+				if (completed) return;
+				completed = YES;
+				UIWindow *current = PDShell.shared.overlayWindow;
+				((PDOnboardingViewController *)current.rootViewController).onAccepted = nil;
+				current.hidden = YES;
+				PDShell.shared.overlayWindow = nil;
+				completion();
+			}];
+			if (problem) [(PDOnboardingViewController *)win.rootViewController showRomProblem:problem];
+		});
+	});
+}
+
 + (void)runUntilRomPresent
 {
 	NSAssert(NSThread.isMainThread, @"onboarding is UIKit");
@@ -324,25 +375,8 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	NSLog(@"perfectdark: [onboard] no ROM in Documents — presenting onboarding");
 
 	__block BOOL done = NO;
-	PDOnboardingViewController *vc = [PDOnboardingViewController new];
-	vc.onAccepted = ^{ done = YES; };
-
-	UIWindowScene *scene = nil;
-	for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
-		if ([s isKindOfClass:UIWindowScene.class]) {
-			scene = (UIWindowScene *)s;
-			break;
-		}
-	}
-	UIWindow *win = scene ? [[UIWindow alloc] initWithWindowScene:scene]
-	                      : [[UIWindow alloc] initWithFrame:PDVisionFallbackWindowFrame()];
-	win.windowLevel = UIWindowLevelAlert + 1;
-	win.rootViewController = vc;
-	[win makeKeyAndVisible];
-	PDShell.shared.overlayWindow = win;
-	NSLog(@"perfectdark: [onboard] window frame=%@ scene=%@",
-		NSStringFromCGRect(win.frame), scene ? @"yes" : @"no");
-
+	UIWindow *win = [self showOnboardingWithCompletion:^{ done = YES; }];
+	PDOnboardingViewController *vc = (PDOnboardingViewController *)win.rootViewController;
 	NSString *candidate = [self existingRomCandidate];
 	if (candidate) [vc showRomProblem:[self classifyFileAtPath:candidate].explanation];
 	NSDate *nextScan = NSDate.date;
@@ -370,6 +404,54 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	PDShell.shared.overlayWindow = nil;
 	NSLog(@"perfectdark: [onboard] ROM accepted, starting the engine");
 }
+
++ (nullable NSString *)installPickedRom:(NSURL *)url
+{
+	// asCopy:YES already gives us a copy in a temporary directory, but a
+	// security scope is still the correct thing to ask for: it costs nothing
+	// when it is not needed and is the difference between working and silently
+	// reading nothing when it is.
+	BOOL scoped = [url startAccessingSecurityScopedResource];
+	NSString *source = nil;
+	PDRomCheck *check = [PDOnboarding checkRomAtPath:url.path usable:&source];
+	NSLog(@"perfectdark: [onboard] picked %@ -> verdict %ld (%@)",
+		url.lastPathComponent, (long)check.verdict, check.explanation);
+
+	if (!check.ok) {
+		if (scoped) {
+			[url stopAccessingSecurityScopedResource];
+		}
+		return check.explanation;
+	}
+
+	NSString *dst = [PDOnboarding romDestination];
+	NSError *err = nil;
+	// Copied beside the name and renamed over it only once complete (D-075): a
+	// copy that fails part-way leaves whatever was at that name as it was.
+	BOOL ok = [PDXbla copyFileSafely:source to:dst same:NULL error:&err];
+	if (![source isEqualToString:url.path]) {
+		[NSFileManager.defaultManager removeItemAtPath:source error:NULL];
+	}
+	if (scoped) {
+		[url stopAccessingSecurityScopedResource];
+	}
+
+	if (!ok) {
+		return [NSString stringWithFormat:@"Could not copy the file in: %@", err.localizedDescription];
+	}
+
+	// The engine opens the ROM with plain fopen() at launch, and an app can be
+	// launched while the device is still locked after a reboot. Data protection
+	// would make that open fail with EPERM and look exactly like a missing
+	// file, so the ROM is explicitly unprotected - it is the player's own game
+	// data, not a secret.
+	[NSFileManager.defaultManager setAttributes:@{ NSFileProtectionKey: NSFileProtectionNone }
+	                               ofItemAtPath:dst error:NULL];
+
+	NSLog(@"perfectdark: [onboard] ROM installed at %@", dst);
+	return nil;
+}
+
 
 @end
 
@@ -413,8 +495,13 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	help.numberOfLines = 0;
 	help.font = [UIFont systemFontOfSize:14];
 	help.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+#if TARGET_OS_MACCATALYST
+	help.text = @"Your ROM and saves stay in DarkPad's Application Support folder. "
+	             "Use a keyboard and mouse or a game controller. Optional artwork can be added later in Settings.";
+#else
 	help.text = @"You can also add the ROM through Files → On My iPhone/iPad → DarkPad. "
 	             "Return here to continue. Optional artwork can be added later in Settings.";
+#endif
 
 	UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:
 		@[ title, body, _status, pick, help ]];
@@ -499,57 +586,25 @@ static NSString *const kRomFileName = @"pd.ntsc-final.z64";
 	didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 {
 	NSURL *url = urls.firstObject;
-	if (!url) {
-		return;
-	}
-
-	// asCopy:YES already gives us a copy in a temporary directory, but a
-	// security scope is still the correct thing to ask for: it costs nothing
-	// when it is not needed and is the difference between working and silently
-	// reading nothing when it is.
-	BOOL scoped = [url startAccessingSecurityScopedResource];
-	NSString *source = nil;
-	PDRomCheck *check = [PDOnboarding checkRomAtPath:url.path usable:&source];
-	NSLog(@"perfectdark: [onboard] picked %@ -> verdict %ld (%@)",
-		url.lastPathComponent, (long)check.verdict, check.explanation);
-
-	if (!check.ok) {
-		_status.text = check.explanation;
-		if (scoped) {
-			[url stopAccessingSecurityScopedResource];
-		}
-		return;
-	}
-
-	NSString *dst = [PDOnboarding romDestination];
-	NSError *err = nil;
-	// Copied beside the name and renamed over it only once complete (D-075): a
-	// copy that fails part-way leaves whatever was at that name as it was.
-	BOOL ok = [PDXbla copyFileSafely:source to:dst same:NULL error:&err];
-	if (source != url.path) {
-		[NSFileManager.defaultManager removeItemAtPath:source error:NULL];
-	}
-	if (scoped) {
-		[url stopAccessingSecurityScopedResource];
-	}
-
-	if (!ok) {
-		_status.text = [NSString stringWithFormat:@"Could not copy the file in: %@", err.localizedDescription];
-		return;
-	}
-
-	// The engine opens the ROM with plain fopen() at launch, and an app can be
-	// launched while the device is still locked after a reboot. Data protection
-	// would make that open fail with EPERM and look exactly like a missing
-	// file, so the ROM is explicitly unprotected - it is the player's own game
-	// data, not a secret.
-	[NSFileManager.defaultManager setAttributes:@{ NSFileProtectionKey: NSFileProtectionNone }
-	                               ofItemAtPath:dst error:NULL];
-
-	NSLog(@"perfectdark: [onboard] ROM installed at %@", dst);
-	if (self.onAccepted) {
-		self.onAccepted();
-	}
+	if (!url) return;
+#if TARGET_OS_MACCATALYST
+	_status.text = @"Checking and importing your ROM…";
+	self.view.userInteractionEnabled = NO;
+	__weak typeof(self) weakSelf = self;
+	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		NSString *problem = [PDOnboarding installPickedRom:url];
+		dispatch_async(dispatch_get_main_queue(), ^{
+			PDOnboardingViewController *vc = weakSelf;
+			vc.view.userInteractionEnabled = YES;
+			[vc showRomProblem:problem ?: @""];
+			if (!problem && vc.onAccepted) vc.onAccepted();
+		});
+	});
+#else
+	NSString *problem = [PDOnboarding installPickedRom:url];
+	if (problem) { _status.text = problem; return; }
+	if (self.onAccepted) self.onAccepted();
+#endif
 }
 
 @end

@@ -14,7 +14,7 @@
         "n64"
       ],
       "when": "in-app",
-      "description": "Your own Perfect Dark (USA) Rev 1 / v1.1 ROM. After installing, open DarkPad and choose it from Files. The build does not read it."
+      "description": "Your own Perfect Dark (USA) Rev 1 / v1.1 ROM. After installing, open DarkPad and choose your ROM. The build does not read it."
     }
   ],
   "targets": {
@@ -29,6 +29,25 @@
           "stage": "compile",
           "command": [
             "{repo}/scripts/build-personal-ipa.sh",
+            "{output}"
+          ],
+          "env": {
+            "PD_BUILD_JOBS": "{jobs}"
+          }
+        }
+      ]
+    },
+    "macos": {
+      "hosts": {
+        "macos-arm64": "experimental"
+      },
+      "output": "zip",
+      "check": "none",
+      "steps": [
+        {
+          "stage": "compile",
+          "command": [
+            "{repo}/scripts/build-personal-macos.sh",
             "{output}"
           ],
           "env": {
@@ -59,9 +78,9 @@
         "version_args": [
           "--version"
         ],
-        "min_version": "3.20",
+        "min_version": "3.31",
         "player": true,
-        "note": "Install CMake: brew install cmake"
+        "note": "Install CMake 3.31 or newer for Mac Catalyst: brew install cmake"
       },
       {
         "name": "ninja",
