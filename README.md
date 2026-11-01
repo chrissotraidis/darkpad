@@ -66,7 +66,8 @@ of its upstream projects.
 | iPhone / iPad, iOS 15+ | Personal unsigned IPA built on an Apple Silicon Mac |
 | PadMint | Released iPhone/iPad builds with PadMint 0.5.23 or newer |
 | Apple Silicon Mac, macOS 12+ | Experimental Mac Catalyst app from source; [Mac guide and validation status](docs/MACOS.md) |
-| Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
+| No Mac: GitHub's Mac, from Windows, Linux or a browser | Experimental, with PadMint 0.5.27 or newer: [private GitHub build](https://github.com/chrissotraidis/padmint#darkpad-private-github-build) |
+| Local Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
 | App Store, TestFlight, prebuilt apps | Not offered |
 
 The published **v0.1.0 recipe targets iPhone/iPad**. The Mac app is a newer
@@ -95,6 +96,13 @@ You need:
   not need an iOS sideloading tool.
 
 ### Build for iPhone/iPad with PadMint
+
+**No Mac?** With PadMint 0.5.27 or newer, GitHub's Mac can build DarkPad for
+iPhone/iPad from Windows, Linux or any browser. It needs a **private** copy of
+PadMint (a public fork can't run this personal build) and uses your account's
+Actions allowance. Follow PadMint's [private GitHub build steps](https://github.com/chrissotraidis/padmint#darkpad-private-github-build),
+then add your own ROM inside DarkPad. This route is experimental: a clean hosted
+build passed, but installing and playing that build still need testing.
 
 Use **PadMint 0.5.23 or newer**. Older downloads do not include DarkPad;
 extract the new ZIP and open the launcher in that new folder to update.
