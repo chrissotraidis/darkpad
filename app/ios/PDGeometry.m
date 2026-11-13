@@ -27,6 +27,7 @@ int pdGeoRepair(const char *why) { (void)why; return 0; }
 NSString *pdGeoStateLines(void) { return @""; }
 NSString *pdGeoReport(void) { return @"geo: not on visionOS (windows are freely resizable)\n"; }
 void pdGeoSceneCoordinateSpaceChanged(long o, long n) { (void)o; (void)n; }
+void pdGeoFollowScene(UIWindowScene *scene) { (void)scene; }
 NSString *pdGeoPresentedReport(void) { return @"presented: not on visionOS\n"; }
 NSString *pdGeoPickerFinish(NSString *pathOrNil) { (void)pathOrNil; return @"ERR not on visionOS"; }
 
@@ -35,6 +36,7 @@ NSString *pdGeoPickerFinish(NSString *pathOrNil) { (void)pathOrNil; return @"ERR
 // app/gfx/gfx_angle_egl.mm
 extern void *pdAngleGetHostView(void);
 extern void *pdAngleGetSDLWindow(void);
+extern void pdAngleResized(SDL_Window *wnd);
 
 /** One reading of every link. Integers, so "changed?" is a memcmp. */
 typedef struct {
@@ -102,6 +104,9 @@ static UIWindowScene *pdGeoScene(UIWindow *win)
 {
 	if (win.windowScene) {
 		return win.windowScene;
+	}
+	if (pdOwningScene()) {
+		return pdOwningScene();
 	}
 	for (UIScene *sc in UIApplication.sharedApplication.connectedScenes) {
 		if ([sc isKindOfClass:UIWindowScene.class]) {
@@ -445,6 +450,53 @@ void pdGeoSceneCoordinateSpaceChanged(long oldOrientation, long newOrientation)
 	PDLifecycle("GEO scene coordinate space updated: %s -> %s",
 		pdOrientName(oldOrientation), pdOrientName(newOrientation));
 	pdGeoLogIfChanged("scene-update", YES);
+}
+
+void pdGeoFollowScene(UIWindowScene *scene)
+{
+#if !TARGET_OS_MACCATALYST
+	// SDL 2.32.8 creates its window off-scene, on the main screen, so that is
+	// the scale its Metal layer starts at.
+	static CGFloat sFollowedScale;
+	if (sFollowedScale <= 0) {
+		sFollowedScale = UIScreen.mainScreen.nativeScale;
+	}
+	UIView *host = (__bridge UIView *)pdAngleGetHostView();
+	UIWindow *win = host.window;
+	const CGRect sb = scene.coordinateSpace.bounds;
+	if (!scene || !win || win.windowScene != scene || sb.size.width <= 0 || sb.size.height <= 0) {
+		return;
+	}
+	const CGFloat scale = scene.screen.nativeScale;
+	BOOL scaleChanged = NO;
+	if (scale > 0 && scale != sFollowedScale && [host.layer isKindOfClass:CAMetalLayer.class]
+		&& host.layer.contentsScale == sFollowedScale) {
+		host.layer.contentsScale = scale;
+		[host setNeedsLayout];
+		scaleChanged = YES;
+	}
+	if (scale > 0) {
+		sFollowedScale = scale;
+	}
+	BOOL moved = NO;
+	if (!CGRectEqualToRect(win.frame, sb)) {
+		// SDL's view controller reports the new size from viewDidLayoutSubviews.
+		win.frame = sb;
+		moved = YES;
+	}
+	[win layoutIfNeeded];
+	if (scaleChanged) {
+		// Same points, new pixels: no SDL resize event, so size the drawable here.
+		pdAngleResized((SDL_Window *)pdAngleGetSDLWindow());
+	}
+	if (moved || scaleChanged) {
+		PDLifecycle("GEO followed the scene: %.0fx%.0f @%.2f%s", sb.size.width, sb.size.height,
+			scale, scaleChanged ? " (scale moved)" : "");
+		pdGeoLogIfChanged("scene-follow", YES);
+	}
+#else
+	(void)scene;
+#endif
 }
 
 NSString *pdGeoStateLines(void)

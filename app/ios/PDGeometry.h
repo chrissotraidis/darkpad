@@ -17,6 +17,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class UIWindowScene;
+
 NS_ASSUME_NONNULL_BEGIN
 
 #ifdef __cplusplus
@@ -53,6 +55,16 @@ extern int pdGeoRepairEnabled;
 
 /** Called from the scene delegate when UIKit moves the scene's coordinate space. */
 void pdGeoSceneCoordinateSpaceChanged(long oldOrientation, long newOrientation);
+
+/**
+ * Fits SDL's window to the scene that owns it, the way the scene-aware SDL
+ * does (UIKit_UpdateWindowsForScene in chrissotraidis/SDL): the window takes
+ * the scene's bounds, and a Metal layer still at the old screen's scale moves
+ * to the new screen's. A render scale the player chose is left alone. Called
+ * when the scene resizes, rotates, moves to another display or comes back to
+ * the foreground. Catalyst keeps its own per-frame sync (gfx_angle_egl.mm).
+ */
+void pdGeoFollowScene(UIWindowScene *_Nullable scene);
 
 #ifdef __cplusplus
 }

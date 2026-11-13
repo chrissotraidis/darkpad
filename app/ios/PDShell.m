@@ -418,8 +418,25 @@ int pdExtraPumpMs = 0;
 
 int pdGraftEnabled = 1;
 
+static __weak UIWindowScene *sOwningScene;
+
+UIWindowScene *pdOwningScene(void)
+{
+	return sOwningScene;
+}
+
+void pdSetOwningScene(UIWindowScene *scene)
+{
+	sOwningScene = scene;
+}
+
 static UIWindowScene *pdForegroundScene(void)
 {
+	// The scene UIKit connected for the game, whichever display it is on.
+	UIWindowScene *owner = sOwningScene;
+	if (owner) {
+		return owner;
+	}
 	UIWindowScene *any = nil;
 	for (UIScene *sc in UIApplication.sharedApplication.connectedScenes) {
 		if (![sc isKindOfClass:UIWindowScene.class]) {
@@ -480,8 +497,11 @@ int pdGraftSDLWindows(void)
 	}
 #pragma clang diagnostic pop
 
+	NSSet<UIScene *> *connected = UIApplication.sharedApplication.connectedScenes;
 	for (UIWindow *w in candidates) {
-		if (w.windowScene) {
+		// A window left on a scene that has since disconnected is as invisible
+		// as a sceneless one: the replacement scene adopts it.
+		if (w.windowScene && [connected containsObject:w.windowScene]) {
 			continue;
 		}
 		w.windowScene = scene;
@@ -492,6 +512,11 @@ int pdGraftSDLWindows(void)
 		NSLog(@"perfectdark: [scene] grafted a sceneless window %@ (root %@) onto %@",
 			NSStringFromCGRect(w.bounds), NSStringFromClass(w.rootViewController.class),
 			scene.session.persistentIdentifier);
+	}
+	if (moved) {
+		// SDL sized its window for the main screen; the scene may be smaller
+		// (Split View, Stage Manager) or on another display.
+		pdGeoFollowScene(scene);
 	}
 	return moved;
 }

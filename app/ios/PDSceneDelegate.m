@@ -97,6 +97,12 @@
 		scene.title = @"DarkPad";
 	}
 #endif
+	// The game's scene. The engine starts from the app delegate, so a later
+	// scene (a replacement after a disconnect) only adopts SDL's windows.
+	if ([scene isKindOfClass:UIWindowScene.class]
+		&& [session.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
+		pdSetOwningScene((UIWindowScene *)scene);
+	}
 
 	pdGraftSDLWindows();
 
@@ -117,7 +123,25 @@
 	// Cheap, idempotent, and the moment a window that missed the graft at
 	// connect time (SDL's, which does not exist yet then) would be visible.
 	pdGraftSDLWindows();
+	if (scene == pdOwningScene()) {
+		pdGeoFollowScene(pdOwningScene());
+	}
 	pdGeoCheckpoint("scene active");
+}
+
+- (void)sceneWillEnterForeground:(UIScene *)scene
+{
+	// The scene may have been resized or moved to another display while away.
+	if (scene == pdOwningScene()) {
+		pdGeoFollowScene(pdOwningScene());
+	}
+}
+
+- (void)sceneDidDisconnect:(UIScene *)scene
+{
+	if (scene == pdOwningScene()) {
+		pdSetOwningScene(nil);
+	}
 }
 
 /**
@@ -136,6 +160,8 @@
 {
 	(void)previousCoordinateSpace;
 	(void)previousTraitCollection;
+	// Rotation, a resize, or a move to another display: refit SDL's window.
+	pdGeoFollowScene(windowScene);
 	pdGeoSceneCoordinateSpaceChanged((long)previousInterfaceOrientation,
 		(long)windowScene.interfaceOrientation);
 }
