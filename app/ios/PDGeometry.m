@@ -468,12 +468,11 @@ void pdGeoFollowScene(UIWindowScene *scene)
 		return;
 	}
 	const CGFloat scale = scene.screen.nativeScale;
-	BOOL scaleChanged = NO;
-	if (scale > 0 && scale != sFollowedScale && [host.layer isKindOfClass:CAMetalLayer.class]
+	const BOOL scaleChanged = scale > 0 && scale != sFollowedScale;
+	if (scaleChanged && [host.layer isKindOfClass:CAMetalLayer.class]
 		&& host.layer.contentsScale == sFollowedScale) {
 		host.layer.contentsScale = scale;
 		[host setNeedsLayout];
-		scaleChanged = YES;
 	}
 	if (scale > 0) {
 		sFollowedScale = scale;
@@ -487,11 +486,13 @@ void pdGeoFollowScene(UIWindowScene *scene)
 	[win layoutIfNeeded];
 	if (scaleChanged) {
 		// Same points, new pixels: no SDL resize event, so size the drawable here.
+		// This also re-applies a chosen render scale against the new screen. The
+		// renderer reads the surface size every frame (gfx_sdl_get_dimensions).
 		pdAngleResized((SDL_Window *)pdAngleGetSDLWindow());
 	}
 	if (moved || scaleChanged) {
 		PDLifecycle("GEO followed the scene: %.0fx%.0f @%.2f%s", sb.size.width, sb.size.height,
-			scale, scaleChanged ? " (scale moved)" : "");
+			scale, scaleChanged ? " (screen scale changed)" : "");
 		pdGeoLogIfChanged("scene-follow", YES);
 	}
 #else
