@@ -19,6 +19,7 @@
 #import "PDMac.h"
 #import "PDShell.h"
 #import "PDTouchOverlay.h"
+#import "PDTouchVisibility.h"
 #import "PDVision.h"
 
 #import <GameController/GameController.h>
@@ -395,8 +396,28 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 	PDMenuNode *edit = pdAction(@"Edit Touch Controls", @"hand.draw", ^{
 		pdAfterMenu(^{ [PDTouchOverlay.current beginLayoutEditing]; });
 	});
-	PDMenuNode *onScreen = pdChoices(@"On-Screen Controls", @"hand.tap", PDDefTouchMode,
-		@[ @"Auto", @"On", @"Off" ], @[ @0, @1, @2 ], @[ @"Hidden while a controller is connected", @"", @"" ]);
+	// The existing Auto/On/Off mode, exposed as two direct actions. Show always
+	// works with a controller still connected (On = auto-hide off); the full
+	// three-way choice stays on the Settings page.
+	const NSInteger touchMode = PDDefInt(PDDefTouchMode);
+	const BOOL touchHidden = PDTouchGameplayHidden(touchMode, PDTouchOverlayAnyPadConnected(), NO, NO);
+	PDMenuNode *onScreen = touchHidden
+		? pdAction(@"Show Touch Controls", @"hand.tap", ^{
+			[NSUserDefaults.standardUserDefaults setInteger:PDTouchModeOn forKey:PDDefTouchMode];
+			[PDSettingsViewController applyDefaultsChange];
+		})
+		: pdAction(@"Hide Touch Controls", @"hand.raised.slash", ^{
+			[NSUserDefaults.standardUserDefaults setInteger:PDTouchModeOff forKey:PDDefTouchMode];
+			[PDSettingsViewController applyDefaultsChange];
+		});
+	PDMenuNode *autoHide = pdAction(@"Auto-hide Touch Controls with Controller", @"gamecontroller", ^{
+		const NSInteger mode = PDDefInt(PDDefTouchMode);
+		[NSUserDefaults.standardUserDefaults setInteger:PDTouchModeWithAutoHide(!PDTouchAutoHideEnabled(mode))
+			forKey:PDDefTouchMode];
+		[PDSettingsViewController applyDefaultsChange];
+	});
+	autoHide.checked = PDTouchAutoHideEnabled(touchMode);
+	autoHide.keepsOpen = YES;
 	PDMenuNode *touchSettings = pdAction(@"Touch Control Settings…", @"slider.horizontal.3", ^{
 		pdOpenSettings(@"Touch Controls");
 	});
@@ -415,7 +436,7 @@ static UIFont *pdRounded(CGFloat size, UIFontWeight weight)
 #if TARGET_OS_MACCATALYST
 		@[ mouseSettings ],
 #else
-		@[ edit, onScreen, touchSettings ],
+		@[ onScreen, autoHide, edit, touchSettings ],
 #endif
 		@[ preset, controllerSettings ],
 	]];

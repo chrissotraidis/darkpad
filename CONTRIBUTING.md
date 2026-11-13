@@ -32,6 +32,7 @@ python3 tests/image_decoder_limits.py
 python3 tests/texture_pack_prepare.py
 python3 tests/input_clipboard.py build/src/port/src/input.c
 clang -std=c11 -Iapp/ios -fsanitize=address,undefined tests/gyro_math.c -o /tmp/gyro_math && /tmp/gyro_math
+clang -std=c11 -fsanitize=address,undefined tests/touch_visibility.c -o /tmp/touch_visibility && /tmp/touch_visibility
 python3 tests/network_touch_look.py build/src
 python3 tests/network_local_player.py build/src
 python3 tests/network_coop_results.py build/src/src/game/endscreen.c

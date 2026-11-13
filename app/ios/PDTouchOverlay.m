@@ -39,6 +39,7 @@
 #import "PDDefaults.h"
 #import "PDSettingsViewController.h"
 #import "PDUtilityMenu.h"
+#import "PDTouchVisibility.h"
 
 // overlay 0051 — one menu line as a fraction of the screen's height (D-083).
 extern float menuIosRowFraction(void);
@@ -631,8 +632,12 @@ BOOL PDTouchOverlayAnyPadConnected(void)
 	if (sFakePadOverride >= 0) {
 		return sFakePadOverride ? YES : NO;
 	}
-	if (GCController.controllers.count > 0) {
-		return YES;
+	for (GCController *pad in GCController.controllers) {
+		// A menu-only or incomplete profile (no extended gamepad: no stick and
+		// face buttons) cannot play, so it must not hide the touch controls.
+		if (pad.extendedGamepad != nil) {
+			return YES;
+		}
 	}
 	static int fake = -1;
 	if (fake < 0) {
@@ -1781,7 +1786,7 @@ static const CGFloat kWheelRadius = 32.0;
 	// reachable while mouse/keyboard events go straight to SDL.
 	BOOL hide = YES;
 #else
-	BOOL hide = !_editing && ((mode == 2) || (mode == 0 && self.padConnected && !_menuOpen));
+	BOOL hide = PDTouchGameplayHidden(mode, self.padConnected, _menuOpen, _editing);
 #endif
 	const BOOL wasHidden = self.hidden;
 	self.hidden = hide;

@@ -24,7 +24,8 @@ adjusted for Perfect Dark's extra actions:
 | Pause | Start |
 | Menu accept / cancel | A / B |
 
-While a controller is connected the touch buttons hide (On-Screen Controls: Auto).
+While a controller is connected the touch buttons hide
+(**••• → Controls → Auto-hide Touch Controls with Controller**, on by default).
 **Settings → Controller → Use GoldenPad Controller Layout…** restores this layout
 and keeps a backup of your previous bindings.
 
@@ -156,8 +157,9 @@ test record.
 
 - **The ROM is refused.** The message names the revision or byte order it found.
   Only USA Rev 1 (v1.1) is supported. Copy cloud files to **On My iPhone/iPad** first.
-- **The on-screen buttons disappeared.** A connected controller hides them in
-  Auto mode. Set **••• → Controls → On-Screen Controls** to **On**.
+- **The on-screen buttons disappeared.** A connected controller hides them while
+  auto-hide is on. Choose **••• → Controls → Show Touch Controls**; it works with
+  the controller still connected and turns auto-hide off.
 - **The game seems fast.** Set **••• → Display → Frame Rate** to 60 Hz.
 - **Stuck in GoldenEye.** Abort from the watch, then press B or BACK, or tap
   PREVIOUS, until the Perfect Menu returns.
