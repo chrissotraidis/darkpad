@@ -153,6 +153,10 @@ static void pdRemoveArrowStickBinds(void)
 	                                           name:GCControllerDidConnectNotification object:nil];
 	[NSNotificationCenter.defaultCenter addObserver:self selector:@selector(padsChanged)
 	                                           name:GCControllerDidDisconnectNotification object:nil];
+	// A pad can come or go while the app is in the background; settle the
+	// touch layer against what is connected now when it returns.
+	[NSNotificationCenter.defaultCenter addObserver:self selector:@selector(padsChanged)
+	                                           name:UIApplicationDidBecomeActiveNotification object:nil];
 	[GCController startWirelessControllerDiscoveryWithCompletionHandler:^{}];
 	[self padsChanged];
 }
