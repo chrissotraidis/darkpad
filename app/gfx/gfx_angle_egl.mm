@@ -45,7 +45,7 @@
 #ifndef TARGET_OS_VISION
 #define TARGET_OS_VISION 0
 #endif
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_IOS
 #import <UIKit/UIKit.h>
 #endif
 
@@ -167,9 +167,12 @@ static double pdAngleRenderScale(void)
  * fraction of the PANEL's own scale rather than an absolute pixels-per-point,
  * because "half resolution" is the thing a player chooses and 1.5 is not.
  *
- * It is applied against the layer's native contentsScale, remembered on the
- * first call because after that call the layer's scale is ours and no longer
- * the panel's. PD_IOS_RENDER_SCALE always wins: the gates set it so the replay
+ * It is applied against the scale of the screen showing the game window, so it
+ * stays right when the scene moves to a display of another density (as the
+ * Catalyst sync below does). Without a window, and on visionOS, it uses the
+ * layer's native contentsScale, remembered on the first call because after that
+ * call the layer's scale is ours and no longer the panel's. PD_IOS_RENDER_SCALE
+ * always wins: the gates set it so the replay
  * draws the oracle's own resolution, and a gate must not be at the mercy of a
  * setting a previous run left in NSUserDefaults.
  */
@@ -190,12 +193,19 @@ static int pdAngleApplyRenderScale(void)
 	if (s_layer && s_nativeScale <= 0.0) {
 		s_nativeScale = s_layer.contentsScale;
 	}
+	double nativeScale = s_nativeScale;
+#if TARGET_OS_IOS && !TARGET_OS_VISION
+	UIScreen *screen = ((__bridge UIView *)s_view).window.screen;
+	if (screen.nativeScale > 0.0) {
+		nativeScale = screen.nativeScale;
+	}
+#endif
 
 	double scale = pdAngleRenderScale();
 	if (scale <= 0.0) {
 		const double f = pdAngleRenderFraction();
-		if (f > 0.0 && s_nativeScale > 0.0) {
-			scale = s_nativeScale * f;
+		if (f > 0.0 && nativeScale > 0.0) {
+			scale = nativeScale * f;
 		}
 	}
 	if (scale <= 0.0 || !s_layer) {

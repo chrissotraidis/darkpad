@@ -364,6 +364,15 @@ NS_ASSUME_NONNULL_END
 int pdGraftSDLWindows(void);
 
 /**
+ * The application scene PDSceneDelegate connected, which owns the game: the
+ * graft puts SDL's windows on it and the geometry code measures it. Nil before
+ * the scene connects, after it disconnects, and on visionOS (no PDSceneDelegate),
+ * where the graft keeps its foreground-scene search.
+ */
+UIWindowScene *_Nullable pdOwningScene(void);
+void pdSetOwningScene(UIWindowScene *_Nullable scene);
+
+/**
  * The bridge's `graft off|on` (D-044): a live bisect switch for the graft.
  *
  * 1 by default. Turning it off makes pdGraftSDLWindows() a no-op - but ONLY
