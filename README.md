@@ -70,10 +70,12 @@ of its upstream projects.
 | Local Windows / Linux builds, Android, Apple TV, Vision Pro | Not offered in this release |
 | App Store, TestFlight, prebuilt apps | Not offered |
 
-The published **v0.1.0 recipe targets iPhone/iPad**. The Mac app is a newer
-source-build target and has a separate [validation status](docs/MACOS.md#validation-status).
+The published **v0.1.1 recipe includes iPhone/iPad and experimental Mac Catalyst
+targets**. PadMint currently offers iPhone/iPad; build the Mac app from source
+using the instructions below. It has a separate
+[validation status](docs/MACOS.md#validation-status).
 
-**DarkPad 0.1.0 is a preview.** The previous engine was played on an iPad Pro
+**DarkPad is still early software.** The previous engine was played on an iPad Pro
 with an Xbox controller. The current Dab's Mod v3.15.1 build has been built,
 installed and launched on that iPad with saves preserved; its hands-on gameplay
 check is still pending. Simulator checks cover saved games, Carrington Institute,
