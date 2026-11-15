@@ -7,9 +7,9 @@ using Mac Catalyst. It uses the same game patches, settings implementation,
 ROM importer and ANGLE-to-Metal renderer. The older OpenGL desktop reference
 is retained for development comparisons.
 
-This Mac app is a new source-build target. The published **v0.1.0 release and
-its PadMint recipe still target iPhone/iPad**. No prebuilt Mac app, IPA or game
-data is distributed.
+The published **v0.1.1 recipe includes this experimental Mac Catalyst target**.
+PadMint currently offers iPhone/iPad; use the source-build instructions below
+for Mac. No prebuilt Mac app, IPA or game data is distributed.
 
 ## Build and open
 
