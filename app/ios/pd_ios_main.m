@@ -319,10 +319,11 @@ static int pdStartEngine(int argc, char *argv[])
 		// UIApplication.statusBarOrientation, which under the UIScene life
 		// cycle is Unknown. Unknown plus "portrait is supported" = portrait:
 		// SDL laid its view out 420x912 on a 912x420 scene and kept it. The
-		// app is landscape-only on iPhone and iPad (Info.plist); saying so to
-		// SDL makes that computation answer landscape whatever the status bar
-		// claims. PDGeometry.m repairs any portrait shape that still gets in.
-		SDL_SetHintWithPriority(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight", SDL_HINT_OVERRIDE);
+		// The hint follows each device family’s declared Info.plist orientations.
+		SDL_SetHintWithPriority(SDL_HINT_ORIENTATIONS,
+		    UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad
+		        ? "Portrait PortraitUpsideDown LandscapeLeft LandscapeRight"
+		        : "LandscapeLeft LandscapeRight", SDL_HINT_OVERRIDE);
 #endif
 
 		[PDPacing.shared startWithBypass:pdReplayRun];
