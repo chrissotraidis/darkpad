@@ -100,6 +100,21 @@ static BOOL pdGeoIsPhone(void)
 	return UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone;
 }
 
+// Where a portrait-shaped game view is always wrong: an iPhone (landscape only),
+// and any window on an external display (a TV is landscape, yet iPadOS labels
+// its scene "portrait", so SDL 2.32.8 lays the view out 720x1280 in a 1280x720
+// window and half the picture is off screen). On the iPad's own screen portrait
+// is a real orientation, so the repair stays off there.
+static BOOL pdGeoRepairApplies(void)
+{
+	if (pdGeoIsPhone()) {
+		return YES;
+	}
+	UIView *host = (__bridge UIView *)pdAngleGetHostView();
+	UIScreen *screen = host.window.windowScene.screen;
+	return screen != nil && screen != UIScreen.mainScreen;
+}
+
 static UIWindowScene *pdGeoScene(UIWindow *win)
 {
 	if (win.windowScene) {
@@ -299,7 +314,7 @@ int pdGeoRepairEnabled = 1;
 
 int pdGeoRepair(const char *why)
 {
-	if (!pdGeoIsPhone() || !pdGeoRepairEnabled || sRepairGaveUp) {
+	if (!pdGeoRepairApplies() || !pdGeoRepairEnabled || sRepairGaveUp) {
 		return 0;
 	}
 	UIView *host = (__bridge UIView *)pdAngleGetHostView();
@@ -408,7 +423,7 @@ void pdGeoFrame(void)
 	int ew = 0, eh = 0;
 	pdAngleGetDrawableSize(&ew, &eh);
 	pdGeoQuietSummary();
-	if (pdGeoIsPhone() && ew > 0 && eh > 0 && ew < eh) {
+	if (pdGeoRepairApplies() && ew > 0 && eh > 0 && ew < eh) {
 		sPortraitFrames++;
 		pdGeoLogIfChanged("frame", NO);
 		pdGeoRepair("portrait EGL surface at a frame");
@@ -416,7 +431,7 @@ void pdGeoFrame(void)
 		// A portrait SDL view whose surface has not caught up yet is the same
 		// fault one frame earlier.
 		UIView *host = (__bridge UIView *)pdAngleGetHostView();
-		if (pdGeoIsPhone() && host.window && host.bounds.size.width < host.bounds.size.height) {
+		if (pdGeoRepairApplies() && host.window && host.bounds.size.width < host.bounds.size.height) {
 			pdGeoLogIfChanged("frame", NO);
 			pdGeoRepair("portrait SDL view at a frame");
 		} else {
