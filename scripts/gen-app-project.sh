@@ -17,7 +17,11 @@ DEVIT="$(tr -d ' \n' < DEV_ITERATION)"
 [ -n "$PUBVER" ] || { echo "FATAL: VERSION is empty" >&2; exit 1; }
 [ -n "$DEVIT" ] || { echo "FATAL: DEV_ITERATION is empty" >&2; exit 1; }
 if [ "$DEVIT" = "0" ]; then MARKETING="$PUBVER"; else MARKETING="$PUBVER.$DEVIT"; fi
-BUILDNUM="$(date -u +%Y%m%d%H%M)"
+if [ "$DEVIT" = "0" ]; then
+  BUILDNUM="$(tr -d ' \n' < BUILD_NUMBER)"
+else
+  BUILDNUM="$(date -u +%Y%m%d%H%M)"
+fi
 
 test -d work/angle-xcframeworks/libEGL.xcframework || scripts/make-angle-xcframeworks.sh
 test -f work/deps-iphonesimulator/lib/libSDL2.a || test -f work/deps-iphoneos/lib/libSDL2.a \
